@@ -54,7 +54,7 @@ class PubSourcesGenerator {
               'https://pub.dartlang.org/packages/$name/versions/$version.tar.gz',
           sha256: sha256,
           dest: '.pub-cache/hosted/pub.dev/$name-$version',
-          stripComponents: 1,
+          stripComponents: 0,
         );
       }));
       entries.addAll(results);
