@@ -163,9 +163,19 @@ class FlutterSdkGenerator {
   String _urlFor(
       _Artifact art, String engineHash, String fontsHash, String gradleHash) {
     if (art.path == '__fonts__') {
+      // Newer Flutter stores a full GCS path in material_fonts.version
+      // (e.g. "flutter_infra_release/flutter/fonts/<hash>/fonts.zip")
+      // instead of just the bare hash.
+      if (fontsHash.contains('/')) {
+        return 'https://storage.googleapis.com/$fontsHash';
+      }
       return '$_infraBase/flutter/fonts/$fontsHash/fonts.zip';
     }
     if (art.path == '__gradle__') {
+      // Same pattern may apply to gradle_wrapper.version.
+      if (gradleHash.contains('/')) {
+        return 'https://storage.googleapis.com/$gradleHash';
+      }
       return '$_infraBase/gradle-wrapper/$gradleHash/gradle-wrapper.tgz';
     }
     return '$_infraBase/flutter/$engineHash/${art.path}';
