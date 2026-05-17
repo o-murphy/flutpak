@@ -1,0 +1,25 @@
+name: flatpak_gen
+description: >
+  Generate Flatpak source manifests for Flutter/Dart applications.
+  Produces generated-sources.json (pub packages + Flutter SDK) and
+  Flutter SDK Extension manifests for Flathub.
+version: 0.1.0
+repository: https://github.com/o-murphy/flatpak_gen
+
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+
+dependencies:
+  args: ^2.5.0
+  crypto: ^3.0.0
+  glob: ^2.1.2
+  http: ^1.2.0
+  path: ^1.9.0
+  yaml: ^3.1.2
+
+dev_dependencies:
+  lints: ^3.0.0
+  test: ^1.24.0
+
+executables:
+  flatpak_gen: flatpak_gen
