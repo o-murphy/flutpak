@@ -1,7 +1,5 @@
-import 'dart:convert';
 import 'dart:io';
 import 'package:path/path.dart' as p;
-import '../models/flatpak_source.dart';
 import '../utils/download_cache.dart';
 import 'flutter_sdk.dart';
 

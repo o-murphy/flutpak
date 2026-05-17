@@ -47,7 +47,7 @@ class FlutterCommand extends Command<void> {
     final cache = LocalDownloadCache();
     try {
       final gen = FlutterSdkGenerator(
-        sdkPath: sdkPath!,
+        sdkPath: sdkPath,
         patchPath: patchPath,
         cache: cache,
       );

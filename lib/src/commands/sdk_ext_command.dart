@@ -54,7 +54,7 @@ class SdkExtCommand extends Command<void> {
     final cache = LocalDownloadCache();
     try {
       final gen = SdkExtensionGenerator(
-        sdkPath: sdkPath!,
+        sdkPath: sdkPath,
         runtimeVersion: runtimeVersion,
         patchPath: patchPath,
         cache: cache,

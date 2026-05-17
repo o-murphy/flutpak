@@ -5,19 +5,11 @@ import '../utils/download_cache.dart';
 
 /// Describes one artifact entry in the Flutter engine infra.
 class _Artifact {
-  final String path;        // relative URL path after engine hash
-  final String dest;        // flatpak dest directory
-  final int stripComponents;
+  final String path;
+  final String dest;
   final List<String>? onlyArches;
-  final bool isFile;        // type: file vs type: archive
 
-  const _Artifact(
-    this.path,
-    this.dest, {
-    this.stripComponents = 0,
-    this.onlyArches,
-    this.isFile = false,
-  });
+  const _Artifact(this.path, this.dest, {this.onlyArches});
 }
 
 const String _infraBase =
@@ -76,21 +68,13 @@ class FlutterSdkGenerator {
       final url = _urlFor(art, engineHash, fontsHash, gradleHash);
       final sha256 = await _cache.sha256For(url);
 
-      if (art.isFile) {
-        sources.add(FileSource(
-          url: url,
-          sha256: sha256,
-          dest: art.dest,
-        ));
-      } else {
-        sources.add(ArchiveSource(
-          url: url,
-          sha256: sha256,
-          dest: art.dest,
-          stripComponents: art.stripComponents,
-          onlyArches: art.onlyArches,
-        ));
-      }
+      sources.add(ArchiveSource(
+        url: url,
+        sha256: sha256,
+        dest: art.dest,
+        stripComponents: 0,
+        onlyArches: art.onlyArches,
+      ));
     }
 
     // 3. patch for shared.sh (forces --offline in pub upgrade)
@@ -187,14 +171,9 @@ class FlutterSdkGenerator {
     return '$_infraBase/flutter/$engineHash/${art.path}';
   }
 
-  static String _gitRevParse(String repoPath) {
-    final result = Process.runSync(
-      'git',
-      ['-C', repoPath, 'rev-parse', 'HEAD'],
-    );
-    if (result.exitCode != 0) {
-      throw Exception('git rev-parse failed in $repoPath: ${result.stderr}');
-    }
+  static String? _gitRevParse(String repoPath) {
+    final result = Process.runSync('git', ['-C', repoPath, 'rev-parse', 'HEAD']);
+    if (result.exitCode != 0) return null;
     return (result.stdout as String).trim();
   }
 }

@@ -8,7 +8,7 @@ import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 
 /// Fake SHA-256 (64 hex chars) returned by the mock API.
-const _fakeSha256 = 'a' * 64;
+const _fakeSha256 = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 
 http.Client _mockPubDevClient() => MockClient((request) async {
       expect(request.url.host, 'pub.dev');
