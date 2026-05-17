@@ -44,7 +44,7 @@ class FlutterCommand extends Command<void> {
     final output = argResults!['output'] as String? ?? cfg.output;
     final patchPath = argResults!['patch'] as String? ?? cfg.patchPath;
 
-    final cache = DownloadCache();
+    final cache = LocalDownloadCache();
     try {
       final gen = FlutterSdkGenerator(
         sdkPath: sdkPath!,

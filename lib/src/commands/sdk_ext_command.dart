@@ -51,7 +51,7 @@ class SdkExtCommand extends Command<void> {
     final output = argResults!['output'] as String;
     final patchPath = argResults!['patch'] as String? ?? cfg.patchPath;
 
-    final cache = DownloadCache();
+    final cache = LocalDownloadCache();
     try {
       final gen = SdkExtensionGenerator(
         sdkPath: sdkPath!,

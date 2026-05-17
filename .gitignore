@@ -1,3 +1,5 @@
 .dart_tool/
 pubspec.lock
 build/
+.git
+test/fixtures/flutter_sdk/.git

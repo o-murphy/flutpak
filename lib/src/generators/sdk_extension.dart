@@ -28,7 +28,7 @@ class SdkExtensionGenerator {
     required this.runtimeVersion,
     this.patchPath,
     DownloadCache? cache,
-  }) : _cache = cache ?? DownloadCache();
+  }) : _cache = cache ?? LocalDownloadCache();
 
   Future<Map<String, dynamic>> generate() async {
     final flutterTag =

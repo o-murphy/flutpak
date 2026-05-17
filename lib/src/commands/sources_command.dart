@@ -52,7 +52,7 @@ class SourcesCommand extends Command<void> {
     final flutterOnly = argResults!['flutter-only'] as bool;
 
     final allSources = <Map<String, dynamic>>[];
-    final cache = DownloadCache();
+    final cache = LocalDownloadCache();
 
     try {
       if (!flutterOnly) {

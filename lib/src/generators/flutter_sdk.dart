@@ -37,7 +37,7 @@ class FlutterSdkGenerator {
     required this.sdkPath,
     this.patchPath,
     DownloadCache? cache,
-  }) : _cache = cache ?? DownloadCache();
+  }) : _cache = cache ?? LocalDownloadCache();
 
   /// Returns flatpak sources representing the full Flutter SDK for offline builds.
   ///

@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    name: Analyze & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+
+      - name: Install dependencies
+        run: dart pub get
+
+      - name: Analyze
+        run: dart analyze --fatal-infos
+
+      - name: Run tests
+        run: dart test --reporter=expanded
+
+  # Verify the executable compiles correctly
+  compile:
+    name: Compile binary
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+
+      - run: dart pub get
+
+      - name: Compile
+        run: dart compile exe bin/flatpak_gen.dart -o /tmp/flatpak_gen
+
+      - name: Smoke test — help
+        run: /tmp/flatpak_gen --help
+
+      - name: Smoke test — pub --help
+        run: /tmp/flatpak_gen pub --help
+
+      - name: Smoke test — sdk-ext --help
+        run: /tmp/flatpak_gen sdk-ext --help
