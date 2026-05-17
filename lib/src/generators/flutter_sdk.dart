@@ -175,26 +175,29 @@ class FlutterSdkGenerator {
   ///
   /// Tries in order:
   ///   1. `flutter/version` — legacy flat file (Flutter < ~3.32)
-  ///   2. `flutter/pubspec.yaml` — new monorepo layout (Flutter ≥ ~3.32)
-  ///   3. `git describe --tags --abbrev=0` — last resort
+  ///   2. `git describe --tags --abbrev=0` — works for any tagged git clone
+  ///   3. `flutter/packages/flutter/pubspec.yaml` — inner package version
   static String _readFlutterVersion(String sdkPath) {
     final versionFile = File(p.join(sdkPath, 'version'));
     if (versionFile.existsSync()) return versionFile.readAsStringSync().trim();
 
-    final pubspecFile = File(p.join(sdkPath, 'pubspec.yaml'));
-    if (pubspecFile.existsSync()) {
-      final yaml = loadYaml(pubspecFile.readAsStringSync());
+    final gitResult = Process.runSync(
+        'git', ['-C', sdkPath, 'describe', '--tags', '--abbrev=0']);
+    if (gitResult.exitCode == 0) {
+      return (gitResult.stdout as String).trim();
+    }
+
+    // Fall back to the inner flutter package pubspec.yaml.
+    final innerPubspec =
+        File(p.join(sdkPath, 'packages', 'flutter', 'pubspec.yaml'));
+    if (innerPubspec.existsSync()) {
+      final yaml = loadYaml(innerPubspec.readAsStringSync());
       if (yaml is Map && yaml['version'] != null) {
         return yaml['version'].toString();
       }
     }
 
-    final result = Process.runSync(
-        'git', ['-C', sdkPath, 'describe', '--tags', '--abbrev=0']);
-    if (result.exitCode == 0) return (result.stdout as String).trim();
-
-    throw Exception('Cannot determine Flutter version from $sdkPath. '
-        'Expected flutter/version or flutter/pubspec.yaml with version field.');
+    throw Exception('Cannot determine Flutter version from $sdkPath');
   }
 
   static String? _gitRevParse(String repoPath) {

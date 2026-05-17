@@ -94,14 +94,11 @@ runs:
           exit 1
         fi
 
-        # Version: legacy flat file OR new monorepo pubspec.yaml.
-        if [ -f "$FLUTTER_PATH/version" ]; then
-          echo "Flutter version (version file): $(cat $FLUTTER_PATH/version)"
-        elif [ -f "$FLUTTER_PATH/pubspec.yaml" ]; then
-          VERSION=$(grep '^version:' "$FLUTTER_PATH/pubspec.yaml" | head -1 | awk '{print $2}')
-          echo "Flutter version (pubspec.yaml): $VERSION"
-        else
-          echo "WARNING: cannot determine Flutter version"
-        fi
-
-        echo "Engine: $(cat $FLUTTER_PATH/bin/internal/engine.version 2>/dev/null || echo 'not found')"
+        # Print version from whatever source is available.
+        FLUTTER_VERSION=$(
+          cat "$FLUTTER_PATH/version" 2>/dev/null ||
+          git -C "$FLUTTER_PATH" describe --tags --abbrev=0 2>/dev/null ||
+          echo "unknown"
+        )
+        echo "Flutter version: $FLUTTER_VERSION"
+        echo "Engine: $(cat "$FLUTTER_PATH/bin/internal/engine.version" 2>/dev/null || echo 'not found')"
