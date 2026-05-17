@@ -6,10 +6,10 @@ on:
   pull_request:
 
 jobs:
+  # ── Lint + unit tests ────────────────────────────────────────────────────────
   test:
-    name: Analyze & Test
+    name: Analyze & Unit tests
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
 
@@ -23,14 +23,16 @@ jobs:
       - name: Analyze
         run: dart analyze --fatal-infos
 
-      - name: Run tests
-        run: dart test --reporter=expanded
+      - name: Unit tests
+        run: dart test --exclude-tags "integration,flutter" --reporter=expanded
 
-  # Verify the executable compiles correctly
-  compile:
-    name: Compile binary
+      - name: Golden tests
+        run: dart test test/golden_test.dart --reporter=expanded
+
+  # ── Integration tests (real pub.dev network) ─────────────────────────────────
+  integration:
+    name: Integration tests (pub.dev)
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
 
@@ -38,7 +40,48 @@ jobs:
         with:
           sdk: stable
 
-      - run: dart pub get
+      - name: Install dependencies
+        run: dart pub get
+
+      - name: Integration tests
+        run: dart test --tags integration --reporter=expanded
+
+  # ── Flutter SDK tests (real Flutter clone) ───────────────────────────────────
+  flutter:
+    name: Flutter SDK tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+
+      - name: Setup Flutter
+        uses: ./.github/actions/flutter
+        with:
+          flutter-version: stable
+          cache: true
+
+      - name: Install dependencies
+        run: dart pub get
+
+      - name: Flutter SDK tests
+        run: dart test --tags flutter --reporter=expanded
+
+  # ── Compile + smoke tests ────────────────────────────────────────────────────
+  compile:
+    name: Compile & Smoke tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+
+      - name: Install dependencies
+        run: dart pub get
 
       - name: Compile
         run: dart compile exe bin/flatpak_gen.dart -o /tmp/flatpak_gen
@@ -51,3 +94,12 @@ jobs:
 
       - name: Smoke test — sdk-ext --help
         run: /tmp/flatpak_gen sdk-ext --help
+
+      - name: Smoke test — pub sources (real pub.dev)
+        run: |
+          /tmp/flatpak_gen pub \
+            --lock test/fixtures/simple.lock \
+            --output /tmp/smoke-sources.json
+          COUNT=$(python3 -c "import json; d=json.load(open('/tmp/smoke-sources.json')); print(len(d))")
+          [ "$COUNT" -eq 3 ] || { echo "Expected 3 entries, got $COUNT"; exit 1; }
+          echo "pub smoke test passed: $COUNT entries"
