@@ -54,14 +54,24 @@ runs:
         restore-keys: |
           flutter-${{ runner.os }}-${{ runner.arch }}-
 
-    - name: Clone Flutter
-      if: steps.cache-flutter.outputs.cache-hit != 'true'
+    - name: Clone or repair Flutter SDK
       shell: bash
       run: |
-        git clone --depth ${{ steps.resolve-version.outputs.depth }} \
-          --branch ${{ steps.resolve-version.outputs.branch }} \
-          https://github.com/flutter/flutter.git \
-          "${{ steps.get-path.outputs.flutter-path }}"
+        FLUTTER_PATH="${{ steps.get-path.outputs.flutter-path }}"
+        BRANCH="${{ steps.resolve-version.outputs.branch }}"
+        DEPTH="${{ steps.resolve-version.outputs.depth }}"
+
+        # Re-clone if the SDK is missing or incomplete (cache may be stale).
+        if [ ! -f "$FLUTTER_PATH/version" ]; then
+          echo "Flutter SDK missing or incomplete — cloning branch=$BRANCH"
+          rm -rf "$FLUTTER_PATH"
+          git clone --depth "$DEPTH" \
+            --branch "$BRANCH" \
+            https://github.com/flutter/flutter.git \
+            "$FLUTTER_PATH"
+        fi
+
+        echo "Flutter version: $(cat $FLUTTER_PATH/version)"
 
     - name: Set environment
       shell: bash

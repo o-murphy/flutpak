@@ -95,6 +95,9 @@ jobs:
       - name: Smoke test — sdk-ext --help
         run: /tmp/flatpak_gen sdk-ext --help
 
+      - name: Smoke test — manifest --help
+        run: /tmp/flatpak_gen manifest --help
+
       - name: Smoke test — pub sources (real pub.dev)
         run: |
           /tmp/flatpak_gen pub \
