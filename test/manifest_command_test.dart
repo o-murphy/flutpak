@@ -128,26 +128,13 @@ modules:
 // ── CLI runner helper ──────────────────────────────────────────────────────
 
 Future<_Result> _runCli(List<String> args) async {
-  final dart = Platform.executable;
-  // Run via `dart run` so we pick up the local package without compiling.
+  // dart test runs with cwd = package root, so no workingDirectory needed.
   final result = await Process.run(
-    dart,
+    Platform.executable,
     ['run', 'bin/flatpak_gen.dart', ...args],
-    workingDirectory: _packageRoot(),
   );
   return _Result(result.exitCode, result.stdout as String,
       result.stderr as String);
-}
-
-String _packageRoot() {
-  // Resolve from the test file location: test/ → package root
-  var dir = Directory(p.dirname(Platform.script.toFilePath()));
-  while (!File(p.join(dir.path, 'pubspec.yaml')).existsSync()) {
-    final parent = dir.parent;
-    if (parent.path == dir.path) throw StateError('pubspec.yaml not found');
-    dir = parent;
-  }
-  return dir.path;
 }
 
 class _Result {

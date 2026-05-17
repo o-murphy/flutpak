@@ -82,6 +82,15 @@ runs:
         echo "$FLUTTER_PATH/bin" >> $GITHUB_PATH
         echo "PUB_CACHE=$RUNNER_TEMP/pub-cache" >> $GITHUB_ENV
 
-    - name: Verify Flutter
+    - name: Verify Flutter SDK
       shell: bash
-      run: flutter --version
+      run: |
+        FLUTTER_PATH="${{ steps.get-path.outputs.flutter-path }}"
+        if [ ! -f "$FLUTTER_PATH/version" ]; then
+          echo "ERROR: Flutter SDK is still incomplete after setup."
+          echo "Contents of $FLUTTER_PATH:"
+          ls -la "$FLUTTER_PATH" 2>/dev/null || echo "(directory empty or missing)"
+          exit 1
+        fi
+        echo "Flutter SDK OK: $(cat $FLUTTER_PATH/version)"
+        echo "Engine: $(cat $FLUTTER_PATH/bin/internal/engine.version)"
