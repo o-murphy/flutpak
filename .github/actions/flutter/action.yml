@@ -62,7 +62,8 @@ runs:
         DEPTH="${{ steps.resolve-version.outputs.depth }}"
 
         # Re-clone if the SDK is missing or incomplete (cache may be stale).
-        if [ ! -f "$FLUTTER_PATH/version" ]; then
+        # Use the flutter tool binary as the existence check — it's always present.
+        if [ ! -f "$FLUTTER_PATH/bin/flutter" ]; then
           echo "Flutter SDK missing or incomplete — cloning branch=$BRANCH"
           rm -rf "$FLUTTER_PATH"
           git clone --depth "$DEPTH" \
@@ -70,8 +71,6 @@ runs:
             https://github.com/flutter/flutter.git \
             "$FLUTTER_PATH"
         fi
-
-        echo "Flutter version: $(cat $FLUTTER_PATH/version)"
 
     - name: Set environment
       shell: bash
@@ -86,11 +85,23 @@ runs:
       shell: bash
       run: |
         FLUTTER_PATH="${{ steps.get-path.outputs.flutter-path }}"
-        if [ ! -f "$FLUTTER_PATH/version" ]; then
+
+        # Must have the Flutter tool entry-point.
+        if [ ! -f "$FLUTTER_PATH/bin/flutter" ]; then
           echo "ERROR: Flutter SDK is still incomplete after setup."
           echo "Contents of $FLUTTER_PATH:"
           ls -la "$FLUTTER_PATH" 2>/dev/null || echo "(directory empty or missing)"
           exit 1
         fi
-        echo "Flutter SDK OK: $(cat $FLUTTER_PATH/version)"
-        echo "Engine: $(cat $FLUTTER_PATH/bin/internal/engine.version)"
+
+        # Version: legacy flat file OR new monorepo pubspec.yaml.
+        if [ -f "$FLUTTER_PATH/version" ]; then
+          echo "Flutter version (version file): $(cat $FLUTTER_PATH/version)"
+        elif [ -f "$FLUTTER_PATH/pubspec.yaml" ]; then
+          VERSION=$(grep '^version:' "$FLUTTER_PATH/pubspec.yaml" | head -1 | awk '{print $2}')
+          echo "Flutter version (pubspec.yaml): $VERSION"
+        else
+          echo "WARNING: cannot determine Flutter version"
+        fi
+
+        echo "Engine: $(cat $FLUTTER_PATH/bin/internal/engine.version 2>/dev/null || echo 'not found')"

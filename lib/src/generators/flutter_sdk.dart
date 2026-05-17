@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:path/path.dart' as p;
+import 'package:yaml/yaml.dart';
 import '../models/flatpak_source.dart';
 import '../utils/download_cache.dart';
 
@@ -46,8 +47,7 @@ class FlutterSdkGenerator {
     final gradleHash = File(p.join(internalDir, 'gradle_wrapper.version'))
         .readAsStringSync()
         .trim();
-    final flutterTag =
-        File(p.join(sdkPath, 'version')).readAsStringSync().trim();
+    final flutterTag = _readFlutterVersion(sdkPath);
     final flutterCommit = _gitRevParse(sdkPath);
 
     stderr.writeln('flutter: version=$flutterTag engine=$engineHash');
@@ -169,6 +169,32 @@ class FlutterSdkGenerator {
       return '$_infraBase/gradle-wrapper/$gradleHash/gradle-wrapper.tgz';
     }
     return '$_infraBase/flutter/$engineHash/${art.path}';
+  }
+
+  /// Reads the Flutter SDK version tag.
+  ///
+  /// Tries in order:
+  ///   1. `flutter/version` — legacy flat file (Flutter < ~3.32)
+  ///   2. `flutter/pubspec.yaml` — new monorepo layout (Flutter ≥ ~3.32)
+  ///   3. `git describe --tags --abbrev=0` — last resort
+  static String _readFlutterVersion(String sdkPath) {
+    final versionFile = File(p.join(sdkPath, 'version'));
+    if (versionFile.existsSync()) return versionFile.readAsStringSync().trim();
+
+    final pubspecFile = File(p.join(sdkPath, 'pubspec.yaml'));
+    if (pubspecFile.existsSync()) {
+      final yaml = loadYaml(pubspecFile.readAsStringSync());
+      if (yaml is Map && yaml['version'] != null) {
+        return yaml['version'].toString();
+      }
+    }
+
+    final result = Process.runSync(
+        'git', ['-C', sdkPath, 'describe', '--tags', '--abbrev=0']);
+    if (result.exitCode == 0) return (result.stdout as String).trim();
+
+    throw Exception('Cannot determine Flutter version from $sdkPath. '
+        'Expected flutter/version or flutter/pubspec.yaml with version field.');
   }
 
   static String? _gitRevParse(String repoPath) {
