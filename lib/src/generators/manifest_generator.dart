@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'package:path/path.dart' as p;
 import '../config.dart';
-import '../patches_registry.dart';
 
 const String tagPlaceholder = '__FLATPAK_TAG__';
 const String commitPlaceholder = '__FLATPAK_COMMIT__';
@@ -150,7 +149,7 @@ class ManifestGenerator {
     buf.writeln('      - mkdir -p /app/$appName');
     buf.writeln('      - cp -r "\$BUNDLE_PATH"/. /app/$appName/');
     buf.writeln(
-        '      - install -Dm755 flatpak/${appName}-wrapper.sh /app/bin/${cfg.command}');
+        '      - install -Dm755 flatpak/$appName-wrapper.sh /app/bin/${cfg.command}');
     buf.writeln(
         '      - install -Dm644 flatpak/${cfg.appId}.desktop'
         ' /app/share/applications/${cfg.appId}.desktop');

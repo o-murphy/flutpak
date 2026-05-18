@@ -58,7 +58,7 @@ class PrepareCommand extends Command<void> {
     final flutterOnly = argResults!['flutter-only'] as bool;
 
     // ── 1. Resolve patch entries ─────────────────────────────────────────────
-    final patchesDir = p.dirname(p.absolute(cfg.output)) + '/patches';
+    final patchesDir = '${p.dirname(p.absolute(cfg.output))}/patches';
     final patchEntries = resolvePatchEntries(
       lockPaths: cfg.pubLocks,
       patchesDir: patchesDir,
@@ -98,8 +98,6 @@ class PrepareCommand extends Command<void> {
           manifestFile: manifestFile,
           tag: tag,
           commit: commit,
-          patchEntries: patchEntries,
-          generatedSourcesPath: cfg.output,
         );
         stderr.writeln('✓  manifest updated: $manifestPath');
       }
@@ -187,15 +185,13 @@ class PrepareCommand extends Command<void> {
     required File manifestFile,
     required String? tag,
     required String? commit,
-    required List<PatchEntry> patchEntries,
-    required String generatedSourcesPath,
   }) {
-    var content = manifestFile.readAsStringSync();
-
-    if (commit != null) {
-      content = patchManifestPlaceholders(content, commit: commit, tag: tag);
-    }
-
+    if (commit == null) return;
+    final content = patchManifestPlaceholders(
+      manifestFile.readAsStringSync(),
+      commit: commit,
+      tag: tag,
+    );
     manifestFile.writeAsStringSync(content);
   }
 
