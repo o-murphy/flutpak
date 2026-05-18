@@ -16,19 +16,48 @@ class _Artifact {
 const String _infraBase =
     'https://storage.googleapis.com/flutter_infra_release';
 
+/// Patch content to replace `pub upgrade` with `pub get --offline` inside
+/// Flutter's shared.sh bootstrap function.  Applied automatically when no
+/// explicit [patchPath] is given to [FlutterSdkGenerator].
+const String builtinSharedShPatch = r'''
+--- a/flutter/bin/internal/shared.sh
++++ b/flutter/bin/internal/shared.sh
+@@ -20,8 +20,8 @@ function pub_upgrade_with_retry {
+   local total_tries="10"
+   local remaining_tries=$((total_tries - 1))
+   while [[ "$remaining_tries" -gt 0 ]]; do
+-    (cd "$FLUTTER_TOOLS_DIR" && "$DART" pub upgrade --suppress-analytics >&2) && break
+-    >&2 echo "Error: Unable to 'pub upgrade' flutter tool. Retrying in five seconds... ($remaining_tries tries left)"
++    (cd "$FLUTTER_TOOLS_DIR" && "$DART" pub get --offline --suppress-analytics >&2) && break
++    >&2 echo "Error: Unable to 'pub get --offline' flutter tool. Retrying in five seconds... ($remaining_tries tries left)"
+     remaining_tries=$((remaining_tries - 1))
+     sleep 5
+''';
+
+/// Default relative path (from the output dir) where the built-in patch is
+/// written when no explicit [patchPath] is provided.
+const String defaultSharedShPatchPath = 'patches/flutter/shared.sh.patch';
+
 /// Generates Flutter SDK [FlatpakSource] entries from a local Flutter SDK install.
 ///
 /// Reads version files from [sdkPath] to determine the engine hash, fonts hash
 /// and gradle wrapper hash, then constructs all artifact entries.
 /// SHA-256 checksums are fetched by downloading each artifact (cached locally).
+///
+/// If [patchPath] is null, the built-in [builtinSharedShPatch] is written to
+/// [defaultSharedShPatchPath] relative to [outputDir] and included automatically.
+/// Pass an explicit [patchPath] to override, or set [outputDir] to null to skip
+/// the patch entirely (not recommended for Flatpak offline builds).
 class FlutterSdkGenerator {
   final String sdkPath;
-  final String? patchPath; // relative path to the shared.sh patch, if any
+  final String? patchPath;
+  final String? outputDir;
   final DownloadCache _cache;
 
   FlutterSdkGenerator({
     required this.sdkPath,
     this.patchPath,
+    this.outputDir,
     DownloadCache? cache,
   }) : _cache = cache ?? LocalDownloadCache();
 
@@ -77,9 +106,10 @@ class FlutterSdkGenerator {
       ));
     }
 
-    // 3. patch for shared.sh (forces --offline in pub upgrade)
-    if (patchPath != null) {
-      sources.add(PatchSource(path: patchPath!));
+    // 3. patch for shared.sh (replaces pub upgrade with pub get --offline)
+    final effectivePatchPath = _resolveOrWritePatch();
+    if (effectivePatchPath != null) {
+      sources.add(PatchSource(path: effectivePatchPath));
     }
 
     // 4. setup-flutter.sh script helper
@@ -100,6 +130,23 @@ class FlutterSdkGenerator {
     ));
 
     return sources;
+  }
+
+  /// Returns the patch path to embed in the source list.
+  ///
+  /// - If [patchPath] was provided explicitly: returns it as-is.
+  /// - If [outputDir] is set: writes [builtinSharedShPatch] to
+  ///   `outputDir/defaultSharedShPatchPath` and returns the relative path.
+  /// - Otherwise: returns null (no patch included).
+  String? _resolveOrWritePatch() {
+    if (patchPath != null) return patchPath;
+    if (outputDir == null) return null;
+
+    final target = File(p.join(outputDir!, defaultSharedShPatchPath));
+    target.createSync(recursive: true);
+    target.writeAsStringSync(builtinSharedShPatch);
+    stderr.writeln('flutter: wrote built-in shared.sh patch → ${target.path}');
+    return defaultSharedShPatchPath;
   }
 
   List<_Artifact> _buildArtifactList(
