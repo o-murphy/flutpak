@@ -25,7 +25,7 @@ void main() {
       p.join(Directory.current.path, 'test', 'fixtures', 'simple.lock');
 
   group('PubSourcesGenerator', () {
-    test('generates one entry per hosted package', () async {
+    test('generates two entries per hosted package (archive + inline)', () async {
       final gen = PubSourcesGenerator(
         lockFilePaths: [lockFile],
         client: _mockPubDevClient(),
@@ -33,17 +33,19 @@ void main() {
       final sources = await gen.generate();
 
       // simple.lock has 3 hosted packages (yaml, collection, path)
-      // sdk_dep is source: sdk — must be excluded
-      expect(sources, hasLength(3));
+      // each produces 1 ArchiveSource + 1 InlineSource = 6 total
+      expect(sources, hasLength(6));
+      expect(sources.whereType<ArchiveSource>(), hasLength(3));
+      expect(sources.whereType<InlineSource>(), hasLength(3));
     });
 
-    test('each entry has correct flatpak format', () async {
+    test('each archive entry has correct flatpak format', () async {
       final gen = PubSourcesGenerator(
         lockFilePaths: [lockFile],
         client: _mockPubDevClient(),
       );
       final sources = await gen.generate();
-      final yaml = sources.firstWhere(
+      final yaml = sources.whereType<ArchiveSource>().firstWhere(
           (s) => s.url.contains('/yaml/versions/'));
 
       expect(yaml.toJson(), {
@@ -56,13 +58,30 @@ void main() {
       });
     });
 
+    test('each inline entry has correct flatpak format', () async {
+      final gen = PubSourcesGenerator(
+        lockFilePaths: [lockFile],
+        client: _mockPubDevClient(),
+      );
+      final sources = await gen.generate();
+      final yamlHash = sources.whereType<InlineSource>().firstWhere(
+          (s) => s.destFilename.contains('yaml-'));
+
+      expect(yamlHash.toJson(), {
+        'type': 'inline',
+        'contents': _fakeSha256,
+        'dest': '.pub-cache/hosted-hashes/pub.dev',
+        'dest-filename': 'yaml-3.1.2.sha256',
+      });
+    });
+
     test('deduplicates packages across multiple lock files', () async {
       final gen = PubSourcesGenerator(
         lockFilePaths: [lockFile, lockFile], // same file twice
         client: _mockPubDevClient(),
       );
       final sources = await gen.generate();
-      expect(sources, hasLength(3)); // still 3, not 6
+      expect(sources, hasLength(6)); // still 3 packages = 6 entries
     });
 
     test('skips missing lock files with a warning', () async {
@@ -70,9 +89,8 @@ void main() {
         lockFilePaths: [lockFile, 'nonexistent.lock'],
         client: _mockPubDevClient(),
       );
-      // Should not throw
       final sources = await gen.generate();
-      expect(sources, hasLength(3));
+      expect(sources, hasLength(6));
     });
   });
 }

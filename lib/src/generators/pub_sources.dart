@@ -16,7 +16,7 @@ class PubSourcesGenerator {
     http.Client? client,
   }) : _client = client ?? http.Client();
 
-  Future<List<ArchiveSource>> generate() async {
+  Future<List<FlatpakSource>> generate() async {
     final packages = <String, String>{}; // name → version (deduped)
 
     for (final raw in lockFilePaths) {
@@ -37,7 +37,7 @@ class PubSourcesGenerator {
 
     stderr.writeln('pub: ${packages.length} unique hosted packages');
 
-    final entries = <ArchiveSource>[];
+    final entries = <FlatpakSource>[];
     var done = 0;
 
     // Batch parallel requests — pub.dev can handle concurrency.
@@ -49,15 +49,24 @@ class PubSourcesGenerator {
       final results = await Future.wait(batch.map((name) async {
         final version = packages[name]!;
         final sha256 = await _fetchSha256(name, version);
-        return ArchiveSource(
-          url:
-              'https://pub.dartlang.org/packages/$name/versions/$version.tar.gz',
-          sha256: sha256,
-          dest: '.pub-cache/hosted/pub.dev/$name-$version',
-          stripComponents: 0,
-        );
+        return [
+          ArchiveSource(
+            url:
+                'https://pub.dartlang.org/packages/$name/versions/$version.tar.gz',
+            sha256: sha256,
+            dest: '.pub-cache/hosted/pub.dev/$name-$version',
+            stripComponents: 0,
+          ),
+          InlineSource(
+            contents: sha256,
+            dest: '.pub-cache/hosted-hashes/pub.dev',
+            destFilename: '$name-$version.sha256',
+          ),
+        ];
       }));
-      entries.addAll(results);
+      for (final pair in results) {
+        entries.addAll(pair);
+      }
       done += batch.length;
       stderr.writeln('  pub: $done / ${packages.length}');
     }

@@ -7,6 +7,12 @@
     "strip-components": 0
   },
   {
+    "type": "inline",
+    "contents": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "dest": ".pub-cache/hosted-hashes/pub.dev",
+    "dest-filename": "yaml-3.1.2.sha256"
+  },
+  {
     "type": "archive",
     "url": "https://pub.dartlang.org/packages/collection/versions/1.18.0.tar.gz",
     "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
@@ -14,10 +20,22 @@
     "strip-components": 0
   },
   {
+    "type": "inline",
+    "contents": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "dest": ".pub-cache/hosted-hashes/pub.dev",
+    "dest-filename": "collection-1.18.0.sha256"
+  },
+  {
     "type": "archive",
     "url": "https://pub.dartlang.org/packages/path/versions/1.9.0.tar.gz",
     "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     "dest": ".pub-cache/hosted/pub.dev/path-1.9.0",
     "strip-components": 0
+  },
+  {
+    "type": "inline",
+    "contents": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "dest": ".pub-cache/hosted-hashes/pub.dev",
+    "dest-filename": "path-1.9.0.sha256"
   }
 ]

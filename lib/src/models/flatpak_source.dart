@@ -97,6 +97,26 @@ final class ScriptSource extends FlatpakSource {
       };
 }
 
+final class InlineSource extends FlatpakSource {
+  final String contents;
+  final String dest;
+  final String destFilename;
+
+  InlineSource({
+    required this.contents,
+    required this.dest,
+    required this.destFilename,
+  });
+
+  @override
+  Map<String, dynamic> toJson() => {
+        'type': 'inline',
+        'contents': contents,
+        'dest': dest,
+        'dest-filename': destFilename,
+      };
+}
+
 final class PatchSource extends FlatpakSource {
   final String path;
   final String? dest;
