@@ -236,9 +236,11 @@ class FlatpakGenConfig {
   ///
   /// Throws if both sources are found (ambiguous config).
   /// Falls back to sensible defaults if neither exists.
-  static FlatpakGenConfig load([String configPath = 'flatpak_gen.yaml']) {
-    final pubspecFile = File('pubspec.yaml');
-    final configFile = File(configPath);
+  static FlatpakGenConfig load(
+      [String configPath = 'flatpak_gen.yaml', String? workingDir]) {
+    final dir = workingDir ?? Directory.current.path;
+    final pubspecFile = File(p.join(dir, 'pubspec.yaml'));
+    final configFile = File(p.join(dir, configPath));
 
     final hasPubspecSection = _hasFlatpakGenSection(pubspecFile);
     final hasConfigFile = configFile.existsSync();

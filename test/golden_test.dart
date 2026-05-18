@@ -10,13 +10,17 @@ import 'package:test/test.dart';
 const _fakeSha256 =
     'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 
-const _goldenPath = 'test/fixtures/pub_sources_golden.json';
+// Capture the absolute project root synchronously at module load time so that
+// concurrent config tests changing Directory.current don't affect path resolution.
+final _projectRoot = Directory.current.absolute.path;
+final _goldenPath =
+    p.join(_projectRoot, 'test', 'fixtures', 'pub_sources_golden.json');
 
 void main() {
   group('PubSourcesGenerator golden output', () {
     test('matches golden file', () async {
       final gen = PubSourcesGenerator(
-        lockFilePaths: [p.join('test', 'fixtures', 'simple.lock')],
+        lockFilePaths: [p.join(_projectRoot, 'test', 'fixtures', 'simple.lock')],
         client: MockClient(
           (req) async => http.Response(
             jsonEncode({'archive_sha256': _fakeSha256}),

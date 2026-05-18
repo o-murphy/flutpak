@@ -106,14 +106,8 @@ flatpak_gen:
     locks:
       - pubspec.lock
 ''');
-      final original = Directory.current;
-      Directory.current = tmpDir;
-      try {
-        final cfg = FlatpakGenConfig.load();
-        expect(cfg.output, 'flatpak/custom-sources.json');
-      } finally {
-        Directory.current = original;
-      }
+      final cfg = FlatpakGenConfig.load('flatpak_gen.yaml', tmpDir.path);
+      expect(cfg.output, 'flatpak/custom-sources.json');
     });
 
     test('reads from flatpak_gen.yaml when no pubspec section', () {
@@ -125,14 +119,8 @@ pub:
   locks:
     - pubspec.lock
 ''');
-      final original = Directory.current;
-      Directory.current = tmpDir;
-      try {
-        final cfg = FlatpakGenConfig.load();
-        expect(cfg.output, 'flatpak/gen-sources.json');
-      } finally {
-        Directory.current = original;
-      }
+      final cfg = FlatpakGenConfig.load('flatpak_gen.yaml', tmpDir.path);
+      expect(cfg.output, 'flatpak/gen-sources.json');
     });
 
     test('throws when both pubspec.yaml section and flatpak_gen.yaml exist',
@@ -144,27 +132,17 @@ flatpak_gen:
 ''');
       File('${tmpDir.path}/flatpak_gen.yaml')
           .writeAsStringSync('output: flatpak/b.json\n');
-      final original = Directory.current;
-      Directory.current = tmpDir;
-      try {
-        expect(() => FlatpakGenConfig.load(), throwsStateError);
-      } finally {
-        Directory.current = original;
-      }
+      expect(
+          () => FlatpakGenConfig.load('flatpak_gen.yaml', tmpDir.path),
+          throwsStateError);
     });
 
     test('returns defaults when neither config exists', () {
       File('${tmpDir.path}/pubspec.yaml')
           .writeAsStringSync('name: myapp\nversion: 1.0.0\n');
-      final original = Directory.current;
-      Directory.current = tmpDir;
-      try {
-        final cfg = FlatpakGenConfig.load();
-        expect(cfg.output, 'flatpak/generated-sources.json');
-        expect(cfg.pubLocks, contains('pubspec.lock'));
-      } finally {
-        Directory.current = original;
-      }
+      final cfg = FlatpakGenConfig.load('flatpak_gen.yaml', tmpDir.path);
+      expect(cfg.output, 'flatpak/generated-sources.json');
+      expect(cfg.pubLocks, contains('pubspec.lock'));
     });
   });
 
