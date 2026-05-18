@@ -94,12 +94,19 @@ void main() {
       expect(stamp.dest, 'flutter/bin/cache');
     });
 
+    test('sky_engine/pubspec.yaml is an InlineSource', () async {
+      final sources = await gen.generate();
+      final inline = sources.whereType<InlineSource>().firstWhere(
+          (s) => s.destFilename == 'pubspec.yaml' && s.dest.contains('sky_engine'));
+      expect(inline.contents, contains('name: sky_engine'));
+      expect(inline.contents, contains('version: 0.0.99'));
+    });
+
     test('setup-flutter.sh is a ScriptSource', () async {
       final sources = await gen.generate();
       final script = sources.whereType<ScriptSource>().first;
 
       expect(script.destFilename, 'setup-flutter.sh');
-      expect(script.commands.any((c) => c.contains('sky_engine')), isTrue);
       expect(script.commands.any((c) => c.contains('--offline')), isTrue);
     });
   });
