@@ -113,8 +113,16 @@ class FlutterSdkGenerator {
     }
 
     // 4. setup-flutter.sh script helper
+    // sky_engine's pubspec.yaml lives in the Flutter git source at
+    // flutter/packages/sky_engine/ but normal Flutter setup copies it to
+    // flutter/bin/cache/pkg/sky_engine/ — we must do it manually here
+    // because we skip the regular `flutter precache` step in Flatpak.
     sources.add(ScriptSource(
-      commands: ['flutter pub get --offline \$@'],
+      commands: [
+        'mkdir -p flutter/bin/cache/pkg/sky_engine',
+        'cp -rn flutter/packages/sky_engine/. flutter/bin/cache/pkg/sky_engine/',
+        'flutter pub get --offline \$@',
+      ],
       dest: 'flutter/bin',
       destFilename: 'setup-flutter.sh',
     ));
