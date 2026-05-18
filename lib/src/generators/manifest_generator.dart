@@ -234,9 +234,9 @@ String patchManifestPlaceholders(
 
 /// Pins screenshot URLs in a metainfo XML file from `/main/` to [ref].
 String patchMetainfoScreenshots(String content, {required String ref}) {
-  return content.replaceAll(
+  return content.replaceAllMapped(
     RegExp(r'(raw\.githubusercontent\.com/[^/]+/[^/]+/)main/'),
-    '\${1}$ref/',
+    (m) => '${m.group(1)}$ref/',
   );
 }
 
