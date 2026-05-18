@@ -112,19 +112,21 @@ class FlutterSdkGenerator {
       sources.add(PatchSource(path: effectivePatchPath));
     }
 
-    // 4. setup-flutter.sh script helper
-    // sky_engine's pubspec.yaml lives in the Flutter git source at
-    // flutter/packages/sky_engine/ but normal Flutter setup copies it to
-    // flutter/bin/cache/pkg/sky_engine/ — we must do it manually here
-    // because we skip the regular `flutter precache` step in Flatpak.
+    // 4. sky_engine/pubspec.yaml — not in the Flutter git tree (removed in
+    //    Flutter 3.x) and not in sky_engine.zip.  Write it inline so that
+    //    `flutter pub get --offline` can resolve the path dependency.
+    sources.add(InlineSource(
+      contents: 'name: sky_engine\n'
+          'description: "Dart API for the Sky engine."\n'
+          'publish_to: none\n'
+          'version: 0.0.99\n',
+      dest: 'flutter/bin/cache/pkg/sky_engine',
+      destFilename: 'pubspec.yaml',
+    ));
+
+    // 5. setup-flutter.sh script helper
     sources.add(ScriptSource(
-      commands: [
-        // sky_engine/pubspec.yaml is in the Flutter git tree but NOT in
-        // sky_engine.zip (engine artifact).  Copy it so pub can resolve it.
-        'mkdir -p flutter/bin/cache/pkg/sky_engine',
-        'cp flutter/packages/sky_engine/pubspec.yaml flutter/bin/cache/pkg/sky_engine/pubspec.yaml',
-        'flutter pub get --offline \$@',
-      ],
+      commands: ['flutter pub get --offline \$@'],
       dest: 'flutter/bin',
       destFilename: 'setup-flutter.sh',
     ));

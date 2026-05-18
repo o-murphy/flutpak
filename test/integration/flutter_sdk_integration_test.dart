@@ -55,7 +55,6 @@ void main() {
       test('setup-flutter.sh ScriptSource is present', () {
         final script = sources.whereType<ScriptSource>().first;
         expect(script.destFilename, 'setup-flutter.sh');
-        expect(script.commands.any((c) => c.contains('sky_engine')), isTrue);
         expect(script.commands.any((c) => c.contains('--offline')), isTrue);
       });
     },
