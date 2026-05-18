@@ -34,7 +34,7 @@ void main() {
       for (final s in sources) {
         final j = s.toJson();
         expect(j['type'], 'archive');
-        expect(j['strip-components'], 1);
+        expect(j['strip-components'], 0);
         expect(j['dest'], startsWith('.pub-cache/hosted/pub.dev/'));
         expect(j['url'], contains('pub.dartlang.org'));
       }
