@@ -9,8 +9,15 @@ class _Artifact {
   final String path;
   final String dest;
   final List<String>? onlyArches;
+  // strip-components for flatpak-builder (default in flatpak-builder is 1).
+  // Packages with a top-level directory matching their name (sky_engine/,
+  // flutter_gpu/, flutter_patched_sdk/) need stripComponents=1 so files land
+  // directly in dest/.  Archives that are already flat (dart-sdk/, linux
+  // engine binaries) need stripComponents=0 to preserve the outer directory.
+  final int stripComponents;
 
-  const _Artifact(this.path, this.dest, {this.onlyArches});
+  const _Artifact(this.path, this.dest,
+      {this.onlyArches, this.stripComponents = 0});
 }
 
 const String _infraBase =
@@ -101,7 +108,7 @@ class FlutterSdkGenerator {
         url: url,
         sha256: sha256,
         dest: art.dest,
-        stripComponents: 0,
+        stripComponents: art.stripComponents,
         onlyArches: art.onlyArches,
       ));
     }
@@ -113,13 +120,19 @@ class FlutterSdkGenerator {
     }
 
     // 4. sky_engine/pubspec.yaml — not in the Flutter git tree (removed in
-    //    Flutter 3.x) and not in sky_engine.zip.  Write it inline so that
-    //    `flutter pub get --offline` can resolve the path dependency.
+    //    Flutter 3.x).  Even if sky_engine.zip includes it, the path inside
+    //    the zip may differ from the expected dest.  Write it inline to
+    //    guarantee the correct content at the correct location.
+    //    The environment constraint must start at >=2.12.0 to enable null
+    //    safety; without it pub rejects the package entirely.
     sources.add(InlineSource(
       contents: 'name: sky_engine\n'
           'description: "Dart API for the Sky engine."\n'
           'publish_to: none\n'
-          'version: 0.0.99\n',
+          'version: 0.0.99\n'
+          '\n'
+          'environment:\n'
+          '  sdk: ">=2.12.0 <4.0.0"\n',
       dest: 'flutter/bin/cache/pkg/sky_engine',
       destFilename: 'pubspec.yaml',
     ));
@@ -164,58 +177,61 @@ class FlutterSdkGenerator {
   List<_Artifact> _buildArtifactList(
       String engineHash, String fontsHash, String gradleHash) {
     return [
-      // Dart SDK (arch-specific)
+      // Dart SDK zips contain a top-level dart-sdk/ directory we want to
+      // keep → strip-components: 0.
       _Artifact('dart-sdk-linux-x64.zip', 'flutter/bin/cache',
-          onlyArches: ['x86_64']),
+          onlyArches: ['x86_64'], stripComponents: 0),
       _Artifact('dart-sdk-linux-arm64.zip', 'flutter/bin/cache',
-          onlyArches: ['aarch64']),
+          onlyArches: ['aarch64'], stripComponents: 0),
 
-      // Shared artifacts (no engine-hash prefix — use fontsHash/gradleHash)
-      _Artifact('__fonts__', 'flutter/bin/cache/artifacts/material_fonts'),
-      _Artifact('__gradle__',
-          'flutter/bin/cache/artifacts/gradle_wrapper'),
+      // Fonts and gradle — flat archives, keep as-is.
+      _Artifact('__fonts__', 'flutter/bin/cache/artifacts/material_fonts',
+          stripComponents: 0),
+      _Artifact('__gradle__', 'flutter/bin/cache/artifacts/gradle_wrapper',
+          stripComponents: 0),
 
-      // Common engine artifacts
-      _Artifact('sky_engine.zip',
-          'flutter/bin/cache/pkg/sky_engine'),
-      _Artifact('flutter_gpu.zip',
-          'flutter/bin/cache/pkg/flutter_gpu'),
+      // Package-style engine artifacts: the zip has a top-level directory
+      // matching the package name (e.g. sky_engine/lib/...) → strip it so
+      // files land directly in dest/.  stripComponents: 1 matches the
+      // default flatpak-builder behaviour used in the hand-crafted manifests
+      // that are known to work.
+      _Artifact('sky_engine.zip', 'flutter/bin/cache/pkg/sky_engine',
+          stripComponents: 1),
+      _Artifact('flutter_gpu.zip', 'flutter/bin/cache/pkg/flutter_gpu',
+          stripComponents: 1),
       _Artifact('flutter_patched_sdk.zip',
-          'flutter/bin/cache/artifacts/engine/common/flutter_patched_sdk'),
+          'flutter/bin/cache/artifacts/engine/common/flutter_patched_sdk',
+          stripComponents: 1),
       _Artifact('flutter_patched_sdk_product.zip',
-          'flutter/bin/cache/artifacts/engine/common/flutter_patched_sdk_product'),
+          'flutter/bin/cache/artifacts/engine/common/flutter_patched_sdk_product',
+          stripComponents: 1),
 
-      // x86_64 engine artifacts
+      // Per-arch engine binary archives — already flat, keep as-is.
       _Artifact('linux-x64/artifacts.zip',
           'flutter/bin/cache/artifacts/engine/linux-x64',
-          onlyArches: ['x86_64']),
+          onlyArches: ['x86_64'], stripComponents: 0),
       _Artifact('linux-x64/font-subset.zip',
           'flutter/bin/cache/artifacts/engine/linux-x64',
-          onlyArches: ['x86_64']),
-      _Artifact(
-          'linux-x64-profile/linux-x64-flutter-gtk.zip',
+          onlyArches: ['x86_64'], stripComponents: 0),
+      _Artifact('linux-x64-profile/linux-x64-flutter-gtk.zip',
           'flutter/bin/cache/artifacts/engine/linux-x64-profile',
-          onlyArches: ['x86_64']),
-      _Artifact(
-          'linux-x64-release/linux-x64-flutter-gtk.zip',
+          onlyArches: ['x86_64'], stripComponents: 0),
+      _Artifact('linux-x64-release/linux-x64-flutter-gtk.zip',
           'flutter/bin/cache/artifacts/engine/linux-x64-release',
-          onlyArches: ['x86_64']),
+          onlyArches: ['x86_64'], stripComponents: 0),
 
-      // aarch64 engine artifacts
       _Artifact('linux-arm64/artifacts.zip',
           'flutter/bin/cache/artifacts/engine/linux-arm64',
-          onlyArches: ['aarch64']),
+          onlyArches: ['aarch64'], stripComponents: 0),
       _Artifact('linux-arm64/font-subset.zip',
           'flutter/bin/cache/artifacts/engine/linux-arm64',
-          onlyArches: ['aarch64']),
-      _Artifact(
-          'linux-arm64-profile/linux-arm64-flutter-gtk.zip',
+          onlyArches: ['aarch64'], stripComponents: 0),
+      _Artifact('linux-arm64-profile/linux-arm64-flutter-gtk.zip',
           'flutter/bin/cache/artifacts/engine/linux-arm64-profile',
-          onlyArches: ['aarch64']),
-      _Artifact(
-          'linux-arm64-release/linux-arm64-flutter-gtk.zip',
+          onlyArches: ['aarch64'], stripComponents: 0),
+      _Artifact('linux-arm64-release/linux-arm64-flutter-gtk.zip',
           'flutter/bin/cache/artifacts/engine/linux-arm64-release',
-          onlyArches: ['aarch64']),
+          onlyArches: ['aarch64'], stripComponents: 0),
     ];
   }
 

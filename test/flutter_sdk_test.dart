@@ -100,6 +100,7 @@ void main() {
           (s) => s.destFilename == 'pubspec.yaml' && s.dest.contains('sky_engine'));
       expect(inline.contents, contains('name: sky_engine'));
       expect(inline.contents, contains('version: 0.0.99'));
+      expect(inline.contents, contains('sdk:'));
     });
 
     test('setup-flutter.sh is a ScriptSource', () async {
