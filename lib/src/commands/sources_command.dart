@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:args/command_runner.dart';
+import 'package:path/path.dart' as p;
 import '../config.dart';
 import '../generators/flutter_sdk.dart';
 import '../generators/pub_sources.dart';
@@ -70,6 +71,7 @@ class SourcesCommand extends Command<void> {
           final flutterGen = FlutterSdkGenerator(
             sdkPath: sdkPath,
             patchPath: patchPath,
+            outputDir: p.dirname(p.absolute(output)),
             cache: cache,
           );
           final flutterSources = await flutterGen.generate();

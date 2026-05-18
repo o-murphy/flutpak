@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:args/command_runner.dart';
+import 'package:path/path.dart' as p;
 import '../config.dart';
 import '../generators/flutter_sdk.dart';
 import '../utils/download_cache.dart';
@@ -21,7 +22,8 @@ class FlutterCommand extends Command<void> {
           help: 'Output JSON file.',
           defaultsTo: null)
       ..addOption('patch',
-          help: 'Relative path to shared.sh.patch to include in sources.')
+          help: 'Path to shared.sh.patch. '
+              'Omit to use the built-in patch (written next to the output file).')
       ..addOption('config',
           abbr: 'c',
           help: 'Config file.',
@@ -49,6 +51,7 @@ class FlutterCommand extends Command<void> {
       final gen = FlutterSdkGenerator(
         sdkPath: sdkPath,
         patchPath: patchPath,
+        outputDir: p.dirname(p.absolute(output)),
         cache: cache,
       );
       final sources = await gen.generate();
