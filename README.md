@@ -28,9 +28,12 @@ flatpak_gen sources \
   --lock pubspec.lock \
   --lock $FLUTTER_ROOT/packages/flutter_tools/pubspec.lock \
   --sdk $FLUTTER_ROOT \
-  --output flatpak/generated-sources.json \
-  --patch flatpak/patches/flutter/shared.sh.patch
+  --output flatpak/generated-sources.json
 ```
+
+The tool writes `flatpak/generated-sources.json` (pub packages + Flutter SDK artifacts)
+and auto-generates `flatpak/patches/flutter/shared.sh.patch` next to it.  You do not need
+to supply or maintain the patch file manually.
 
 Reference the generated file from your Flatpak manifest:
 
@@ -103,8 +106,7 @@ flatpak_gen sources \
   --lock pubspec.lock \
   --lock $FLUTTER_ROOT/packages/flutter_tools/pubspec.lock \
   --sdk $FLUTTER_ROOT \
-  --output flatpak/generated-sources.json \
-  --patch flatpak/patches/flutter/shared.sh.patch
+  --output flatpak/generated-sources.json
 ```
 
 | Flag | Description |
@@ -112,7 +114,7 @@ flatpak_gen sources \
 | `-l, --lock` | `pubspec.lock` paths (repeatable, glob + `$ENV` supported) |
 | `-s, --sdk` | Flutter SDK path (defaults to `$FLUTTER_ROOT`) |
 | `-o, --output` | Output JSON file (default: `flatpak/generated-sources.json`) |
-| `--patch` | Path to `shared.sh.patch` (included as a source in the output) |
+| `--patch` | Path to a custom `shared.sh.patch` (optional; built-in patch is used when omitted) |
 | `--pub-only` | Skip Flutter SDK sources |
 | `--flutter-only` | Skip pub sources |
 | `-c, --config` | Config file (default: `flatpak_gen.yaml`) |
@@ -180,7 +182,6 @@ Create `flatpak_gen.yaml` in your project root to avoid repeating flags:
 
 ```yaml
 output: flatpak/generated-sources.json
-patch_path: flatpak/patches/flutter/shared.sh.patch
 
 pub:
   locks:
@@ -189,6 +190,7 @@ pub:
 
 flutter:
   sdk: $FLUTTER_ROOT   # $ENV variables are expanded
+  # patch_path: flatpak/patches/flutter/shared.sh.patch  # optional custom patch
 ```
 
 When `flatpak_gen.yaml` is present, you can run the tool with no arguments:
@@ -233,8 +235,7 @@ jobs:
             --lock pubspec.lock \
             --lock "$FLUTTER_ROOT/packages/flutter_tools/pubspec.lock" \
             --sdk "$FLUTTER_ROOT" \
-            --output flatpak/generated-sources.json \
-            --patch flatpak/patches/flutter/shared.sh.patch
+            --output flatpak/generated-sources.json
 
       - name: Commit updated sources
         run: |
@@ -295,6 +296,18 @@ The tool reads three version files from a local Flutter install:
 
 Artifacts are fetched from `storage.googleapis.com/flutter_infra_release`. SHA-256
 checksums are cached locally in `~/.cache/flatpak_gen/` keyed by URL.
+
+Two extra entries are always added for Flutter projects:
+
+- **`sky_engine/pubspec.yaml` (inline)** — `packages/sky_engine/` was removed from the
+  Flutter git tree in Flutter 3.x. The file is written inline with the correct
+  `environment: sdk` constraint so `pub get --offline` can resolve it without network.
+
+- **`shared.sh.patch` (patch + file)** — Flutter's `shared.sh` bootstraps the Flutter
+  tool with `pub upgrade`, which requires network. The built-in patch replaces it with
+  `pub get --offline`. The patch is written to `patches/flutter/shared.sh.patch` next to
+  the output file and referenced as a `type: patch` source in the JSON.  Pass `--patch`
+  to supply a custom patch instead.
 
 ## License
 
