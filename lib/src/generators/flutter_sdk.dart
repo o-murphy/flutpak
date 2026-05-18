@@ -119,8 +119,10 @@ class FlutterSdkGenerator {
     // because we skip the regular `flutter precache` step in Flatpak.
     sources.add(ScriptSource(
       commands: [
+        // sky_engine/pubspec.yaml is in the Flutter git tree but NOT in
+        // sky_engine.zip (engine artifact).  Copy it so pub can resolve it.
         'mkdir -p flutter/bin/cache/pkg/sky_engine',
-        'cp -rn flutter/packages/sky_engine/. flutter/bin/cache/pkg/sky_engine/',
+        'cp flutter/packages/sky_engine/pubspec.yaml flutter/bin/cache/pkg/sky_engine/pubspec.yaml',
         'flutter pub get --offline \$@',
       ],
       dest: 'flutter/bin',
