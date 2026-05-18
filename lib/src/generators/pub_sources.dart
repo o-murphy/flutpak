@@ -17,7 +17,9 @@ class PubSourcesGenerator {
   }) : _client = client ?? http.Client();
 
   Future<List<FlatpakSource>> generate() async {
-    final packages = <String, String>{}; // name → version (deduped)
+    // Deduplicate by (name, version) so different lock files can require
+    // different versions of the same package (e.g. app vs flutter_tools).
+    final packages = <({String name, String version})>{};
 
     for (final raw in lockFilePaths) {
       final pattern = _resolveEnv(raw);
@@ -35,19 +37,19 @@ class PubSourcesGenerator {
       }
     }
 
-    stderr.writeln('pub: ${packages.length} unique hosted packages');
+    stderr.writeln('pub: ${packages.length} unique hosted package versions');
 
     final entries = <FlatpakSource>[];
     var done = 0;
 
     // Batch parallel requests — pub.dev can handle concurrency.
     const batchSize = 20;
-    final keys = packages.keys.toList();
+    final pkgList = packages.toList();
 
-    for (var i = 0; i < keys.length; i += batchSize) {
-      final batch = keys.skip(i).take(batchSize);
-      final results = await Future.wait(batch.map((name) async {
-        final version = packages[name]!;
+    for (var i = 0; i < pkgList.length; i += batchSize) {
+      final batch = pkgList.skip(i).take(batchSize);
+      final results = await Future.wait(batch.map((pkg) async {
+        final (:name, :version) = pkg;
         final sha256 = await _fetchSha256(name, version);
         return [
           ArchiveSource(
@@ -68,13 +70,13 @@ class PubSourcesGenerator {
         entries.addAll(pair);
       }
       done += batch.length;
-      stderr.writeln('  pub: $done / ${packages.length}');
+      stderr.writeln('  pub: $done / ${pkgList.length}');
     }
 
     return entries;
   }
 
-  void _parseLock(String path, Map<String, String> out) {
+  void _parseLock(String path, Set<({String name, String version})> out) {
     final raw = File(path).readAsStringSync();
     final yaml = loadYaml(raw);
     if (yaml is! Map) return;
@@ -87,7 +89,7 @@ class PubSourcesGenerator {
       if (info is! Map) continue;
       if (info['source'] != 'hosted') continue;
       final version = info['version'] as String?;
-      if (version != null) out[name] = version;
+      if (version != null) out.add((name: name, version: version));
     }
   }
 
