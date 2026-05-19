@@ -61,10 +61,11 @@ runs:
         BRANCH="${{ steps.resolve-version.outputs.branch }}"
         DEPTH="${{ steps.resolve-version.outputs.depth }}"
 
-        # Re-clone if the SDK is missing or incomplete (cache may be stale).
-        # Use the flutter tool binary as the existence check — it's always present.
-        if [ ! -f "$FLUTTER_PATH/bin/flutter" ]; then
-          echo "Flutter SDK missing or incomplete — cloning branch=$BRANCH"
+        # Re-clone if the SDK is missing, incomplete, or a different version was
+        # restored from cache via a prefix restore-key.
+        CACHED_VERSION=$(cat "$FLUTTER_PATH/version" 2>/dev/null || echo "")
+        if [ ! -f "$FLUTTER_PATH/bin/flutter" ] || [ "$CACHED_VERSION" != "$BRANCH" ]; then
+          echo "Flutter SDK missing or version mismatch (cached=$CACHED_VERSION want=$BRANCH) — cloning"
           rm -rf "$FLUTTER_PATH"
           git clone --depth "$DEPTH" \
             --branch "$BRANCH" \
