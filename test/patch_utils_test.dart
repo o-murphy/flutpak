@@ -145,52 +145,77 @@ commit: __FLATPAK_COMMIT__
     });
   });
 
-  group('patchMetainfoScreenshots', () {
-    const metainfo = '''
-<screenshots>
-  <screenshot type="default">
-    <image>https://raw.githubusercontent.com/o-murphy/ebalistyka-app/main/docs/screenshots/home.png</image>
-  </screenshot>
-  <screenshot>
-    <image>https://raw.githubusercontent.com/o-murphy/ebalistyka-app/main/docs/screenshots/conditions.png</image>
-  </screenshot>
-</screenshots>
-''';
+  group('replaceMetainfoScreenshots', () {
+    const screenshots = [
+      ScreenshotConfig(path: 'docs/screenshots/home.png', default_: true),
+      ScreenshotConfig(path: 'docs/screenshots/conditions.png'),
+    ];
 
-    test('replaces /main/ with tag', () {
-      final result = patchMetainfoScreenshots(metainfo, ref: 'v0.1.14');
-      expect(result,
-          contains('ebalistyka-app/v0.1.14/docs/screenshots/home.png'));
-      expect(result,
-          contains('ebalistyka-app/v0.1.14/docs/screenshots/conditions.png'));
-      expect(result, isNot(contains('/main/')));
+    const existingMetainfo = '''<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.o_murphy.ebalistyka</id>
+  <screenshots>
+    <screenshot type="default">
+      <image>https://raw.githubusercontent.com/o-murphy/ebalistyka-app/v0.1.14/docs/screenshots/home.png</image>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/o-murphy/ebalistyka-app/v0.1.14/docs/screenshots/conditions.png</image>
+    </screenshot>
+  </screenshots>
+</component>''';
+
+    test('replaces block with config-built URLs for tag', () {
+      final result = replaceMetainfoScreenshots(
+        existingMetainfo,
+        screenshots: screenshots,
+        repoSlug: 'o-murphy/ebalistyka-app',
+        ref: 'v0.1.15',
+      );
+      expect(result, contains('ebalistyka-app/v0.1.15/docs/screenshots/home.png'));
+      expect(result, contains('ebalistyka-app/v0.1.15/docs/screenshots/conditions.png'));
+      expect(result, isNot(contains('v0.1.14')));
+      expect(result, contains('<screenshot type="default">'));
     });
 
-    test('replaces /main/ with commit SHA', () {
-      final result = patchMetainfoScreenshots(
-        metainfo,
+    test('replaces block with commit SHA', () {
+      final result = replaceMetainfoScreenshots(
+        existingMetainfo,
+        screenshots: screenshots,
+        repoSlug: 'o-murphy/ebalistyka-app',
         ref: 'abc1234567890abcdef',
       );
-      expect(result, contains('ebalistyka-app/abc1234567890abcdef/docs/'));
-      expect(result, isNot(contains('/main/')));
+      expect(result, contains('ebalistyka-app/abc1234567890abcdef/docs/screenshots/'));
+      expect(result, isNot(contains('v0.1.14')));
     });
 
-    test('returns content unchanged when no /main/ present', () {
-      const pinned = '''
-<image>https://raw.githubusercontent.com/o-murphy/ebalistyka-app/v0.1.14/docs/screenshots/home.png</image>
-''';
-      final result = patchMetainfoScreenshots(pinned, ref: 'v0.2.0');
-      expect(result, equals(pinned));
+    test('falls back to /main/ when ref is empty', () {
+      final result = replaceMetainfoScreenshots(
+        existingMetainfo,
+        screenshots: screenshots,
+        repoSlug: 'o-murphy/ebalistyka-app',
+        ref: '',
+      );
+      expect(result, contains('ebalistyka-app/main/docs/screenshots/home.png'));
     });
 
-    test('handles multiple repos in same file correctly', () {
-      const content = '''
-<image>https://raw.githubusercontent.com/owner/repo-a/main/img/a.png</image>
-<image>https://raw.githubusercontent.com/owner/repo-b/main/img/b.png</image>
-''';
-      final result = patchMetainfoScreenshots(content, ref: 'v1.0.0');
-      expect(result, contains('repo-a/v1.0.0/img/a.png'));
-      expect(result, contains('repo-b/v1.0.0/img/b.png'));
+    test('returns content unchanged when screenshots list is empty', () {
+      final result = replaceMetainfoScreenshots(
+        existingMetainfo,
+        screenshots: const [],
+        repoSlug: 'o-murphy/ebalistyka-app',
+        ref: 'v0.1.15',
+      );
+      expect(result, equals(existingMetainfo));
+    });
+
+    test('returns content unchanged when repoSlug is empty', () {
+      final result = replaceMetainfoScreenshots(
+        existingMetainfo,
+        screenshots: screenshots,
+        repoSlug: '',
+        ref: 'v0.1.15',
+      );
+      expect(result, equals(existingMetainfo));
     });
   });
 

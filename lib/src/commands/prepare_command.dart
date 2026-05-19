@@ -157,13 +157,18 @@ class PrepareCommand extends Command<void> {
             cfg: manifestCfg.metainfo!,
             tag: tag,
             releaseDate: _tagDate(tag),
+            ref: tag ?? commit,
           );
         }
 
-        // ── 7. Pin metainfo screenshot URLs ────────────────────────────────
-        if (commit != null) {
-          final ref = (tag != null && tag.isNotEmpty) ? tag : commit;
-          _patchMetainfo(metainfoPath, ref);
+        // ── 7. Replace metainfo screenshot URLs from config ───────────────
+        if (manifestCfg.metainfo!.screenshots.isNotEmpty) {
+          final ref = (tag != null && tag.isNotEmpty) ? tag : (commit ?? '');
+          _replaceMetainfoScreenshots(
+            metainfoPath,
+            metainfoCfg: manifestCfg.metainfo!,
+            ref: ref,
+          );
         }
 
         // ── 8. Update <releases> in metainfo ───────────────────────────────
@@ -280,14 +285,23 @@ class PrepareCommand extends Command<void> {
     }
   }
 
-  void _patchMetainfo(String metainfoPath, String ref) {
+  void _replaceMetainfoScreenshots(
+    String metainfoPath, {
+    required MetainfoConfig metainfoCfg,
+    required String ref,
+  }) {
     final f = File(metainfoPath);
     if (!f.existsSync()) return;
     final original = f.readAsStringSync();
-    final patched = patchMetainfoScreenshots(original, ref: ref);
+    final patched = replaceMetainfoScreenshots(
+      original,
+      screenshots: metainfoCfg.screenshots,
+      repoSlug: metainfoCfg.repoSlug ?? '',
+      ref: ref,
+    );
     if (patched != original) {
       f.writeAsStringSync(patched);
-      stderr.writeln('  metainfo screenshot URLs → $ref');
+      stderr.writeln('  metainfo screenshots rebuilt → $ref');
     }
   }
 
@@ -336,13 +350,14 @@ class PrepareCommand extends Command<void> {
     required MetainfoConfig cfg,
     String? tag,
     DateTime? releaseDate,
+    String? ref,
   }) {
     final content = MetainfoGenerator(
       appId: appId,
       cfg: cfg,
       version: tag,
       releaseDate: releaseDate ?? DateTime.now().toUtc(),
-    ).generate();
+    ).generate(ref: ref);
     File(metainfoPath)
       ..createSync(recursive: true)
       ..writeAsStringSync(content);
@@ -427,8 +442,8 @@ class PrepareCommand extends Command<void> {
             manifestCfg.metainfo!.canGenerate) {
           stderr.writeln('  would create metainfo: $metainfoPath');
         }
-        if (commit != null) {
-          stderr.writeln('  would pin metainfo screenshots → $ref');
+        if (manifestCfg.metainfo!.screenshots.isNotEmpty) {
+          stderr.writeln('  would rebuild metainfo screenshots → $ref');
         }
         if (tag != null && tag.isNotEmpty) {
           stderr.writeln('  would update metainfo releases → $tag');

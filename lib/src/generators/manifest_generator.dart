@@ -285,10 +285,36 @@ String patchManifestPlaceholders(
 }
 
 /// Pins screenshot URLs in a metainfo XML file from `/main/` to [ref].
-String patchMetainfoScreenshots(String content, {required String ref}) {
-  return content.replaceAllMapped(
-    RegExp(r'(raw\.githubusercontent\.com/[^/]+/[^/]+/)main/'),
-    (m) => '${m.group(1)}$ref/',
+/// Replaces the entire `<screenshots>` block in [content] with one built
+/// from [screenshots] config, using [repoSlug] and [ref] for URLs.
+///
+/// If [screenshots] is empty or [repoSlug] is empty the file is returned
+/// unchanged.  Falls back to `main` when [ref] is empty.
+String replaceMetainfoScreenshots(
+  String content, {
+  required List<ScreenshotConfig> screenshots,
+  required String repoSlug,
+  required String ref,
+}) {
+  if (screenshots.isEmpty || repoSlug.isEmpty) return content;
+  final gitRef = ref.isNotEmpty ? ref : 'main';
+
+  final buf = StringBuffer('  <screenshots>\n');
+  var first = true;
+  for (final s in screenshots) {
+    final isDefault = s.default_ || first;
+    final tag = isDefault ? '<screenshot type="default">' : '<screenshot>';
+    buf.writeln('    $tag');
+    buf.writeln(
+        '      <image>https://raw.githubusercontent.com/$repoSlug/$gitRef/${s.path}</image>');
+    buf.writeln('    </screenshot>');
+    first = false;
+  }
+  buf.write('  </screenshots>');
+
+  return content.replaceFirstMapped(
+    RegExp(r'[ \t]*<screenshots>.*?</screenshots>', dotAll: true),
+    (_) => buf.toString(),
   );
 }
 
