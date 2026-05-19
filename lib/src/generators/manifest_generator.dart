@@ -51,17 +51,14 @@ class ManifestGenerator {
     _line(buf, 'modules:');
 
     // Extra modules (inline YAML or file paths).
+    // Files are included verbatim with a 2-space indent so they can be
+    // written as normal YAML lists rooted at the modules level.
     for (final modPath in cfg.extraModules) {
       final f = File(modPath);
       if (f.existsSync()) {
         final content = f.readAsStringSync().trimRight();
         for (final rawLine in content.split('\n')) {
-          if (rawLine.trimLeft().startsWith('-') ||
-              rawLine.trimLeft().startsWith('#')) {
-            _line(buf, '  $rawLine');
-          } else {
-            _line(buf, '    $rawLine');
-          }
+          _line(buf, '  $rawLine');
         }
       } else {
         _line(buf, '  - $modPath');
