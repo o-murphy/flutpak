@@ -1,0 +1,46 @@
+name: Upload Binaries to Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: "Release tag to upload binaries to (e.g. v0.1.1)"
+        required: true
+        type: string
+
+jobs:
+  build:
+    name: Build binary (${{ matrix.arch }})
+    strategy:
+      matrix:
+        include:
+          - arch: x64
+            runs-on: ubuntu-latest
+            artifact: flutpak-linux-x64
+          - arch: arm64
+            runs-on: ubuntu-24.04-arm
+            artifact: flutpak-linux-arm64
+    runs-on: ${{ matrix.runs-on }}
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.tag_name }}
+
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+
+      - name: Install dependencies
+        run: dart pub get
+
+      - name: Build binary
+        run: dart compile exe bin/flutpak.dart -o ${{ matrix.artifact }}
+
+      - name: Upload to release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ inputs.tag_name }}
+          files: ${{ matrix.artifact }}
