@@ -127,6 +127,100 @@ commit: __FLATPAK_COMMIT__
     });
   });
 
+  group('patchMetainfoReleases', () {
+    final date = DateTime.utc(2026, 5, 19);
+
+    test('strips leading v and updates version and date', () {
+      const input = '''
+<releases>
+  <release version="0.1.14" date="2026-05-14"/>
+</releases>
+''';
+      final result = patchMetainfoReleases(input, 'v0.1.15', date);
+      expect(result, contains('version="0.1.15"'));
+      expect(result, contains('date="2026-05-19"'));
+      expect(result, isNot(contains('version="0.1.14"')));
+      expect(result, isNot(contains('date="2026-05-14"')));
+    });
+
+    test('handles tag without leading v', () {
+      const input = '''
+<releases>
+  <release version="0.1.14" date="2026-05-14"/>
+</releases>
+''';
+      final result = patchMetainfoReleases(input, '0.1.15', date);
+      expect(result, contains('version="0.1.15"'));
+      expect(result, contains('date="2026-05-19"'));
+    });
+
+    test('handles pre-release tag (v0.1.15-beta.1)', () {
+      const input = '''
+<releases>
+  <release version="0.1.14" date="2026-05-14"/>
+</releases>
+''';
+      final result = patchMetainfoReleases(input, 'v0.1.15-beta.1', date);
+      expect(result, contains('version="0.1.15-beta.1"'));
+      expect(result, contains('date="2026-05-19"'));
+    });
+
+    test('only updates first <release> entry', () {
+      const input = '''
+<releases>
+  <release version="0.1.14" date="2026-05-14"/>
+  <release version="0.1.13" date="2026-04-01"/>
+</releases>
+''';
+      final result = patchMetainfoReleases(input, 'v0.1.15', date);
+      expect(result, contains('version="0.1.15"'));
+      // Second entry should remain unchanged
+      expect(result, contains('version="0.1.13"'));
+      expect(result, contains('date="2026-04-01"'));
+    });
+
+    test('preserves surrounding whitespace and indentation', () {
+      const input = '''
+<releases>
+  <release version="0.1.14" date="2026-05-14"/>
+</releases>
+''';
+      final result = patchMetainfoReleases(input, 'v0.1.15', date);
+      expect(result, contains('  <release version="0.1.15" date="2026-05-19"/>'));
+    });
+
+    test('returns content unchanged when tag is empty', () {
+      const input = '''
+<releases>
+  <release version="0.1.14" date="2026-05-14"/>
+</releases>
+''';
+      final result = patchMetainfoReleases(input, '', date);
+      expect(result, equals(input));
+    });
+
+    test('returns content unchanged when no <releases> section exists', () {
+      const input = '''
+<component>
+  <name>My App</name>
+</component>
+''';
+      final result = patchMetainfoReleases(input, 'v0.1.15', date);
+      expect(result, equals(input));
+    });
+
+    test('pads month and day with leading zeros', () {
+      final earlyDate = DateTime.utc(2026, 1, 5);
+      const input = '''
+<releases>
+  <release version="0.1.14" date="2026-05-14"/>
+</releases>
+''';
+      final result = patchMetainfoReleases(input, 'v0.1.15', earlyDate);
+      expect(result, contains('date="2026-01-05"'));
+    });
+  });
+
   group('resolvePatchEntries', () {
     late Directory tmpDir;
 

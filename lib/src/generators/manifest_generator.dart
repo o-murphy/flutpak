@@ -269,3 +269,37 @@ String patchMetainfoScreenshots(String content, {required String ref}) {
   );
 }
 
+/// Updates the first `<release .../>` entry inside `<releases>` in a
+/// metainfo XML file.
+///
+/// - Strips a leading `v` from [tag] (e.g. `v0.1.15` → `0.1.15`).
+/// - Formats [date] as `YYYY-MM-DD`.
+/// - Returns [content] unchanged if [tag] is empty or if no `<releases>`
+///   section is present.
+String patchMetainfoReleases(String content, String tag, DateTime date) {
+  if (tag.isEmpty) return content;
+  if (!content.contains('<releases>')) return content;
+
+  final version = tag.startsWith('v') ? tag.substring(1) : tag;
+  final dateStr =
+      '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+
+  return content.replaceFirstMapped(
+    RegExp(r'(<release\s[^/]*/?>)', multiLine: true),
+    (m) {
+      final original = m.group(1)!;
+      // Replace version="..." and date="..." attributes, preserving indentation
+      // by operating on the tag text only.
+      var updated = original.replaceFirst(
+        RegExp(r'version="[^"]*"'),
+        'version="$version"',
+      );
+      updated = updated.replaceFirst(
+        RegExp(r'date="[^"]*"'),
+        'date="$dateStr"',
+      );
+      return updated;
+    },
+  );
+}
+
