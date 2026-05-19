@@ -190,13 +190,13 @@ class ManifestGenerator {
     buf.writeln('        commit: $commitPlaceholder');
     buf.writeln('        disable-submodules: true');
 
-    // generated-sources.json reference (relative to manifest dir).
-    buf.writeln('      - ${p.basename(generatedSourcesPath)}');
-
     // Extra verbatim sources (e.g. arch-specific prebuilt archives).
     for (final src in cfg.extraSources) {
       _writeYamlMap(buf, src, indent: '      ');
     }
+
+    // generated-sources.json reference (relative to manifest dir).
+    buf.writeln('      - ${p.basename(generatedSourcesPath)}');
 
     // Patch sources from registry / project config.
     // Paths are made relative to the manifest directory so flatpak-builder
@@ -206,10 +206,10 @@ class ManifestGenerator {
       final dest = patch.version != null ? patch.dest(patch.version!) : null;
       final relPath = p.relative(patch.path, from: manifestDir);
       buf.writeln('      - type: patch');
-      buf.writeln('        path: $relPath');
       if (dest != null) {
         buf.writeln('        dest: $dest');
       }
+      buf.writeln('        path: $relPath');
     }
   }
 
