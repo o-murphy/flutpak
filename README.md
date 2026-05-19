@@ -1,5 +1,7 @@
 # flutpak
 
+[![Pub Version](https://img.shields.io/pub/v/flutpak?logo=dart&link=https%3A%2F%2Fpub.dev%2Fpackages%2Fflutpak)](https://pub.dev/packages/flutpak)
+
 A Dart CLI tool that automates Flatpak packaging for Flutter applications.
 Analogous to `flutter pub run build_runner build` — describe your config once
 in `pubspec.yaml` and let `flutpak prepare` generate everything needed for a
