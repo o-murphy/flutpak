@@ -78,11 +78,15 @@ class PrepareCommand extends Command<void> {
       );
     }
 
-    // ── 3. Create or update manifest ─────────────────────────────────────────
+    // ── 3. Write flutter version file ────────────────────────────────────────
+    if (sdkPath != null && cfg.flutterVersionFile != null) {
+      _writeFlutterVersionFile(sdkPath, cfg.flutterVersionFile!);
+    }
+
+    // ── 4. Create or update manifest ─────────────────────────────────────────
     final manifestCfg = cfg.manifest;
     if (manifestCfg != null) {
-      final manifestPath =
-          'flatpak/${manifestCfg.appId}.yml';
+      final manifestPath = 'flatpak/${manifestCfg.appId}.yml';
       final manifestFile = File(manifestPath);
 
       if (!manifestFile.existsSync()) {
@@ -102,7 +106,15 @@ class PrepareCommand extends Command<void> {
         stderr.writeln('✓  manifest updated: $manifestPath');
       }
 
-      // ── 4. Pin metainfo screenshot URLs ──────────────────────────────────
+      // ── 5. Generate .desktop file (first run only) ────────────────────────
+      if (manifestCfg.desktop != null) {
+        final desktopPath = 'flatpak/${manifestCfg.appId}.desktop';
+        if (!File(desktopPath).existsSync()) {
+          _generateDesktopFile(manifestCfg: manifestCfg, desktopPath: desktopPath);
+        }
+      }
+
+      // ── 6. Pin metainfo screenshot URLs ──────────────────────────────────
       if (manifestCfg.metainfo != null && commit != null) {
         final ref = (tag != null && tag.isNotEmpty) ? tag : commit;
         _patchMetainfo(manifestCfg.metainfo!.path, ref);
@@ -223,6 +235,36 @@ class PrepareCommand extends Command<void> {
       f.writeAsStringSync(patched);
       stderr.writeln('  metainfo screenshot URLs → $ref');
     }
+  }
+
+  void _writeFlutterVersionFile(String sdkPath, String outputPath) {
+    final versionFile = File(p.join(sdkPath, 'version'));
+    if (!versionFile.existsSync()) return;
+    final version = versionFile.readAsStringSync().trim();
+    File(outputPath)
+      ..createSync(recursive: true)
+      ..writeAsStringSync('$version\n');
+    stderr.writeln('✓  flutter.version → $outputPath ($version)');
+  }
+
+  void _generateDesktopFile({
+    required ManifestConfig manifestCfg,
+    required String desktopPath,
+  }) {
+    final desktop = manifestCfg.desktop!;
+    final buf = StringBuffer();
+    buf.writeln('[Desktop Entry]');
+    buf.writeln('Type=Application');
+    buf.writeln('Name=${desktop.name}');
+    buf.writeln('Exec=${manifestCfg.command}');
+    buf.writeln('Icon=${manifestCfg.appId}');
+    if (desktop.categories.isNotEmpty) {
+      buf.writeln('Categories=${desktop.categories.join(';')};');
+    }
+    File(desktopPath)
+      ..createSync(recursive: true)
+      ..writeAsStringSync(buf.toString());
+    stderr.writeln('✓  desktop file created: $desktopPath');
   }
 
   String? _gitHead() {
