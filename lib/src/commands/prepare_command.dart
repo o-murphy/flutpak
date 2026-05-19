@@ -127,6 +127,16 @@ class PrepareCommand extends Command<void> {
         final ref = (tag != null && tag.isNotEmpty) ? tag : commit;
         _patchMetainfo(manifestCfg.metainfo!.path, ref);
       }
+
+      // ── 7. Update <releases> in metainfo ─────────────────────────────────
+      if (manifestCfg.metainfo != null &&
+          tag != null &&
+          tag.isNotEmpty) {
+        _patchMetainfoReleasesSection(
+          manifestCfg.metainfo!.path,
+          tag,
+        );
+      }
     } else if (tag != null || commit != null) {
       // No manifest config but we have tag/commit — try to patch any existing
       // manifest that uses the placeholders.
@@ -242,6 +252,18 @@ class PrepareCommand extends Command<void> {
     if (patched != original) {
       f.writeAsStringSync(patched);
       stderr.writeln('  metainfo screenshot URLs → $ref');
+    }
+  }
+
+  void _patchMetainfoReleasesSection(String metainfoPath, String tag) {
+    final f = File(metainfoPath);
+    if (!f.existsSync()) return;
+    final original = f.readAsStringSync();
+    final patched =
+        patchMetainfoReleases(original, tag, DateTime.now().toUtc());
+    if (patched != original) {
+      f.writeAsStringSync(patched);
+      stderr.writeln('  metainfo releases → $tag');
     }
   }
 

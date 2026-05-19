@@ -248,16 +248,38 @@ String patchManifestPlaceholders(
 }) {
   var result = content;
 
-  if (tag != null && tag.isNotEmpty) {
-    result = result.replaceAll(tagPlaceholder, tag);
+  final hasTagPlaceholder = result.contains(tagPlaceholder);
+  final hasCommitPlaceholder = result.contains(commitPlaceholder);
+
+  if (hasTagPlaceholder || hasCommitPlaceholder) {
+    // Fast path: manifest still has template placeholders.
+    if (tag != null && tag.isNotEmpty) {
+      result = result.replaceAll(tagPlaceholder, tag);
+    } else {
+      result = result.replaceAll(
+        RegExp(r'[ \t]*tag:\s*' + RegExp.escape(tagPlaceholder) + r'\n?'),
+        '',
+      );
+    }
+    result = result.replaceAll(commitPlaceholder, commit);
   } else {
-    result = result.replaceAll(
-      RegExp(r'[ \t]*tag:\s*' + RegExp.escape(tagPlaceholder) + r'\n?'),
-      '',
+    // Manifest was previously pinned — placeholders are gone.
+    // Locate the app source block by its unique `disable-submodules: true`
+    // marker and re-pin tag/commit in-place.
+    result = result.replaceFirstMapped(
+      RegExp(
+        r'(?:[ \t]*tag:\s+\S+\n)?([ \t]*)commit:\s+\S+(?=\n[ \t]*disable-submodules:)',
+        multiLine: true,
+      ),
+      (m) {
+        final indent = m.group(1)!;
+        final tagLine =
+            (tag != null && tag.isNotEmpty) ? '${indent}tag: $tag\n' : '';
+        return '$tagLine${indent}commit: $commit';
+      },
     );
   }
 
-  result = result.replaceAll(commitPlaceholder, commit);
   return result;
 }
 
@@ -266,6 +288,40 @@ String patchMetainfoScreenshots(String content, {required String ref}) {
   return content.replaceAllMapped(
     RegExp(r'(raw\.githubusercontent\.com/[^/]+/[^/]+/)main/'),
     (m) => '${m.group(1)}$ref/',
+  );
+}
+
+/// Updates the first `<release .../>` entry inside `<releases>` in a
+/// metainfo XML file.
+///
+/// - Strips a leading `v` from [tag] (e.g. `v0.1.15` → `0.1.15`).
+/// - Formats [date] as `YYYY-MM-DD`.
+/// - Returns [content] unchanged if [tag] is empty or if no `<releases>`
+///   section is present.
+String patchMetainfoReleases(String content, String tag, DateTime date) {
+  if (tag.isEmpty) return content;
+  if (!content.contains('<releases>')) return content;
+
+  final version = tag.startsWith('v') ? tag.substring(1) : tag;
+  final dateStr =
+      '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+
+  return content.replaceFirstMapped(
+    RegExp(r'(<release\s[^/]*/?>)', multiLine: true),
+    (m) {
+      final original = m.group(1)!;
+      // Replace version="..." and date="..." attributes, preserving indentation
+      // by operating on the tag text only.
+      var updated = original.replaceFirst(
+        RegExp('version\\s*=\\s*["\'][^"\']*["\']'),
+        'version="$version"',
+      );
+      updated = updated.replaceFirst(
+        RegExp('date\\s*=\\s*["\'][^"\']*["\']'),
+        'date="$dateStr"',
+      );
+      return updated;
+    },
   );
 }
 
