@@ -1,0 +1,165 @@
+name: Test pin-manifest action
+
+on:
+  push:
+    branches-ignore: [main]
+    paths:
+      - .github/actions/pin-manifest/**
+      - .github/workflows/test-action.yml
+      - bin/**
+      - lib/**
+      - pubspec.yaml
+      - pubspec.lock
+  pull_request:
+    paths:
+      - .github/actions/pin-manifest/**
+      - .github/workflows/test-action.yml
+      - bin/**
+      - lib/**
+      - pubspec.yaml
+      - pubspec.lock
+  workflow_dispatch:
+
+jobs:
+  # ── Build binary from source ──────────────────────────────────────────────
+  build:
+    name: Build flutpak binary
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dart-lang/setup-dart@v1
+
+      - name: Build binary
+        run: dart compile exe bin/flutpak.dart -o /tmp/flutpak
+
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: flutpak-linux-x64
+          path: /tmp/flutpak
+          retention-days: 1
+
+  # ── Input validation (fast, no Flutter needed) ────────────────────────────
+  test-input-validation:
+    name: Fails without flutter version
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download binary
+        uses: actions/download-artifact@v4
+        with:
+          name: flutpak-linux-x64
+          path: /tmp/bin
+
+      - name: Make executable
+        run: chmod +x /tmp/bin/flutpak
+
+      - name: Run action without flutter version (expect failure)
+        id: no-flutter
+        continue-on-error: true
+        uses: ./.github/actions/pin-manifest
+        with:
+          tag_name: v0.0.0
+          validate: 'false'
+          flutpak_binary: /tmp/bin/flutpak
+
+      - name: Assert failure
+        run: |
+          [ "${{ steps.no-flutter.outcome }}" = "failure" ] || \
+            { echo "ERROR: expected failure, got ${{ steps.no-flutter.outcome }}"; exit 1; }
+          echo "✓ correctly fails without flutter version"
+
+  # ── Smoke: explicit flutter_version ──────────────────────────────────────
+  test-smoke-flutter-version:
+    name: Smoke — flutter_version input
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download binary
+        uses: actions/download-artifact@v4
+        with:
+          name: flutpak-linux-x64
+          path: /tmp/bin
+
+      - name: Make executable
+        run: chmod +x /tmp/bin/flutpak
+
+      - name: Write minimal config
+        run: |
+          mkdir -p /tmp/smoke-out
+          cat > /tmp/smoke.yaml <<'EOF'
+          output: /tmp/smoke-out
+          pub:
+            locks: []
+          EOF
+
+      - name: Run pin-manifest
+        uses: ./.github/actions/pin-manifest
+        with:
+          tag_name: v0.0.0-smoke
+          commit: ${{ github.sha }}
+          flutter_version: stable
+          config: /tmp/smoke.yaml
+          validate: 'false'
+          flutpak_binary: /tmp/bin/flutpak
+
+      - name: Verify output
+        run: |
+          [ -f /tmp/smoke-out/generated-sources.json ] || \
+            { echo "ERROR: generated-sources.json not written"; exit 1; }
+          echo "✓ generated-sources.json written"
+          wc -c /tmp/smoke-out/generated-sources.json
+
+  # ── Smoke: flutter_version_file input ────────────────────────────────────
+  test-smoke-version-file:
+    name: Smoke — flutter_version_file input
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download binary
+        uses: actions/download-artifact@v4
+        with:
+          name: flutpak-linux-x64
+          path: /tmp/bin
+
+      - name: Make executable
+        run: chmod +x /tmp/bin/flutpak
+
+      - name: Write version file and config
+        run: |
+          mkdir -p /tmp/smoke-out2
+          echo "stable" > /tmp/flutter.version
+          cat > /tmp/smoke2.yaml <<'EOF'
+          output: /tmp/smoke-out2
+          pub:
+            locks: []
+          EOF
+
+      - name: Run pin-manifest
+        uses: ./.github/actions/pin-manifest
+        with:
+          tag_name: v0.0.0-smoke
+          commit: ${{ github.sha }}
+          flutter_version_file: /tmp/flutter.version
+          config: /tmp/smoke2.yaml
+          validate: 'false'
+          flutpak_binary: /tmp/bin/flutpak
+
+      - name: Verify output
+        run: |
+          [ -f /tmp/smoke-out2/generated-sources.json ] || \
+            { echo "ERROR: generated-sources.json not written"; exit 1; }
+          echo "✓ flutter_version_file input works"

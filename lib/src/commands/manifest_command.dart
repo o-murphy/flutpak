@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:args/command_runner.dart';
+import 'package:path/path.dart' as p;
 import 'package:yaml/yaml.dart';
 import '../config.dart';
 import '../generators/flutter_sdk.dart';
@@ -37,7 +38,7 @@ class ManifestCommand extends Command<void> {
           help: 'Flutter SDK path. Defaults to \$FLUTTER_ROOT.')
       ..addOption('output',
           abbr: 'o',
-          help: 'Generated sources output path.')
+          help: 'Output directory (generated-sources.json is written inside).')
       ..addOption('patch',
           help: 'Relative path to shared.sh.patch.')
       ..addFlag('pub-only', help: 'Skip Flutter SDK sources.')
@@ -66,7 +67,8 @@ class ManifestCommand extends Command<void> {
     final sdkPath = argResults!['sdk'] as String? ??
         cfg.flutterSdk ??
         Platform.environment['FLUTTER_ROOT'];
-    final output = argResults!['output'] as String? ?? cfg.output;
+    final outputDir = argResults!['output'] as String? ?? cfg.output;
+    final outputFile = p.join(outputDir, 'generated-sources.json');
     final patchPath = argResults!['patch'] as String? ?? cfg.patchPath;
 
     // ── 1. Resolve version ────────────────────────────────────────────────────
@@ -124,11 +126,11 @@ class ManifestCommand extends Command<void> {
     }
 
     final json = const JsonEncoder.withIndent('    ').convert(allSources);
-    File(output)
+    File(outputFile)
       ..createSync(recursive: true)
       ..writeAsStringSync('$json\n');
 
-    stderr.writeln('✓  ${allSources.length} total sources → $output');
+    stderr.writeln('✓  ${allSources.length} total sources → $outputFile');
   }
 
   static String _readVersionFromPubspec(String path) {

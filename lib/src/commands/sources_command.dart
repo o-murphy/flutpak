@@ -25,7 +25,7 @@ class SourcesCommand extends Command<void> {
           help: 'Flutter SDK path. Defaults to \$FLUTTER_ROOT.')
       ..addOption('output',
           abbr: 'o',
-          help: 'Output JSON file.')
+          help: 'Output directory (generated-sources.json is written inside).')
       ..addOption('patch',
           help: 'Relative path to shared.sh.patch.')
       ..addOption('config',
@@ -47,7 +47,8 @@ class SourcesCommand extends Command<void> {
         cfg.flutterSdk ??
         Platform.environment['FLUTTER_ROOT'];
 
-    final output = argResults!['output'] as String? ?? cfg.output;
+    final outputDir = argResults!['output'] as String? ?? cfg.output;
+    final outputFile = p.join(outputDir, 'generated-sources.json');
     final patchPath = argResults!['patch'] as String? ?? cfg.patchPath;
     final pubOnly = argResults!['pub-only'] as bool;
     final flutterOnly = argResults!['flutter-only'] as bool;
@@ -71,7 +72,7 @@ class SourcesCommand extends Command<void> {
           final flutterGen = FlutterSdkGenerator(
             sdkPath: sdkPath,
             patchPath: patchPath,
-            outputDir: p.dirname(p.absolute(output)),
+            outputDir: outputDir,
             cache: cache,
           );
           final flutterSources = await flutterGen.generate();
@@ -85,10 +86,10 @@ class SourcesCommand extends Command<void> {
 
     final json =
         const JsonEncoder.withIndent('    ').convert(allSources);
-    File(output)
+    File(outputFile)
       ..createSync(recursive: true)
       ..writeAsStringSync('$json\n');
 
-    stderr.writeln('✓  ${allSources.length} total sources → $output');
+    stderr.writeln('✓  ${allSources.length} total sources → $outputFile');
   }
 }

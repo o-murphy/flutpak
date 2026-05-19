@@ -166,7 +166,8 @@ class ManifestGenerator {
 
     // Metainfo: version/date sed + install.
     if (cfg.metainfo != null) {
-      final metainfoPath = cfg.metainfo!.path;
+      final metainfoPath = cfg.metainfo!.path ??
+          'flatpak/${cfg.appId}.metainfo.xml';
       buf.writeln('      - |');
       buf.writeln(
           "        VERSION=\$(grep '^version:' pubspec.yaml | sed 's/version:[[:space:]]*//' | sed 's/+.*//')");

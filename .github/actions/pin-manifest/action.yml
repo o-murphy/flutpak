@@ -11,16 +11,45 @@ inputs:
     description: Commit SHA (empty = resolved from tag automatically)
     required: false
     default: ''
-  flatpak_dir:
-    description: Directory containing manifest, generated-sources.json and flutter.version
+  config:
+    description: >
+      Path to flutpak config file — either flutpak.yaml or a pubspec.yaml
+      containing a flutpak: section. If omitted, flutpak searches the current
+      working directory automatically.
     required: false
-    default: flatpak
+    default: ''
+  flutter_version:
+    description: >
+      Flutter SDK version to install (e.g. 3.41.9). Takes priority over
+      flutter_version_file. One of flutter_version or flutter_version_file
+      must be provided.
+    required: false
+    default: ''
+  flutter_version_file:
+    description: >
+      Path to a committed file containing the Flutter version string
+      (e.g. flatpak/flutter.version). Used when flutter_version is not set.
+      One of flutter_version or flutter_version_file must be provided.
+    required: false
+    default: ''
   flutpak_version:
     description: flutpak release tag to download (empty = latest stable)
     required: false
     default: ''
+  flutpak_binary:
+    description: >
+      Path to a pre-built flutpak binary. When set, skips the download steps.
+      Intended for CI testing of the action itself.
+    required: false
+    default: ''
   cache:
     description: Enable caching for Flutter SDK
+    required: false
+    default: 'true'
+  validate:
+    description: >
+      Run flutpak validate after prepare to check the AppStream metainfo file.
+      Installs appstream-util automatically. Set to false to skip.
     required: false
     default: 'true'
 
@@ -29,6 +58,7 @@ runs:
   steps:
     - name: Resolve flutpak version
       id: flutpak-ver
+      if: inputs.flutpak_binary == ''
       shell: bash
       run: |
         VERSION="${{ inputs.flutpak_version }}"
@@ -38,6 +68,7 @@ runs:
         echo "version=$VERSION" >> $GITHUB_OUTPUT
 
     - name: Download flutpak binary
+      if: inputs.flutpak_binary == ''
       shell: bash
       run: |
         case "${{ runner.arch }}" in
@@ -55,14 +86,25 @@ runs:
       run: |
         COMMIT="${{ inputs.commit }}"
         if [ -z "$COMMIT" ]; then
-          COMMIT=$(git rev-parse "${{ inputs.tag_name }}" 2>/dev/null || { git fetch origin tag "${{ inputs.tag_name }}" --no-tags >/dev/null 2>&1 && git rev-parse "${{ inputs.tag_name }}"; })
+          COMMIT=$(git rev-parse "${{ inputs.tag_name }}" 2>/dev/null || \
+            { git fetch origin tag "${{ inputs.tag_name }}" --no-tags >/dev/null 2>&1 && \
+              git rev-parse "${{ inputs.tag_name }}"; })
         fi
         echo "commit=$COMMIT" >> $GITHUB_OUTPUT
 
-    - name: Read Flutter version
+    - name: Resolve Flutter version
       id: flutter-ver
       shell: bash
-      run: echo "version=$(cat '${{ inputs.flatpak_dir }}/flutter.version')" >> $GITHUB_OUTPUT
+      run: |
+        VERSION="${{ inputs.flutter_version }}"
+        if [ -z "$VERSION" ] && [ -n "${{ inputs.flutter_version_file }}" ]; then
+          VERSION=$(cat "${{ inputs.flutter_version_file }}")
+        fi
+        if [ -z "$VERSION" ]; then
+          echo "::error::Either flutter_version or flutter_version_file must be provided"
+          exit 1
+        fi
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
 
     - name: Setup Flutter
       uses: o-murphy/flutpak/.github/actions/flutter@main
@@ -81,7 +123,24 @@ runs:
     - name: Run flutpak prepare
       shell: bash
       run: |
-        "$RUNNER_TEMP/flutpak" prepare \
+        FLUTPAK="${{ inputs.flutpak_binary || format('{0}/flutpak', runner.temp) }}"
+        CONFIG="${{ inputs.config }}"
+        "$FLUTPAK" prepare \
+          ${CONFIG:+--config "$CONFIG"} \
           --tag "${{ inputs.tag_name }}" \
           --commit "${{ steps.meta.outputs.commit }}" \
           --sdk "$FLUTTER_ROOT"
+
+    - name: Install appstream-util
+      if: inputs.validate == 'true'
+      shell: bash
+      run: sudo apt-get install -y --no-install-recommends appstream
+
+    - name: Validate metainfo
+      if: inputs.validate == 'true'
+      shell: bash
+      run: |
+        FLUTPAK="${{ inputs.flutpak_binary || format('{0}/flutpak', runner.temp) }}"
+        CONFIG="${{ inputs.config }}"
+        "$FLUTPAK" validate \
+          ${CONFIG:+--config "$CONFIG"}
