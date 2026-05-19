@@ -5,6 +5,7 @@ MetainfoConfig _cfg({
   String name = 'My App',
   String summary = 'A great app',
   String? description,
+  DeveloperConfig? developer,
   List<String> categories = const [],
   List<String> keywords = const [],
   UrlConfig? url,
@@ -16,6 +17,7 @@ MetainfoConfig _cfg({
       name: name,
       summary: summary,
       description: description,
+      developer: developer,
       categories: categories,
       keywords: keywords,
       url: url,
@@ -114,7 +116,33 @@ void main() {
       expect(xml, isNot(contains('<url')));
     });
 
-    test('first screenshot gets type="default"', () {
+    test('emits developer without id', () {
+      final xml = MetainfoGenerator(
+        appId: appId,
+        cfg: _cfg(developer: DeveloperConfig(name: 'o-murphy')),
+      ).generate();
+      expect(xml, contains('<developer>'));
+      expect(xml, contains('<name>o-murphy</name>'));
+      expect(xml, isNot(contains('id=')));
+    });
+
+    test('emits developer with id attribute', () {
+      final xml = MetainfoGenerator(
+        appId: appId,
+        cfg: _cfg(
+          developer: DeveloperConfig(name: 'o-murphy', id: 'io.github.o_murphy'),
+        ),
+      ).generate();
+      expect(xml, contains('<developer id="io.github.o_murphy">'));
+      expect(xml, contains('<name>o-murphy</name>'));
+    });
+
+    test('omits developer block when null', () {
+      final xml = MetainfoGenerator(appId: appId, cfg: _cfg()).generate();
+      expect(xml, isNot(contains('<developer')));
+    });
+
+    test('first screenshot gets type="default" using /main/ when no ref', () {
       final xml = MetainfoGenerator(
         appId: appId,
         cfg: _cfg(
@@ -128,6 +156,18 @@ void main() {
       expect(xml, contains('<screenshot type="default">'));
       expect(xml, contains('owner/repo/main/docs/a.png'));
       expect(xml, contains('owner/repo/main/docs/b.png'));
+    });
+
+    test('screenshots use ref when provided', () {
+      final xml = MetainfoGenerator(
+        appId: appId,
+        cfg: _cfg(
+          repoSlug: 'owner/repo',
+          screenshots: [ScreenshotConfig(path: 'docs/a.png')],
+        ),
+      ).generate(ref: 'v0.1.15');
+      expect(xml, contains('owner/repo/v0.1.15/docs/a.png'));
+      expect(xml, isNot(contains('/main/')));
     });
 
     test('screenshot marked default_ overrides first-item rule', () {

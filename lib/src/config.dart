@@ -32,6 +32,30 @@ class PatchEntry {
   }
 }
 
+/// Developer info for metainfo `<developer>` element.
+class DeveloperConfig {
+  /// Display name shown in software centres.
+  final String name;
+
+  /// Reverse-DNS id matching the app-id (e.g. "io.github.o_murphy").
+  /// Required by AppStream 1.0 / Flathub guidelines.
+  final String? id;
+
+  const DeveloperConfig({required this.name, this.id});
+
+  factory DeveloperConfig.fromYaml(dynamic yaml) {
+    if (yaml is String) return DeveloperConfig(name: yaml);
+    if (yaml is! Map) {
+      throw ArgumentError(
+          'developer config must be a String or Map, got ${yaml.runtimeType}');
+    }
+    return DeveloperConfig(
+      name: yaml['name'] as String,
+      id: yaml['id'] as String?,
+    );
+  }
+}
+
 /// Homepage / issue tracker URLs for metainfo.
 class UrlConfig {
   final String? homepage;
@@ -86,6 +110,7 @@ class MetainfoConfig {
   final String? name;
   final String? summary;
   final String? description;
+  final DeveloperConfig? developer;
   final List<String> categories;
   final List<String> keywords;
   final UrlConfig? url;
@@ -103,6 +128,7 @@ class MetainfoConfig {
     this.name,
     this.summary,
     this.description,
+    this.developer,
     this.categories = const [],
     this.keywords = const [],
     this.url,
@@ -122,6 +148,9 @@ class MetainfoConfig {
       categories: (yaml['categories'] as List?)?.cast<String>() ?? [],
       keywords: (yaml['keywords'] as List?)?.cast<String>() ?? [],
       url: yaml['url'] != null ? UrlConfig.fromYaml(yaml['url'] as Map) : null,
+      developer: yaml['developer'] != null
+          ? DeveloperConfig.fromYaml(yaml['developer'])
+          : null,
       screenshots:
           screensRaw.map((e) => ScreenshotConfig.fromYaml(e)).toList(),
       contentRating: yaml['content_rating'] as String? ?? 'oars-1.1',
