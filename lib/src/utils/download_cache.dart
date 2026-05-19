@@ -11,7 +11,7 @@ abstract interface class DownloadCache {
 }
 
 /// SHA-256 cache keyed by URL — avoids re-downloading Flutter SDK artifacts
-/// across runs. Stored in ~/.cache/flatpak_gen/.
+/// across runs. Stored in ~/.cache/flutpak/.
 class LocalDownloadCache implements DownloadCache {
   final Directory _dir;
   final http.Client _client;
@@ -20,7 +20,7 @@ class LocalDownloadCache implements DownloadCache {
       : _dir = Directory(p.join(
           Platform.environment['HOME'] ?? '.',
           '.cache',
-          'flatpak_gen',
+          'flutpak',
         )),
         _client = client ?? http.Client();
 

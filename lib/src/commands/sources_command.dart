@@ -31,7 +31,7 @@ class SourcesCommand extends Command<void> {
       ..addOption('config',
           abbr: 'c',
           help: 'Config file.',
-          defaultsTo: 'flatpak_gen.yaml')
+          defaultsTo: 'flutpak.yaml')
       ..addFlag('pub-only', help: 'Skip Flutter SDK sources.')
       ..addFlag('flutter-only', help: 'Skip pub sources.');
   }

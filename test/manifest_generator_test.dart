@@ -1,4 +1,4 @@
-import 'package:flatpak_gen/flatpak_gen.dart';
+import 'package:flutpak/flutpak.dart';
 import 'package:test/test.dart';
 
 ManifestConfig _baseConfig({

@@ -1,10 +1,20 @@
-name: flatpak_gen
+name: flutpak
 description: >
-  Generate Flatpak source manifests for Flutter/Dart applications.
-  Produces generated-sources.json (pub packages + Flutter SDK) and
-  Flutter SDK Extension manifests for Flathub.
+  CLI tool that generates Flatpak manifests and offline source bundles for
+  Flutter applications. One command prepares everything needed for a
+  Flathub-compatible offline build: generated-sources.json, manifest with
+  placeholders, patches, and Flutter SDK sources.
 version: 0.1.0
-repository: https://github.com/o-murphy/flatpak_gen
+repository: https://github.com/o-murphy/flutpak
+topics:
+  - flatpak
+  - flathub
+  - flutter
+  - build-tool
+  - linux
+
+platforms:
+  linux:
 
 environment:
   sdk: '>=3.3.0 <4.0.0'
@@ -22,4 +32,4 @@ dev_dependencies:
   test: ^1.24.0
 
 executables:
-  flatpak_gen: flatpak_gen
+  flutpak: flutpak

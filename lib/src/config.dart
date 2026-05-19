@@ -96,7 +96,7 @@ class DesktopConfig {
   }
 }
 
-/// Config for manifest generation (`flatpak_gen.manifest:` section).
+/// Config for manifest generation (`flutpak.manifest:` section).
 class ManifestConfig {
   final String appId;
   final String runtimeVersion;
@@ -151,10 +151,10 @@ class ManifestConfig {
     final appId = yaml['app_id'];
     final command = yaml['command'];
     if (appId == null) {
-      throw ArgumentError('manifest.app_id is required in flatpak_gen config');
+      throw ArgumentError('manifest.app_id is required in flutpak config');
     }
     if (command == null) {
-      throw ArgumentError('manifest.command is required in flatpak_gen config');
+      throw ArgumentError('manifest.command is required in flutpak config');
     }
 
     final exts = (yaml['sdk_extensions'] as List?)?.cast<String>() ?? [];
@@ -201,7 +201,7 @@ class ManifestConfig {
   }
 }
 
-/// Parsed contents of `flatpak_gen:` in `pubspec.yaml` or `flatpak_gen.yaml`.
+/// Parsed contents of `flutpak:` in `pubspec.yaml` or `flutpak.yaml`.
 class FlatpakGenConfig {
   final String output;
   final List<String> pubLocks;
@@ -262,7 +262,7 @@ class FlatpakGenConfig {
   /// Throws if both sources are found (ambiguous config).
   /// Falls back to sensible defaults if neither exists.
   static FlatpakGenConfig load(
-      [String configPath = 'flatpak_gen.yaml', String? workingDir]) {
+      [String configPath = 'flutpak.yaml', String? workingDir]) {
     final dir = workingDir ?? Directory.current.path;
     final pubspecFile = File(p.join(dir, 'pubspec.yaml'));
     final configFile = File(p.join(dir, configPath));
@@ -279,7 +279,7 @@ class FlatpakGenConfig {
 
     if (hasPubspecSection) {
       final yaml = loadYaml(pubspecFile.readAsStringSync()) as Map;
-      return FlatpakGenConfig.fromYaml(yaml['flatpak_gen'] as Map);
+      return FlatpakGenConfig.fromYaml(yaml['flutpak'] as Map);
     }
 
     if (hasConfigFile) {
@@ -304,6 +304,6 @@ class FlatpakGenConfig {
   static bool _hasFlatpakGenSection(File pubspecFile) {
     if (!pubspecFile.existsSync()) return false;
     final yaml = loadYaml(pubspecFile.readAsStringSync());
-    return yaml is Map && yaml.containsKey('flatpak_gen');
+    return yaml is Map && yaml.containsKey('flutpak');
   }
 }

@@ -5,7 +5,7 @@ import 'package:test/test.dart';
 void main() {
   late Directory tmp;
 
-  setUp(() => tmp = Directory.systemTemp.createTempSync('flatpak_gen_test_'));
+  setUp(() => tmp = Directory.systemTemp.createTempSync('flutpak_test_'));
   tearDown(() => tmp.deleteSync(recursive: true));
 
   // ── Helpers ────────────────────────────────────────────────────────────────
@@ -131,7 +131,7 @@ Future<_Result> _runCli(List<String> args) async {
   // dart test runs with cwd = package root, so no workingDirectory needed.
   final result = await Process.run(
     Platform.executable,
-    ['run', 'bin/flatpak_gen.dart', ...args],
+    ['run', 'bin/flutpak.dart', ...args],
   );
   return _Result(result.exitCode, result.stdout as String,
       result.stderr as String);

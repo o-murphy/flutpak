@@ -47,7 +47,7 @@ class ManifestCommand extends Command<void> {
       ..addOption('config',
           abbr: 'c',
           help: 'Config file.',
-          defaultsTo: 'flatpak_gen.yaml');
+          defaultsTo: 'flutpak.yaml');
   }
 
   @override

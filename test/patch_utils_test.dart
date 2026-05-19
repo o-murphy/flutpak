@@ -1,5 +1,5 @@
 import 'dart:io';
-import 'package:flatpak_gen/flatpak_gen.dart';
+import 'package:flutpak/flutpak.dart';
 import 'package:test/test.dart';
 
 void main() {
@@ -131,7 +131,7 @@ commit: __FLATPAK_COMMIT__
     late Directory tmpDir;
 
     setUp(() {
-      tmpDir = Directory.systemTemp.createTempSync('flatpak_gen_patch_test_');
+      tmpDir = Directory.systemTemp.createTempSync('flutpak_patch_test_');
     });
 
     tearDown(() {
