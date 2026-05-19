@@ -100,6 +100,8 @@ class ManifestGenerator {
         prependLdLib ??= '/usr/lib/sdk/llvm$ver/lib';
       }
     }
+    // Flutter SDK is bundled into the build dir — always add its bin to PATH.
+    appendParts.add('/run/build/$appName/flutter/bin');
     if (cfg.appendPath != null) appendParts.add(cfg.appendPath!);
 
     if (appendParts.isNotEmpty) {
@@ -194,15 +196,43 @@ class ManifestGenerator {
     // generated-sources.json reference (relative to manifest dir).
     buf.writeln('      - ${p.basename(generatedSourcesPath)}');
 
+    // Extra verbatim sources (e.g. arch-specific prebuilt archives).
+    for (final src in cfg.extraSources) {
+      _writeYamlMap(buf, src, indent: '      ');
+    }
+
     // Patch sources from registry / project config.
+    // Paths are made relative to the manifest directory so flatpak-builder
+    // can resolve them correctly (manifest lives in flatpak/).
+    final manifestDir = p.dirname(p.absolute(generatedSourcesPath));
     for (final patch in patchEntries) {
-      final dest =
-          patch.version != null ? patch.dest(patch.version!) : null;
+      final dest = patch.version != null ? patch.dest(patch.version!) : null;
+      final relPath = p.relative(patch.path, from: manifestDir);
       buf.writeln('      - type: patch');
-      buf.writeln('        path: ${patch.path}');
+      buf.writeln('        path: $relPath');
       if (dest != null) {
         buf.writeln('        dest: $dest');
       }
+    }
+  }
+
+  /// Writes a Map as indented YAML key-value pairs with a leading `- ` on the
+  /// first key (list item syntax).
+  static void _writeYamlMap(
+      StringBuffer buf, Map<String, dynamic> map, {required String indent}) {
+    var first = true;
+    for (final entry in map.entries) {
+      final value = entry.value;
+      final prefix = first ? '- ' : '  ';
+      if (value is List) {
+        buf.writeln('$indent$prefix${entry.key}:');
+        for (final item in value) {
+          buf.writeln('$indent    - $item');
+        }
+      } else {
+        buf.writeln('$indent$prefix${entry.key}: $value');
+      }
+      first = false;
     }
   }
 

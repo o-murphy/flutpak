@@ -56,7 +56,18 @@ List<PatchEntry> resolvePatchEntries({
   final overriddenPackages =
       projectPatches.map((e) => e.package).toSet();
 
-  final entries = <PatchEntry>[...projectPatches];
+  // Back-fill version from lock file for project patches that omit it.
+  final entries = <PatchEntry>[
+    for (final p in projectPatches)
+      p.version != null
+          ? p
+          : PatchEntry(
+              package: p.package,
+              version: lockedVersions[p.package],
+              path: p.path,
+              destSubpath: p.destSubpath,
+            ),
+  ];
 
   for (final entry in _registry) {
     if (overriddenPackages.contains(entry.package)) continue;

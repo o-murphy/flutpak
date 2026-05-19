@@ -124,6 +124,11 @@ class ManifestConfig {
   /// Git repository URL for the app source entry.
   final String? repoUrl;
 
+  /// Extra flatpak sources inserted verbatim into the app module sources list.
+  /// Use for arch-specific prebuilt archives (e.g. objectbox-c) that have no
+  /// pub package equivalent.
+  final List<Map<String, dynamic>> extraSources;
+
   const ManifestConfig({
     required this.appId,
     required this.runtimeVersion,
@@ -139,6 +144,7 @@ class ManifestConfig {
     this.screenshots = const [],
     this.metainfo,
     this.repoUrl,
+    this.extraSources = const [],
   });
 
   factory ManifestConfig.fromYaml(Map yaml) {
@@ -146,11 +152,18 @@ class ManifestConfig {
     final finArgs = (yaml['finish_args'] as List?)?.cast<String>() ?? [];
     final extraMods = (yaml['extra_modules'] as List?)?.cast<String>() ?? [];
     final buildOpts = yaml['build_options'] as Map? ?? {};
-    final envMap = (buildOpts['env'] as Map? ?? {})
+
+    // Accept env at both manifest.env and manifest.build_options.env levels;
+    // build_options.env takes precedence for overlapping keys.
+    final envTop = (yaml['env'] as Map? ?? {})
         .map((k, v) => MapEntry(k as String, v.toString()));
+    final envOpts = (buildOpts['env'] as Map? ?? {})
+        .map((k, v) => MapEntry(k as String, v.toString()));
+    final envMap = {...envTop, ...envOpts};
 
     final iconsRaw = yaml['icons'] as List? ?? [];
     final screensRaw = yaml['screenshots'] as List? ?? [];
+    final extraSourcesRaw = yaml['extra_sources'] as List? ?? [];
 
     return ManifestConfig(
       appId: yaml['app_id'] as String,
@@ -172,6 +185,9 @@ class ManifestConfig {
           ? MetainfoConfig.fromYaml(yaml['metainfo'] as Map)
           : null,
       repoUrl: yaml['repo_url'] as String?,
+      extraSources: extraSourcesRaw
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList(),
     );
   }
 }

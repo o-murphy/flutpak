@@ -71,6 +71,7 @@ void main() {
       ).generate();
 
       expect(yaml, contains('/usr/lib/sdk/llvm20/bin'));
+      expect(yaml, contains('/run/build/myapp/flutter/bin'));
       expect(yaml, contains('prepend-ld-library-path: /usr/lib/sdk/llvm20/lib'));
     });
 
@@ -117,7 +118,8 @@ void main() {
       ).generate();
 
       expect(yaml, contains('type: patch'));
-      expect(yaml, contains('path: flatpak/patches/objectbox.patch'));
+      // Path is made relative to manifest dir (flatpak/), so flatpak/ prefix is stripped.
+      expect(yaml, contains('path: patches/objectbox.patch'));
       expect(yaml,
           contains('.pub-cache/hosted/pub.dev/objectbox_flutter_libs-5.3.1'));
     });
