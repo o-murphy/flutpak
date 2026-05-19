@@ -275,7 +275,7 @@ String patchManifestPlaceholders(
         final indent = m.group(1)!;
         final tagLine =
             (tag != null && tag.isNotEmpty) ? '${indent}tag: $tag\n' : '';
-        return '${tagLine}${indent}commit: $commit';
+        return '$tagLine${indent}commit: $commit';
       },
     );
   }
