@@ -1,0 +1,79 @@
+name: Pin Flatpak Manifest
+description: >
+  Generates Flatpak sources and pins manifest placeholders to a tag/commit.
+  Uses a pre-compiled flutpak binary from GitHub releases — no Dart SDK required.
+
+inputs:
+  tag_name:
+    description: Tag to pin (e.g. v0.1.15)
+    required: true
+  commit:
+    description: Commit SHA (empty = resolved from tag automatically)
+    required: false
+    default: ''
+  flatpak_dir:
+    description: Directory containing manifest, generated-sources.json and flutter.version
+    required: false
+    default: flatpak
+  flutpak_version:
+    description: flutpak release tag to download (empty = latest stable)
+    required: false
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    - name: Resolve flutpak version
+      id: flutpak-ver
+      shell: bash
+      run: |
+        VERSION="${{ inputs.flutpak_version }}"
+        if [ -z "$VERSION" ]; then
+          VERSION=$(curl -fsSL https://api.github.com/repos/o-murphy/flutpak/releases/latest \
+            | grep '"tag_name"' | head -1 | sed 's/.*"tag_name": *"\([^"]*\)".*/\1/')
+        fi
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+    - name: Download flutpak binary
+      shell: bash
+      run: |
+        curl -fsSL \
+          "https://github.com/o-murphy/flutpak/releases/download/${{ steps.flutpak-ver.outputs.version }}/flutpak-linux-x64" \
+          -o /tmp/flutpak
+        chmod +x /tmp/flutpak
+
+    - name: Resolve commit SHA
+      id: meta
+      shell: bash
+      run: |
+        COMMIT="${{ inputs.commit }}"
+        if [ -z "$COMMIT" ]; then
+          COMMIT=$(git rev-list -n 1 "${{ inputs.tag_name }}")
+        fi
+        echo "commit=$COMMIT" >> $GITHUB_OUTPUT
+
+    - name: Read Flutter version
+      id: flutter-ver
+      shell: bash
+      run: echo "version=$(cat '${{ inputs.flatpak_dir }}/flutter.version')" >> $GITHUB_OUTPUT
+
+    - name: Setup Flutter
+      uses: o-murphy/flutpak/.github/actions/flutter@main
+      with:
+        flutter-version: ${{ steps.flutter-ver.outputs.version }}
+
+    - name: Resolve flutter_tools pubspec.lock
+      shell: bash
+      run: |
+        LOCK="$FLUTTER_ROOT/packages/flutter_tools/pubspec.lock"
+        if [ ! -f "$LOCK" ]; then
+          (cd "$FLUTTER_ROOT/packages/flutter_tools" && dart pub get --no-example 2>&1)
+        fi
+
+    - name: Run flutpak prepare
+      shell: bash
+      run: |
+        /tmp/flutpak prepare \
+          --tag "${{ inputs.tag_name }}" \
+          --commit "${{ steps.meta.outputs.commit }}" \
+          --sdk "$FLUTTER_ROOT"

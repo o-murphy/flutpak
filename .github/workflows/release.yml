@@ -68,12 +68,16 @@ jobs:
           fi
           cat /tmp/release_notes.md
 
+      - name: Build Linux binary
+        run: dart compile exe bin/flutpak.dart -o flutpak-linux-x64
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ steps.meta.outputs.tag }}
           body_path: /tmp/release_notes.md
           prerelease: ${{ steps.meta.outputs.prerelease }}
+          files: flutpak-linux-x64
 
       - name: Publish to pub.dev
         run: dart pub publish --force
