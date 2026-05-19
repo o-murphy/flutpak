@@ -98,6 +98,14 @@ class PrepareCommand extends Command<void> {
         );
         stderr.writeln('✓  manifest created: $manifestPath');
       } else {
+        if (commit == null) {
+          final content = manifestFile.readAsStringSync();
+          if (content.contains('__FLATPAK_COMMIT__')) {
+            stderr.writeln(
+                '⚠  commit hash unknown (not in a git repo and --commit not set);\n'
+                '   __FLATPAK_COMMIT__ placeholder will remain in $manifestPath');
+          }
+        }
         _updateManifestPlaceholders(
           manifestFile: manifestFile,
           tag: tag,
