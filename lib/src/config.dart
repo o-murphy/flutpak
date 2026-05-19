@@ -148,6 +148,15 @@ class ManifestConfig {
   });
 
   factory ManifestConfig.fromYaml(Map yaml) {
+    final appId = yaml['app_id'];
+    final command = yaml['command'];
+    if (appId == null) {
+      throw ArgumentError('manifest.app_id is required in flatpak_gen config');
+    }
+    if (command == null) {
+      throw ArgumentError('manifest.command is required in flatpak_gen config');
+    }
+
     final exts = (yaml['sdk_extensions'] as List?)?.cast<String>() ?? [];
     final finArgs = (yaml['finish_args'] as List?)?.cast<String>() ?? [];
     final extraMods = (yaml['extra_modules'] as List?)?.cast<String>() ?? [];
@@ -166,10 +175,10 @@ class ManifestConfig {
     final extraSourcesRaw = yaml['extra_sources'] as List? ?? [];
 
     return ManifestConfig(
-      appId: yaml['app_id'] as String,
+      appId: appId as String,
       runtimeVersion: (yaml['runtime_version'] ?? '25.08').toString(),
       sdkExtensions: exts,
-      command: yaml['command'] as String,
+      command: command as String,
       finishArgs: finArgs,
       extraModules: extraMods,
       appendPath: buildOpts['append_path'] as String?,

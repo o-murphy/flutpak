@@ -61,6 +61,7 @@ class ManifestGenerator {
           _line(buf, '  $rawLine');
         }
       } else {
+        stderr.writeln('⚠  extra_modules: file not found: $modPath');
         _line(buf, '  - $modPath');
       }
     }
