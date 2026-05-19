@@ -100,47 +100,47 @@ void main() {
     test('reads flatpak_gen: section from pubspec.yaml', () {
       File('${tmpDir.path}/pubspec.yaml').writeAsStringSync('''
 name: myapp
-flatpak_gen:
+flutpak:
   output: flatpak/custom-sources.json
   pub:
     locks:
       - pubspec.lock
 ''');
-      final cfg = FlatpakGenConfig.load('flatpak_gen.yaml', tmpDir.path);
+      final cfg = FlatpakGenConfig.load('flutpak.yaml', tmpDir.path);
       expect(cfg.output, 'flatpak/custom-sources.json');
     });
 
-    test('reads from flatpak_gen.yaml when no pubspec section', () {
+    test('reads from flutpak.yaml when no pubspec section', () {
       File('${tmpDir.path}/pubspec.yaml')
           .writeAsStringSync('name: myapp\nversion: 1.0.0\n');
-      File('${tmpDir.path}/flatpak_gen.yaml').writeAsStringSync('''
+      File('${tmpDir.path}/flutpak.yaml').writeAsStringSync('''
 output: flatpak/gen-sources.json
 pub:
   locks:
     - pubspec.lock
 ''');
-      final cfg = FlatpakGenConfig.load('flatpak_gen.yaml', tmpDir.path);
+      final cfg = FlatpakGenConfig.load('flutpak.yaml', tmpDir.path);
       expect(cfg.output, 'flatpak/gen-sources.json');
     });
 
-    test('throws when both pubspec.yaml section and flatpak_gen.yaml exist',
+    test('throws when both pubspec.yaml section and flutpak.yaml exist',
         () {
       File('${tmpDir.path}/pubspec.yaml').writeAsStringSync('''
 name: myapp
-flatpak_gen:
+flutpak:
   output: flatpak/a.json
 ''');
-      File('${tmpDir.path}/flatpak_gen.yaml')
+      File('${tmpDir.path}/flutpak.yaml')
           .writeAsStringSync('output: flatpak/b.json\n');
       expect(
-          () => FlatpakGenConfig.load('flatpak_gen.yaml', tmpDir.path),
+          () => FlatpakGenConfig.load('flutpak.yaml', tmpDir.path),
           throwsStateError);
     });
 
     test('returns defaults when neither config exists', () {
       File('${tmpDir.path}/pubspec.yaml')
           .writeAsStringSync('name: myapp\nversion: 1.0.0\n');
-      final cfg = FlatpakGenConfig.load('flatpak_gen.yaml', tmpDir.path);
+      final cfg = FlatpakGenConfig.load('flutpak.yaml', tmpDir.path);
       expect(cfg.output, 'flatpak/generated-sources.json');
       expect(cfg.pubLocks, contains('pubspec.lock'));
     });
