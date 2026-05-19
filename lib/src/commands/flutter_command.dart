@@ -19,7 +19,7 @@ class FlutterCommand extends Command<void> {
           help: 'Path to Flutter SDK. Defaults to \$FLUTTER_ROOT.')
       ..addOption('output',
           abbr: 'o',
-          help: 'Output JSON file.',
+          help: 'Output directory (generated-sources.json is written inside).',
           defaultsTo: null)
       ..addOption('patch',
           help: 'Path to shared.sh.patch. '
@@ -43,7 +43,8 @@ class FlutterCommand extends Command<void> {
           'Flutter SDK path required: --sdk or \$FLUTTER_ROOT or config flutter.sdk');
     }
 
-    final output = argResults!['output'] as String? ?? cfg.output;
+    final outputDir = argResults!['output'] as String? ?? cfg.output;
+    final outputFile = p.join(outputDir, 'generated-sources.json');
     final patchPath = argResults!['patch'] as String? ?? cfg.patchPath;
 
     final cache = LocalDownloadCache();
@@ -51,18 +52,18 @@ class FlutterCommand extends Command<void> {
       final gen = FlutterSdkGenerator(
         sdkPath: sdkPath,
         patchPath: patchPath,
-        outputDir: p.dirname(p.absolute(output)),
+        outputDir: outputDir,
         cache: cache,
       );
       final sources = await gen.generate();
 
       final json = const JsonEncoder.withIndent('    ')
           .convert(sources.map((s) => s.toJson()).toList());
-      File(output)
+      File(outputFile)
         ..createSync(recursive: true)
         ..writeAsStringSync('$json\n');
 
-      stderr.writeln('✓  ${sources.length} flutter SDK sources → $output');
+      stderr.writeln('✓  ${sources.length} flutter SDK sources → $outputFile');
     } finally {
       cache.dispose();
     }

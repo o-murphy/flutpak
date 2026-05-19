@@ -100,9 +100,10 @@ jobs:
 
       - name: Smoke test — pub sources (real pub.dev)
         run: |
+          mkdir -p /tmp/smoke-sources
           /tmp/flutpak pub \
             --lock test/fixtures/simple.lock \
-            --output /tmp/smoke-sources.json
-          COUNT=$(python3 -c "import json; d=json.load(open('/tmp/smoke-sources.json')); print(len(d))")
+            --output /tmp/smoke-sources
+          COUNT=$(python3 -c "import json; d=json.load(open('/tmp/smoke-sources/generated-sources.json')); print(len(d))")
           [ "$COUNT" -eq 6 ] || { echo "Expected 6 entries (3 archive + 3 inline), got $COUNT"; exit 1; }
           echo "pub smoke test passed: $COUNT entries"

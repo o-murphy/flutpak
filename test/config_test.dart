@@ -6,7 +6,7 @@ void main() {
   group('FlatpakGenConfig.fromYaml', () {
     test('parses full config', () {
       final cfg = FlatpakGenConfig.fromYaml({
-        'output': 'flatpak/generated-sources.json',
+        'output': 'flatpak',
         'pub': {
           'locks': ['pubspec.lock', 'packages/a7p/pubspec.lock'],
         },
@@ -16,7 +16,7 @@ void main() {
         'patch_path': 'flatpak/patches/flutter/shared.sh.patch',
       });
 
-      expect(cfg.output, 'flatpak/generated-sources.json');
+      expect(cfg.output, 'flatpak');
       expect(cfg.pubLocks, ['pubspec.lock', 'packages/a7p/pubspec.lock']);
       expect(cfg.flutterSdk, '/home/user/flutter');
       expect(cfg.patchPath, 'flatpak/patches/flutter/shared.sh.patch');
@@ -24,7 +24,7 @@ void main() {
 
     test('defaults output when missing', () {
       final cfg = FlatpakGenConfig.fromYaml({});
-      expect(cfg.output, 'flatpak/generated-sources.json');
+      expect(cfg.output, 'flatpak');
     });
 
     test('defaults pub locks to pubspec.lock when missing', () {
@@ -101,26 +101,26 @@ void main() {
       File('${tmpDir.path}/pubspec.yaml').writeAsStringSync('''
 name: myapp
 flutpak:
-  output: flatpak/custom-sources.json
+  output: flatpak/custom
   pub:
     locks:
       - pubspec.lock
 ''');
       final cfg = FlatpakGenConfig.load('flutpak.yaml', tmpDir.path);
-      expect(cfg.output, 'flatpak/custom-sources.json');
+      expect(cfg.output, 'flatpak/custom');
     });
 
     test('reads from flutpak.yaml when no pubspec section', () {
       File('${tmpDir.path}/pubspec.yaml')
           .writeAsStringSync('name: myapp\nversion: 1.0.0\n');
       File('${tmpDir.path}/flutpak.yaml').writeAsStringSync('''
-output: flatpak/gen-sources.json
+output: flatpak/gen
 pub:
   locks:
     - pubspec.lock
 ''');
       final cfg = FlatpakGenConfig.load('flutpak.yaml', tmpDir.path);
-      expect(cfg.output, 'flatpak/gen-sources.json');
+      expect(cfg.output, 'flatpak/gen');
     });
 
     test('throws when both pubspec.yaml section and flutpak.yaml exist',
@@ -128,10 +128,10 @@ pub:
       File('${tmpDir.path}/pubspec.yaml').writeAsStringSync('''
 name: myapp
 flutpak:
-  output: flatpak/a.json
+  output: flatpak/a
 ''');
       File('${tmpDir.path}/flutpak.yaml')
-          .writeAsStringSync('output: flatpak/b.json\n');
+          .writeAsStringSync('output: flatpak/b\n');
       expect(
           () => FlatpakGenConfig.load('flutpak.yaml', tmpDir.path),
           throwsStateError);
@@ -141,7 +141,7 @@ flutpak:
       File('${tmpDir.path}/pubspec.yaml')
           .writeAsStringSync('name: myapp\nversion: 1.0.0\n');
       final cfg = FlatpakGenConfig.load('flutpak.yaml', tmpDir.path);
-      expect(cfg.output, 'flatpak/generated-sources.json');
+      expect(cfg.output, 'flatpak');
       expect(cfg.pubLocks, contains('pubspec.lock'));
     });
   });
@@ -170,7 +170,7 @@ flutpak:
   });
 
   group('ManifestConfig.fromYaml', () {
-    test('parses icons and screenshots', () {
+    test('parses icons', () {
       final cfg = ManifestConfig.fromYaml({
         'app_id': 'io.github.example.app',
         'runtime_version': '25.08',
@@ -178,15 +178,27 @@ flutpak:
         'icons': [
           {'size': '512x512', 'path': 'assets/icon_512x512.png'},
         ],
-        'screenshots': [
-          {'path': 'docs/screenshots/home.png'},
-          {'path': 'docs/screenshots/settings.png', 'default': true},
-        ],
       });
       expect(cfg.icons, hasLength(1));
       expect(cfg.icons.first.size, '512x512');
-      expect(cfg.screenshots, hasLength(2));
-      expect(cfg.screenshots.last.default_, true);
+    });
+
+    test('parses metainfo screenshots', () {
+      final cfg = ManifestConfig.fromYaml({
+        'app_id': 'io.github.example.app',
+        'runtime_version': '25.08',
+        'command': 'app',
+        'metainfo': {
+          'name': 'My App',
+          'summary': 'A great app',
+          'screenshots': [
+            {'path': 'docs/screenshots/home.png'},
+            {'path': 'docs/screenshots/settings.png', 'default': true},
+          ],
+        },
+      });
+      expect(cfg.metainfo!.screenshots, hasLength(2));
+      expect(cfg.metainfo!.screenshots.last.default_, true);
     });
 
     test('parses build_options env and append_path', () {
