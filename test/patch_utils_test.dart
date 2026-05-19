@@ -45,7 +45,74 @@ sources:
       expect(result, contains('commit: abc1234567890'));
     });
 
-    test('is idempotent when no placeholders present', () {
+    test('re-pins tag and commit when placeholders already replaced', () {
+      const pinned = '''
+sources:
+  - type: git
+    url: https://github.com/example/app.git
+    tag: v0.1.14
+    commit: abc1234567890
+    disable-submodules: true
+''';
+      final result = patchManifestPlaceholders(
+        pinned,
+        tag: 'v0.2.0',
+        commit: 'deadbeef',
+      );
+      expect(result, contains('tag: v0.2.0'));
+      expect(result, contains('commit: deadbeef'));
+      expect(result, isNot(contains('v0.1.14')));
+      expect(result, isNot(contains('abc1234567890')));
+    });
+
+    test('re-pins commit only (no tag) when placeholders already replaced', () {
+      const pinned = '''
+sources:
+  - type: git
+    url: https://github.com/example/app.git
+    tag: v0.1.14
+    commit: abc1234567890
+    disable-submodules: true
+''';
+      final result = patchManifestPlaceholders(
+        pinned,
+        tag: null,
+        commit: 'deadbeef',
+      );
+      expect(result, isNot(contains('tag:')));
+      expect(result, contains('commit: deadbeef'));
+    });
+
+    test('does not touch other modules without disable-submodules when re-pinning', () {
+      const manifest = '''
+  - name: lib
+    sources:
+      - type: git
+        url: https://github.com/example/lib.git
+        tag: v1.0.6
+        commit: 0000000000000000000000000000000000000001
+  - name: app
+    sources:
+      - type: git
+        url: https://github.com/example/app.git
+        tag: v0.1.14
+        commit: abc1234567890
+        disable-submodules: true
+''';
+      final result = patchManifestPlaceholders(
+        manifest,
+        tag: 'v0.2.0',
+        commit: 'deadbeef',
+      );
+      // lib module unchanged
+      expect(result, contains('tag: v1.0.6'));
+      expect(result, contains('commit: 0000000000000000000000000000000000000001'));
+      // app module updated
+      expect(result, contains('tag: v0.2.0'));
+      expect(result, contains('commit: deadbeef'));
+    });
+
+    test('is idempotent when no placeholders and no disable-submodules marker', () {
       const noPlaceholders = '''
 sources:
   - type: git
@@ -58,7 +125,7 @@ sources:
         tag: 'v0.2.0',
         commit: 'deadbeef',
       );
-      // No placeholders → no replacement, content unchanged
+      // No placeholders and no disable-submodules anchor → unchanged
       expect(result, equals(noPlaceholders));
     });
 
