@@ -313,11 +313,11 @@ String patchMetainfoReleases(String content, String tag, DateTime date) {
       // Replace version="..." and date="..." attributes, preserving indentation
       // by operating on the tag text only.
       var updated = original.replaceFirst(
-        RegExp(r'version="[^"]*"'),
+        RegExp(r'version\s*=\s*["\'][^"\']*["\']'),
         'version="$version"',
       );
       updated = updated.replaceFirst(
-        RegExp(r'date="[^"]*"'),
+        RegExp(r'date\s*=\s*["\'][^"\']*["\']'),
         'date="$dateStr"',
       );
       return updated;

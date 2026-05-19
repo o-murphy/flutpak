@@ -286,6 +286,28 @@ commit: __FLATPAK_COMMIT__
       final result = patchMetainfoReleases(input, 'v0.1.15', earlyDate);
       expect(result, contains('date="2026-01-05"'));
     });
+
+    test('handles single-quoted attributes', () {
+      const input = '''
+<releases>
+  <release version='0.1.14' date='2026-05-14'/>
+</releases>
+''';
+      final result = patchMetainfoReleases(input, 'v0.1.15', date);
+      expect(result, contains('version="0.1.15"'));
+      expect(result, contains('date="2026-05-19"'));
+    });
+
+    test('handles spaces around equals sign in attributes', () {
+      const input = '''
+<releases>
+  <release version = "0.1.14" date = "2026-05-14"/>
+</releases>
+''';
+      final result = patchMetainfoReleases(input, 'v0.1.15', date);
+      expect(result, contains('version="0.1.15"'));
+      expect(result, contains('date="2026-05-19"'));
+    });
   });
 
   group('resolvePatchEntries', () {
