@@ -8,6 +8,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 
+## [0.2.0] - 2026-05-19
+
+### Added
+- `lint` command — `flatpak-builder-lint` wrapper (requires `org.flatpak.Builder`)
+- `export` command — collects manifest, `generated-sources.json`, metainfo, and patches into a ready-to-submit directory
+- `validate` command — `appstream-util validate` wrapper for AppStream metainfo
+- Metainfo XML generation from `manifest.metainfo:` config (name, summary, description, categories, keywords, URLs, screenshots, OARS content rating)
+- `.desktop` file generation from `manifest.desktop:` config
+- `prepare --dry-run` / `-n` — prints what would be written without touching any files
+- `pin-manifest` composite action: `flutter_version` / `flutter_version_file` inputs (one required), `config`, `validate`, `flutpak_binary`
+- `test-action.yml` — CI workflow that builds the binary from source and smoke-tests the action
+
+### Changed
+- `output:` config field is now a **directory** (default: `flatpak`); `generated-sources.json` is always written as `<output>/generated-sources.json`
+- `--output` CLI flag is now a directory in all sub-commands (`sources`, `pub`, `flutter`, `manifest`)
+- All commands resolve paths relative to the config file directory, not CWD
+- `pin-manifest` action: replaced `flatpak_dir` input with `config` + `flutter_version`/`flutter_version_file`
+
+### Fixed
+- Screenshot URL pinning uses git tag date for deterministic release dates
+- `ScreenshotConfig.fromYaml` handles non-Map input safely
+
+
 ## [0.1.1] - 2026-05-19
 
 ### Fixed
@@ -50,6 +73,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   output files
 - MIT License
 
-[Unreleased]: https://github.com/o-murphy/flutpak/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/o-murphy/flutpak/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/o-murphy/flutpak/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/o-murphy/flutpak/releases/tag/v0.1.1
 [0.1.0]: https://github.com/o-murphy/flutpak/releases/tag/v0.1.0
