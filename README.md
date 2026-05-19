@@ -1,12 +1,14 @@
 # flatpak_gen
 
-A Dart CLI tool that generates Flatpak source manifests for Flutter/Dart applications.
+A Dart CLI tool that automates Flatpak packaging for Flutter/Dart applications.
+Analogous to `flutter pub run build_runner build` — describe your Flatpak config once
+in `pubspec.yaml` and let `flatpak_gen prepare` generate everything.
 
+- **One command** — `flatpak_gen prepare` generates sources, resolves patches, and creates/updates the manifest
 - **No Python dependency** — pure Dart, compiles to a single native binary
-- **Uses the pub.dev API** for SHA-256 checksums — no archive downloads for most packages
-- **Generates both** archive sources and inline hash files for each pub package (required for offline `pub get`)
-- **Combines** pub packages + Flutter SDK artifacts into a single `generated-sources.json`
-- **Generates** a Flathub SDK Extension manifest for `org.freedesktop.Sdk.Extension.flutter3`
+- **Config in `pubspec.yaml`** — same pattern as `msix_config`, `flutter_native_splash`
+- **Manifest generation** — writes `flatpak/<app_id>.yml` with `__FLATPAK_TAG__` / `__FLATPAK_COMMIT__` placeholders that CI patches
+- **Patches registry** — known packages (e.g. `objectbox_flutter_libs`) get their patches resolved automatically
 
 ## Installation
 
@@ -17,13 +19,189 @@ dart pub global activate flatpak_gen
 Or compile a native binary for CI:
 
 ```bash
-dart compile exe bin/flatpak_gen.dart -o flatpak_gen
+git clone --depth 1 https://github.com/o-murphy/flutter_flatpak_gen.git /tmp/flatpak_gen_src
+cd /tmp/flatpak_gen_src && dart pub get
+dart compile exe bin/flatpak_gen.dart -o /tmp/flatpak_gen
 ```
 
 ## Quick start
 
+### 1. Add config to `pubspec.yaml`
+
+```yaml
+flatpak_gen:
+  output: flatpak/generated-sources.json
+
+  pub:
+    locks:
+      - pubspec.lock
+      - $FLUTTER_ROOT/packages/flutter_tools/pubspec.lock
+
+  flutter:
+    sdk: $FLUTTER_ROOT
+    patch: patches/flutter/shared.sh.patch   # optional custom patch
+
+  manifest:
+    app_id: io.github.YourOrg.YourApp
+    runtime_version: "25.08"
+    command: yourapp
+    repo_url: https://github.com/YourOrg/YourApp.git
+    finish_args:
+      - --share=ipc
+      - --socket=wayland
+      - --device=dri
+    icons:
+      - size: 512x512
+        path: assets/icon_512x512.png
+    metainfo:
+      path: flatpak/io.github.YourOrg.YourApp.metainfo.xml
+      repo_slug: YourOrg/YourApp
+```
+
+### 2. Generate everything (first run)
+
 ```bash
-# Generate combined pub + Flutter SDK sources
+FLUTTER_ROOT=/path/to/flutter flatpak_gen prepare
+```
+
+This creates:
+- `flatpak/io.github.YourOrg.YourApp.yml` — manifest with `__FLATPAK_TAG__` / `__FLATPAK_COMMIT__` placeholders
+- `flatpak/generated-sources.json` — pub packages + Flutter SDK artifacts
+- `flatpak/patches/` — patch files from the built-in registry (if applicable)
+
+Commit the generated files to git. The manifest is the **artifact of generation**, like `*.g.dart` from build_runner.
+
+### 3. CI: patch placeholders and regenerate sources
+
+```bash
+flatpak_gen prepare \
+  --tag "$TAG" \
+  --commit "$COMMIT_SHA" \
+  --sdk "$FLUTTER_ROOT"
+```
+
+This updates `__FLATPAK_TAG__` / `__FLATPAK_COMMIT__` in the manifest and regenerates `generated-sources.json`.
+
+## Config
+
+Config lives in **one** of two places (error if both exist):
+
+| Location | Key |
+|---|---|
+| `pubspec.yaml` | `flatpak_gen:` section |
+| `flatpak_gen.yaml` | top-level file |
+
+### Full config reference
+
+```yaml
+flatpak_gen:
+  output: flatpak/generated-sources.json   # generated-sources output path
+
+  pub:
+    locks:
+      - pubspec.lock
+      - $FLUTTER_ROOT/packages/flutter_tools/pubspec.lock  # $ENV expanded
+
+  flutter:
+    sdk: $FLUTTER_ROOT
+    patch: flatpak/patches/flutter/shared.sh.patch  # optional custom shared.sh patch
+
+  patches:                           # project-level patches (applied to pub packages)
+    - package: objectbox_flutter_libs
+      path: flatpak/patches/objectbox_flutter_libs/CMakeLists.txt.patch
+      dest_subpath: linux            # optional: patch relative to package subdir
+
+  manifest:
+    app_id: io.github.YourOrg.YourApp
+    runtime_version: "25.08"
+    sdk_extensions:
+      - org.freedesktop.Sdk.Extension.llvm20   # auto-adds llvm bin/lib to PATH
+    command: yourapp
+    repo_url: https://github.com/YourOrg/YourApp.git
+    finish_args:
+      - --share=ipc
+      - --socket=fallback-x11
+      - --socket=wayland
+      - --device=dri
+    extra_modules:
+      - flatpak/modules/some-native-dep.yml    # included verbatim in modules list
+    build_options:
+      append_path: /custom/bin
+      env:
+        MY_VAR: value
+    icons:
+      - size: 512x512
+        path: assets/icon_512x512.png
+    screenshots:
+      - path: docs/screenshots/home.png
+      - path: docs/screenshots/settings.png
+    metainfo:
+      path: flatpak/io.github.YourOrg.YourApp.metainfo.xml
+      repo_slug: YourOrg/YourApp   # screenshot URLs pinned to tag/commit on prepare
+```
+
+## Patches registry
+
+`flatpak_gen` ships a built-in registry of patches for packages that need special
+handling to build inside the Flatpak sandbox. Patches are applied automatically if
+the package is found in any of your lock files.
+
+| Package | What the patch does |
+|---|---|
+| `objectbox_flutter_libs` | Replaces prebuilt download with local objectbox-c binary |
+| `sqflite_common_ffi` | Adjusts CMake for sandbox builds |
+
+To override a registry entry or add custom patches, use the `patches:` section in
+your config. Project-level patches always take priority over the registry.
+
+## Commands
+
+### `prepare` (recommended)
+
+One-shot command: generates sources, resolves patches, creates or updates the manifest,
+and pins metainfo screenshot URLs to the given tag/commit.
+
+```bash
+# First run: generate everything from scratch
+flatpak_gen prepare
+
+# CI: update placeholders + regenerate sources
+flatpak_gen prepare --tag v1.2.3 --commit abc1234567890
+```
+
+| Flag | Description |
+|---|---|
+| `--tag` | Git tag embedded in manifest (e.g. `v0.1.14`). Omit to remove the `tag:` line. |
+| `--commit` | Full git commit SHA. Defaults to `git rev-parse HEAD`. |
+| `-s, --sdk` | Flutter SDK path. Defaults to `$FLUTTER_ROOT`. |
+| `--no-sources` | Skip source regeneration (manifest update only). |
+| `--pub-only` | Skip Flutter SDK sources. |
+| `--flutter-only` | Skip pub sources. |
+| `-c, --config` | Config file (default: `flatpak_gen.yaml`). |
+
+**Workflow:**
+
+```
+pubspec.yaml [flatpak_gen: ...]
+       ↓
+flatpak_gen prepare            # first run: generates everything from scratch
+       ↓
+flatpak/<app_id>.yml           # manifest with __FLATPAK_TAG__ / __FLATPAK_COMMIT__
+flatpak/generated-sources.json # pub + flutter SDK sources
+flatpak/patches/               # patches from registry (if applicable)
+       ↓
+git commit + push
+       ↓
+CI: flatpak_gen prepare --tag $TAG --commit $SHA   # patches placeholders + regen sources
+       ↓
+flatpak-builder build
+```
+
+### `sources`
+
+Generates `generated-sources.json` combining pub packages and Flutter SDK artifacts.
+
+```bash
 flatpak_gen sources \
   --lock pubspec.lock \
   --lock $FLUTTER_ROOT/packages/flutter_tools/pubspec.lock \
@@ -31,43 +209,97 @@ flatpak_gen sources \
   --output flatpak/generated-sources.json
 ```
 
-The tool writes `flatpak/generated-sources.json` (pub packages + Flutter SDK artifacts)
-and auto-generates `flatpak/patches/flutter/shared.sh.patch` next to it.  You do not need
-to supply or maintain the patch file manually.
+| Flag | Description |
+|---|---|
+| `-l, --lock` | `pubspec.lock` paths (repeatable, `$ENV` expanded) |
+| `-s, --sdk` | Flutter SDK path |
+| `-o, --output` | Output JSON file |
+| `--pub-only` | Skip Flutter SDK sources |
+| `--flutter-only` | Skip pub sources |
 
-Reference the generated file from your Flatpak manifest:
+### `pub`
+
+Generates sources for pub packages only.
+
+```bash
+flatpak_gen pub --lock pubspec.lock --output flatpak/pub-sources.json
+```
+
+### `flutter`
+
+Generates sources for Flutter SDK artifacts only.
+
+```bash
+flatpak_gen flutter --sdk $FLUTTER_ROOT --output flatpak/flutter-sources.json
+```
+
+### `sdk-ext`
+
+Generates a Flathub SDK Extension manifest (`org.freedesktop.Sdk.Extension.flutter3`)
+to share the Flutter SDK across multiple Flatpak apps.
+
+```bash
+flatpak_gen sdk-ext \
+  --sdk $FLUTTER_ROOT \
+  --runtime-version 25.08 \
+  --output org.freedesktop.Sdk.Extension.flutter3.json
+```
+
+### `manifest`
+
+Updates `version:` in an existing manifest from `pubspec.yaml`.
+
+```bash
+flatpak_gen manifest --manifest flatpak/io.github.YourOrg.YourApp.yml
+```
+
+## CI/CD integration
+
+### GitHub Actions
 
 ```yaml
-modules:
-  - name: your-app
-    buildsystem: simple
-    sources:
-      - type: dir
-        path: .
-      - generated-sources.json   # ← generated by flatpak_gen
+      - name: Build flatpak_gen
+        run: |
+          git clone --depth 1 \
+            https://github.com/o-murphy/flutter_flatpak_gen.git /tmp/flatpak_gen_src
+          cd /tmp/flatpak_gen_src && dart pub get
+          dart compile exe bin/flatpak_gen.dart -o /tmp/flatpak_gen
+
+      - name: Prepare Flatpak sources and manifest
+        run: |
+          COMMIT=$(git rev-parse HEAD)
+          REF_TYPE="${{ github.ref_type }}"
+          TAG=""
+          if [ "$REF_TYPE" = "tag" ]; then TAG="${{ github.ref_name }}"; fi
+          /tmp/flatpak_gen prepare \
+            --tag "$TAG" \
+            --commit "$COMMIT" \
+            --sdk "$FLUTTER_ROOT"
 ```
 
 ## Why include `flutter_tools/pubspec.lock`?
 
 Before any `flutter` command runs, the Flutter tool bootstraps itself by running
-`pub get` inside `flutter/packages/flutter_tools/`. This requires the flutter_tools
+`pub get` inside `flutter/packages/flutter_tools/`. This requires flutter_tools
 dependencies to already be in the offline pub cache.
 
-The app's own `pubspec.lock` does not include these. Pass both lock files:
+Pass both lock files so the generated sources cover both the app and the tool:
 
 ```bash
 --lock pubspec.lock
 --lock $FLUTTER_ROOT/packages/flutter_tools/pubspec.lock
 ```
 
-When the same package appears at **different versions** across lock files (e.g.
-`json_annotation 4.8.x` in the app vs `json_annotation 4.9.0` in flutter_tools),
-both versions are included in the output — the tool deduplicates by `(name, version)`
-pair, not just by name.
+When the same package appears at different versions (e.g. `json_annotation 4.8.x`
+in the app vs `4.9.0` in flutter_tools), both versions are included — deduplication
+is by `(name, version)` pair.
 
-## How pub sources work offline
+## How it works
 
-For each hosted package the tool generates **two** entries in `generated-sources.json`:
+### Pub packages
+
+For each hosted package, the tool calls the pub.dev API for the SHA-256 hash and
+generates two flatpak source entries:
 
 ```json
 [
@@ -87,227 +319,24 @@ For each hosted package the tool generates **two** entries in `generated-sources
 ]
 ```
 
-The `archive` entry extracts the package into `.pub-cache/hosted/pub.dev/`. The
-`inline` entry writes the SHA-256 checksum into `.pub-cache/hosted-hashes/pub.dev/`.
-Both are required: Dart's pub tool checks for the hash file when running
-`pub get --offline`, and fails if it is missing even when the archive is present.
-
-`strip-components: 0` is correct — pub.dev archives contain package files at the
-root with no wrapping directory, unlike most tarballs.
-
-## Commands
-
-### `sources` (default)
-
-Generates a combined `generated-sources.json` with pub packages and Flutter SDK artifacts.
-
-```bash
-flatpak_gen sources \
-  --lock pubspec.lock \
-  --lock $FLUTTER_ROOT/packages/flutter_tools/pubspec.lock \
-  --sdk $FLUTTER_ROOT \
-  --output flatpak/generated-sources.json
-```
-
-| Flag | Description |
-|---|---|
-| `-l, --lock` | `pubspec.lock` paths (repeatable, glob + `$ENV` supported) |
-| `-s, --sdk` | Flutter SDK path (defaults to `$FLUTTER_ROOT`) |
-| `-o, --output` | Output JSON file (default: `flatpak/generated-sources.json`) |
-| `--patch` | Path to a custom `shared.sh.patch` (optional; built-in patch is used when omitted) |
-| `--pub-only` | Skip Flutter SDK sources |
-| `--flutter-only` | Skip pub sources |
-| `-c, --config` | Config file (default: `flatpak_gen.yaml`) |
-
-### `pub`
-
-Generates sources for pub packages only (archive + inline pair per package).
-
-```bash
-flatpak_gen pub --lock pubspec.lock --output flatpak/pub-sources.json
-```
-
-### `flutter`
-
-Generates sources for Flutter SDK artifacts only. Reads version files from a local
-Flutter install and constructs download URLs with SHA-256 for each artifact (Dart SDK,
-engine, fonts, Gradle wrapper, etc.).
-
-```bash
-flatpak_gen flutter --sdk $FLUTTER_ROOT --output flatpak/flutter-sources.json
-```
-
-### `sdk-ext`
-
-Generates a complete Flathub SDK Extension manifest (`org.freedesktop.Sdk.Extension.flutter3`).
-This allows Flutter apps on Flathub to share a single Flutter SDK instead of bundling
-it per-app.
-
-```bash
-flatpak_gen sdk-ext \
-  --sdk $FLUTTER_ROOT \
-  --runtime-version 25.08 \
-  --output org.freedesktop.Sdk.Extension.flutter3.json
-```
-
-### `manifest`
-
-Updates a Flatpak manifest YAML: syncs `version:` from `pubspec.yaml` and regenerates
-`generated-sources.json`.
-
-```bash
-# Full update: version + sources
-flatpak_gen manifest --manifest io.github.YourOrg.YourApp.yml
-
-# Version only (skip source regeneration)
-flatpak_gen manifest --manifest io.github.YourOrg.YourApp.yml --no-sources
-
-# Override version explicitly
-flatpak_gen manifest --manifest io.github.YourOrg.YourApp.yml --version 1.2.3 --no-sources
-```
-
-| Flag | Description |
-|---|---|
-| `-m, --manifest` | Flatpak manifest YAML file **(required)** |
-| `-p, --pubspec` | `pubspec.yaml` to read version from (default: `pubspec.yaml`) |
-| `-v, --version` | Override version string |
-| `--no-sources` | Skip source regeneration |
-| `-l, --lock` | `pubspec.lock` paths |
-| `-s, --sdk` | Flutter SDK path |
-| `-o, --output` | Generated sources output path |
-
-## Config file
-
-Create `flatpak_gen.yaml` in your project root to avoid repeating flags:
-
-```yaml
-output: flatpak/generated-sources.json
-
-pub:
-  locks:
-    - pubspec.lock
-    - $FLUTTER_ROOT/packages/flutter_tools/pubspec.lock
-
-flutter:
-  sdk: $FLUTTER_ROOT   # $ENV variables are expanded
-  # patch_path: flatpak/patches/flutter/shared.sh.patch  # optional custom patch
-```
-
-When `flatpak_gen.yaml` is present, you can run the tool with no arguments:
-
-```bash
-flatpak_gen          # equivalent to: flatpak_gen sources (uses config defaults)
-flatpak_gen manifest -m io.github.YourOrg.YourApp.yml
-```
-
-## CI/CD integration
-
-### GitHub Actions
-
-```yaml
-jobs:
-  flatpak-sources:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: dart-lang/setup-dart@v1
-        with:
-          sdk: stable
-
-      - name: Install Flutter
-        run: |
-          git clone --depth 1 --branch stable \
-            https://github.com/flutter/flutter.git /tmp/flutter
-          echo "/tmp/flutter/bin" >> $GITHUB_PATH
-          echo "FLUTTER_ROOT=/tmp/flutter" >> $GITHUB_ENV
-
-      - name: Compile flatpak_gen
-        run: |
-          git clone --depth 1 \
-            https://github.com/o-murphy/flutter_flatpak_gen.git /tmp/flatpak_gen_src
-          cd /tmp/flatpak_gen_src && dart pub get
-          dart compile exe bin/flatpak_gen.dart -o /tmp/flatpak_gen
-
-      - name: Generate sources
-        run: |
-          /tmp/flatpak_gen sources \
-            --lock pubspec.lock \
-            --lock "$FLUTTER_ROOT/packages/flutter_tools/pubspec.lock" \
-            --sdk "$FLUTTER_ROOT" \
-            --output flatpak/generated-sources.json
-
-      - name: Commit updated sources
-        run: |
-          git config user.name  "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add flatpak/generated-sources.json
-          git diff --cached --quiet || git commit -m "chore: update flatpak sources"
-          git push
-```
-
-### Using as a Dart library
-
-```yaml
-# pubspec.yaml
-dev_dependencies:
-  flatpak_gen: ^0.1.0
-```
-
-```dart
-import 'package:flatpak_gen/flatpak_gen.dart';
-
-final gen = PubSourcesGenerator(lockFilePaths: [
-  'pubspec.lock',
-  '$flutterRoot/packages/flutter_tools/pubspec.lock',
-]);
-final sources = await gen.generate();
-// sources contains [ArchiveSource, InlineSource] pairs for every (name, version)
-```
-
-## How it works
-
-### Pub packages
-
-For each hosted package in the lock files, the tool calls the pub.dev API:
-
-```
-GET https://pub.dev/api/packages/{name}/versions/{version}
-→ { "archive_sha256": "abc123..." }
-```
-
-This avoids downloading archives for most packages. For packages older than 2023 that
-lack `archive_sha256` in the API response, the tool falls back to downloading the
-archive and computing the hash.
-
-Each package produces two flatpak sources: an `archive` (the extracted package) and
-an `inline` (a small text file containing the SHA-256 hash). Both are needed for
-`pub get --offline` to work inside the sandbox.
+Both are required: `pub get --offline` checks for the hash file and fails if it is
+missing even when the archive is present.
 
 ### Flutter SDK artifacts
 
-The tool reads three version files from a local Flutter install:
+Reads version files from a local Flutter install and constructs download URLs for
+each artifact (Dart SDK, engine, fonts, Gradle wrapper, etc.). SHA-256 checksums
+are cached in `~/.cache/flatpak_gen/` keyed by URL.
 
-| File | Used for |
-|---|---|
-| `bin/internal/engine.version` | Engine artifact URLs |
-| `bin/internal/material_fonts.version` | Fonts download |
-| `bin/internal/gradle_wrapper.version` | Gradle wrapper download |
+Two extra entries are always added:
 
-Artifacts are fetched from `storage.googleapis.com/flutter_infra_release`. SHA-256
-checksums are cached locally in `~/.cache/flatpak_gen/` keyed by URL.
+- **`sky_engine/pubspec.yaml` (inline)** — `packages/sky_engine/` was removed from
+  the Flutter git tree in Flutter 3.x. Written inline so `pub get --offline` can
+  resolve it without network.
 
-Two extra entries are always added for Flutter projects:
-
-- **`sky_engine/pubspec.yaml` (inline)** — `packages/sky_engine/` was removed from the
-  Flutter git tree in Flutter 3.x. The file is written inline with the correct
-  `environment: sdk` constraint so `pub get --offline` can resolve it without network.
-
-- **`shared.sh.patch` (patch + file)** — Flutter's `shared.sh` bootstraps the Flutter
-  tool with `pub upgrade`, which requires network. The built-in patch replaces it with
-  `pub get --offline`. The patch is written to `patches/flutter/shared.sh.patch` next to
-  the output file and referenced as a `type: patch` source in the JSON.  Pass `--patch`
-  to supply a custom patch instead.
+- **`shared.sh.patch`** — Flutter's `shared.sh` bootstraps with `pub upgrade` (requires
+  network). The built-in patch replaces it with `pub get --offline`. Written to
+  `patches/flutter/shared.sh.patch` next to the output file.
 
 ## License
 
