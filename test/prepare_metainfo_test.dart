@@ -141,6 +141,8 @@ manifest:
     name: My App
     summary: A great app
     repo_slug: owner/repo
+    screenshots:
+      - path: docs/screen.png
 ''');
       writeFile('flatpak/generated-sources.json', '[]\n');
       writeFile('flatpak/io.example.App.metainfo.xml', metainfoXml);
