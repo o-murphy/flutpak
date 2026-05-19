@@ -29,8 +29,7 @@ runs:
       run: |
         VERSION="${{ inputs.flutpak_version }}"
         if [ -z "$VERSION" ]; then
-          VERSION=$(curl -fsSL https://api.github.com/repos/o-murphy/flutpak/releases/latest \
-            | grep '"tag_name"' | head -1 | sed 's/.*"tag_name": *"\([^"]*\)".*/\1/')
+          VERSION=$(curl -fsSL https://api.github.com/repos/o-murphy/flutpak/releases/latest | jq -r .tag_name)
         fi
         echo "version=$VERSION" >> $GITHUB_OUTPUT
 
@@ -39,8 +38,8 @@ runs:
       run: |
         curl -fsSL \
           "https://github.com/o-murphy/flutpak/releases/download/${{ steps.flutpak-ver.outputs.version }}/flutpak-linux-x64" \
-          -o /tmp/flutpak
-        chmod +x /tmp/flutpak
+          -o "$RUNNER_TEMP/flutpak"
+        chmod +x "$RUNNER_TEMP/flutpak"
 
     - name: Resolve commit SHA
       id: meta
@@ -48,7 +47,7 @@ runs:
       run: |
         COMMIT="${{ inputs.commit }}"
         if [ -z "$COMMIT" ]; then
-          COMMIT=$(git rev-list -n 1 "${{ inputs.tag_name }}")
+          COMMIT=$(git rev-parse "${{ inputs.tag_name }}" 2>/dev/null || { git fetch origin tag "${{ inputs.tag_name }}" --no-tags >/dev/null 2>&1 && git rev-parse "${{ inputs.tag_name }}"; })
         fi
         echo "commit=$COMMIT" >> $GITHUB_OUTPUT
 
@@ -67,13 +66,13 @@ runs:
       run: |
         LOCK="$FLUTTER_ROOT/packages/flutter_tools/pubspec.lock"
         if [ ! -f "$LOCK" ]; then
-          (cd "$FLUTTER_ROOT/packages/flutter_tools" && dart pub get --no-example 2>&1)
+          (cd "$FLUTTER_ROOT/packages/flutter_tools" && dart pub get --no-example)
         fi
 
     - name: Run flutpak prepare
       shell: bash
       run: |
-        /tmp/flutpak prepare \
+        "$RUNNER_TEMP/flutpak" prepare \
           --tag "${{ inputs.tag_name }}" \
           --commit "${{ steps.meta.outputs.commit }}" \
           --sdk "$FLUTTER_ROOT"
