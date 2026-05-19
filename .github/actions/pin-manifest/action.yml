@@ -36,8 +36,12 @@ runs:
     - name: Download flutpak binary
       shell: bash
       run: |
+        case "${{ runner.arch }}" in
+          ARM64) ARCH=arm64 ;;
+          *)     ARCH=x64   ;;
+        esac
         curl -fsSL \
-          "https://github.com/o-murphy/flutpak/releases/download/${{ steps.flutpak-ver.outputs.version }}/flutpak-linux-x64" \
+          "https://github.com/o-murphy/flutpak/releases/download/${{ steps.flutpak-ver.outputs.version }}/flutpak-linux-${ARCH}" \
           -o "$RUNNER_TEMP/flutpak"
         chmod +x "$RUNNER_TEMP/flutpak"
 

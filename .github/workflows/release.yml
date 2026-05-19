@@ -6,19 +6,22 @@ on:
       - 'v*'
 
 jobs:
-  release:
-    name: GitHub Release & pub.dev
+  prepare:
+    name: Prepare release
     runs-on: ubuntu-latest
-
     permissions:
-      contents: write   # push version bump commit + create GitHub release
+      contents: write   # push version bump commit
       id-token: write   # pub.dev OIDC trusted publisher
+    outputs:
+      tag: ${{ steps.meta.outputs.tag }}
+      version: ${{ steps.meta.outputs.version }}
+      prerelease: ${{ steps.meta.outputs.prerelease }}
 
     steps:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
-          ref: main     # check out main so we can push the version bump
+          ref: main
 
       - uses: dart-lang/setup-dart@v1
         with:
@@ -68,16 +71,49 @@ jobs:
           fi
           cat /tmp/release_notes.md
 
-      - name: Build Linux binary
-        run: dart compile exe bin/flutpak.dart -o flutpak-linux-x64
-
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ steps.meta.outputs.tag }}
           body_path: /tmp/release_notes.md
           prerelease: ${{ steps.meta.outputs.prerelease }}
-          files: flutpak-linux-x64
 
       - name: Publish to pub.dev
         run: dart pub publish --force
+
+  build-binaries:
+    name: Build binary (${{ matrix.arch }})
+    needs: prepare
+    strategy:
+      matrix:
+        include:
+          - arch: x64
+            runs-on: ubuntu-latest
+            artifact: flutpak-linux-x64
+          - arch: arm64
+            runs-on: ubuntu-24.04-arm
+            artifact: flutpak-linux-arm64
+    runs-on: ${{ matrix.runs-on }}
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+
+      - name: Install dependencies
+        run: dart pub get
+
+      - name: Build binary
+        run: dart compile exe bin/flutpak.dart -o ${{ matrix.artifact }}
+
+      - name: Upload to release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ needs.prepare.outputs.tag }}
+          files: ${{ matrix.artifact }}
