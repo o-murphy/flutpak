@@ -96,8 +96,9 @@ class PubSourcesGenerator {
   Future<String> _fetchSha256(String name, String version) async {
     final uri =
         Uri.parse('https://pub.dev/api/packages/$name/versions/$version');
-    final response = await _client.get(
+    final response = await _retryGet(
       uri,
+      tag: '$name@$version',
       headers: {'Accept': 'application/json'},
     );
 
@@ -115,11 +116,32 @@ class PubSourcesGenerator {
   }
 
   Future<String> _downloadAndHash(String url) async {
-    final response = await _client.get(Uri.parse(url));
+    final response = await _retryGet(Uri.parse(url), tag: url);
     if (response.statusCode != 200) {
       throw Exception('Download failed $url: ${response.statusCode}');
     }
     return sha256.convert(response.bodyBytes).toString();
+  }
+
+  // Transient HTTP status codes worth retrying.
+  static const _retryStatuses = {429, 500, 502, 503, 504};
+
+  Future<http.Response> _retryGet(
+    Uri uri, {
+    required String tag,
+    Map<String, String>? headers,
+  }) async {
+    var delay = const Duration(seconds: 2);
+    for (var attempt = 1; attempt <= 4; attempt++) {
+      final response = await _client.get(uri, headers: headers);
+      if (!_retryStatuses.contains(response.statusCode)) return response;
+      if (attempt == 4) return response;
+      stderr.writeln(
+          '  ⚠  $tag ${response.statusCode} — retry $attempt/3 in ${delay.inSeconds}s');
+      await Future.delayed(delay);
+      delay *= 2;
+    }
+    throw StateError('unreachable');
   }
 
   static String _resolveEnv(String s) => s.replaceAllMapped(
