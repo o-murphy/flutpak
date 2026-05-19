@@ -45,7 +45,74 @@ sources:
       expect(result, contains('commit: abc1234567890'));
     });
 
-    test('is idempotent when no placeholders present', () {
+    test('re-pins tag and commit when placeholders already replaced', () {
+      const pinned = '''
+sources:
+  - type: git
+    url: https://github.com/example/app.git
+    tag: v0.1.14
+    commit: abc1234567890
+    disable-submodules: true
+''';
+      final result = patchManifestPlaceholders(
+        pinned,
+        tag: 'v0.2.0',
+        commit: 'deadbeef',
+      );
+      expect(result, contains('tag: v0.2.0'));
+      expect(result, contains('commit: deadbeef'));
+      expect(result, isNot(contains('v0.1.14')));
+      expect(result, isNot(contains('abc1234567890')));
+    });
+
+    test('re-pins commit only (no tag) when placeholders already replaced', () {
+      const pinned = '''
+sources:
+  - type: git
+    url: https://github.com/example/app.git
+    tag: v0.1.14
+    commit: abc1234567890
+    disable-submodules: true
+''';
+      final result = patchManifestPlaceholders(
+        pinned,
+        tag: null,
+        commit: 'deadbeef',
+      );
+      expect(result, isNot(contains('tag:')));
+      expect(result, contains('commit: deadbeef'));
+    });
+
+    test('does not touch other modules without disable-submodules when re-pinning', () {
+      const manifest = '''
+  - name: lib
+    sources:
+      - type: git
+        url: https://github.com/example/lib.git
+        tag: v1.0.6
+        commit: 0000000000000000000000000000000000000001
+  - name: app
+    sources:
+      - type: git
+        url: https://github.com/example/app.git
+        tag: v0.1.14
+        commit: abc1234567890
+        disable-submodules: true
+''';
+      final result = patchManifestPlaceholders(
+        manifest,
+        tag: 'v0.2.0',
+        commit: 'deadbeef',
+      );
+      // lib module unchanged
+      expect(result, contains('tag: v1.0.6'));
+      expect(result, contains('commit: 0000000000000000000000000000000000000001'));
+      // app module updated
+      expect(result, contains('tag: v0.2.0'));
+      expect(result, contains('commit: deadbeef'));
+    });
+
+    test('is idempotent when no placeholders and no disable-submodules marker', () {
       const noPlaceholders = '''
 sources:
   - type: git
@@ -58,7 +125,7 @@ sources:
         tag: 'v0.2.0',
         commit: 'deadbeef',
       );
-      // No placeholders → no replacement, content unchanged
+      // No placeholders and no disable-submodules anchor → unchanged
       expect(result, equals(noPlaceholders));
     });
 
@@ -124,6 +191,122 @@ commit: __FLATPAK_COMMIT__
       final result = patchMetainfoScreenshots(content, ref: 'v1.0.0');
       expect(result, contains('repo-a/v1.0.0/img/a.png'));
       expect(result, contains('repo-b/v1.0.0/img/b.png'));
+    });
+  });
+
+  group('patchMetainfoReleases', () {
+    final date = DateTime.utc(2026, 5, 19);
+
+    test('strips leading v and updates version and date', () {
+      const input = '''
+<releases>
+  <release version="0.1.14" date="2026-05-14"/>
+</releases>
+''';
+      final result = patchMetainfoReleases(input, 'v0.1.15', date);
+      expect(result, contains('version="0.1.15"'));
+      expect(result, contains('date="2026-05-19"'));
+      expect(result, isNot(contains('version="0.1.14"')));
+      expect(result, isNot(contains('date="2026-05-14"')));
+    });
+
+    test('handles tag without leading v', () {
+      const input = '''
+<releases>
+  <release version="0.1.14" date="2026-05-14"/>
+</releases>
+''';
+      final result = patchMetainfoReleases(input, '0.1.15', date);
+      expect(result, contains('version="0.1.15"'));
+      expect(result, contains('date="2026-05-19"'));
+    });
+
+    test('handles pre-release tag (v0.1.15-beta.1)', () {
+      const input = '''
+<releases>
+  <release version="0.1.14" date="2026-05-14"/>
+</releases>
+''';
+      final result = patchMetainfoReleases(input, 'v0.1.15-beta.1', date);
+      expect(result, contains('version="0.1.15-beta.1"'));
+      expect(result, contains('date="2026-05-19"'));
+    });
+
+    test('only updates first <release> entry', () {
+      const input = '''
+<releases>
+  <release version="0.1.14" date="2026-05-14"/>
+  <release version="0.1.13" date="2026-04-01"/>
+</releases>
+''';
+      final result = patchMetainfoReleases(input, 'v0.1.15', date);
+      expect(result, contains('version="0.1.15"'));
+      // Second entry should remain unchanged
+      expect(result, contains('version="0.1.13"'));
+      expect(result, contains('date="2026-04-01"'));
+    });
+
+    test('preserves surrounding whitespace and indentation', () {
+      const input = '''
+<releases>
+  <release version="0.1.14" date="2026-05-14"/>
+</releases>
+''';
+      final result = patchMetainfoReleases(input, 'v0.1.15', date);
+      expect(result, contains('  <release version="0.1.15" date="2026-05-19"/>'));
+    });
+
+    test('returns content unchanged when tag is empty', () {
+      const input = '''
+<releases>
+  <release version="0.1.14" date="2026-05-14"/>
+</releases>
+''';
+      final result = patchMetainfoReleases(input, '', date);
+      expect(result, equals(input));
+    });
+
+    test('returns content unchanged when no <releases> section exists', () {
+      const input = '''
+<component>
+  <name>My App</name>
+</component>
+''';
+      final result = patchMetainfoReleases(input, 'v0.1.15', date);
+      expect(result, equals(input));
+    });
+
+    test('pads month and day with leading zeros', () {
+      final earlyDate = DateTime.utc(2026, 1, 5);
+      const input = '''
+<releases>
+  <release version="0.1.14" date="2026-05-14"/>
+</releases>
+''';
+      final result = patchMetainfoReleases(input, 'v0.1.15', earlyDate);
+      expect(result, contains('date="2026-01-05"'));
+    });
+
+    test('handles single-quoted attributes', () {
+      const input = '''
+<releases>
+  <release version='0.1.14' date='2026-05-14'/>
+</releases>
+''';
+      final result = patchMetainfoReleases(input, 'v0.1.15', date);
+      expect(result, contains('version="0.1.15"'));
+      expect(result, contains('date="2026-05-19"'));
+    });
+
+    test('handles spaces around equals sign in attributes', () {
+      const input = '''
+<releases>
+  <release version = "0.1.14" date = "2026-05-14"/>
+</releases>
+''';
+      final result = patchMetainfoReleases(input, 'v0.1.15', date);
+      expect(result, contains('version="0.1.15"'));
+      expect(result, contains('date="2026-05-19"'));
     });
   });
 
