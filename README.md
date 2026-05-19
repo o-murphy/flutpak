@@ -162,7 +162,7 @@ flutpak:
         path: assets/icon_512x512.png
     metainfo:
       path: flatpak/io.github.YourOrg.YourApp.metainfo.xml  # optional; default derived from app_id
-      repo_slug: YourOrg/YourApp   # screenshot URLs pinned to tag/commit on prepare
+      repo_slug: YourOrg/YourApp   # screenshot <image> URLs rebuilt from config on every prepare
       # Fields below drive automatic metainfo.xml generation on first run.
       # Generation requires at minimum name + summary.
       name: Your App
@@ -180,6 +180,9 @@ flutpak:
         homepage: https://github.com/YourOrg/YourApp
         bugtracker: https://github.com/YourOrg/YourApp/issues
         donation: https://example.com/donate   # optional
+      developer:
+        id: io.github.YourOrg              # recommended for Flathub (AppStream 1.0)
+        name: Your Name
       screenshots:
         - path: docs/screenshots/home.png
         - path: docs/screenshots/settings.png
