@@ -1,7 +1,7 @@
 @Tags(['integration'])
 library;
 
-import 'package:flatpak_gen/flatpak_gen.dart';
+import 'package:flutpak/flutpak.dart';
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 

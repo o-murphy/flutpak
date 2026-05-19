@@ -1,5 +1,5 @@
 import 'dart:io';
-import 'package:flatpak_gen/flatpak_gen.dart';
+import 'package:flutpak/flutpak.dart';
 import 'package:test/test.dart';
 
 void main() {
@@ -90,7 +90,7 @@ void main() {
     late Directory tmpDir;
 
     setUp(() {
-      tmpDir = Directory.systemTemp.createTempSync('flatpak_gen_test_');
+      tmpDir = Directory.systemTemp.createTempSync('flutpak_test_');
     });
 
     tearDown(() {

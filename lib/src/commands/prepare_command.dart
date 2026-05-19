@@ -37,7 +37,7 @@ class PrepareCommand extends Command<void> {
       ..addOption('config',
           abbr: 'c',
           help: 'Config file path.',
-          defaultsTo: 'flatpak_gen.yaml')
+          defaultsTo: 'flutpak.yaml')
       ..addFlag('no-sources',
           help: 'Skip source regeneration (manifest update only).')
       ..addFlag('pub-only', help: 'Skip Flutter SDK sources.')
