@@ -8,6 +8,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 
+## [0.2.1] - 2026-05-19
+
+### Added
+- `DeveloperConfig` — new `developer:` field in `MetainfoConfig`; generates
+  `<developer [id="..."]><name>...</name></developer>` in metainfo XML
+  (AppStream 1.0 / Flathub requirement)
+
+### Changed
+- Screenshot URL pinning is now config-driven: `replaceMetainfoScreenshots()`
+  rebuilds the entire `<screenshots>` block from `metainfo.screenshots:` config
+  + `repo_slug` + ref, instead of regex-replacing `/main/` in the existing file.
+  Works correctly regardless of what ref the file currently contains.
+- `MetainfoGenerator.generate({ref})` bakes the correct ref into screenshot URLs
+  at generation time; `main` is used as a fallback when no ref is provided.
+
+
 ## [0.2.0] - 2026-05-19
 
 ### Added
@@ -73,7 +89,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   output files
 - MIT License
 
-[Unreleased]: https://github.com/o-murphy/flutpak/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/o-murphy/flutpak/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/o-murphy/flutpak/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/o-murphy/flutpak/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/o-murphy/flutpak/releases/tag/v0.1.1
 [0.1.0]: https://github.com/o-murphy/flutpak/releases/tag/v0.1.0
