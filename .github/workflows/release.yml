@@ -15,7 +15,7 @@ jobs:
       id-token: write   # pub.dev OIDC trusted publisher
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
           ref: main     # check out main so we can push the version bump
@@ -69,7 +69,7 @@ jobs:
           cat /tmp/release_notes.md
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ steps.meta.outputs.tag }}
           body_path: /tmp/release_notes.md
