@@ -32,7 +32,7 @@ dart compile exe bin/flutpak.dart -o /tmp/flutpak
 
 ```yaml
 flutpak:
-  output: flatpak/generated-sources.json
+  output: flatpak
   flutter_version_file: flatpak/flutter.version  # optional
 
   pub:
@@ -96,7 +96,7 @@ Config lives in **one** of two places (error if both exist):
 
 ```yaml
 flutpak:
-  output: flatpak/generated-sources.json   # where to write generated-sources.json
+  output: flatpak   # output directory for all generated files (default: flatpak)
 
   flutter_version_file: flatpak/flutter.version  # optional: write Flutter version here
 
@@ -129,11 +129,13 @@ flutpak:
       - --device=dri
     extra_modules:
       - flatpak/modules/some-native-dep.yml    # included verbatim in modules list
-    env:                                       # build-options env vars
+    env:                                       # build-options env vars (shorthand)
       MY_VAR: value
     build_options:
       append_path: /custom/bin               # appended to PATH
       prepend_ld_library_path: /custom/lib   # prepended to LD_LIBRARY_PATH
+      env:                                   # merged with top-level env:
+        ANOTHER_VAR: value
     extra_sources:                           # verbatim flatpak sources (arch-specific archives, etc.)
       - type: archive
         only-arches:
@@ -150,18 +152,37 @@ flutpak:
         dest: lib-prebuilt
         strip-components: 0
     desktop:
-      name: Your App
-      categories:
+      name: Your App           # optional; falls back to metainfo.name
+      categories:              # optional; falls back to metainfo.categories
         - Utility
     icons:
       - size: 512x512
         path: assets/icon_512x512.png
-    screenshots:
-      - path: docs/screenshots/home.png
-      - path: docs/screenshots/settings.png
     metainfo:
-      path: flatpak/io.github.YourOrg.YourApp.metainfo.xml
+      path: flatpak/io.github.YourOrg.YourApp.metainfo.xml  # optional; default derived from app_id
       repo_slug: YourOrg/YourApp   # screenshot URLs pinned to tag/commit on prepare
+      # Fields below drive automatic metainfo.xml generation on first run.
+      # Generation requires at minimum name + summary.
+      name: Your App
+      summary: A brief one-liner
+      description: |
+        First paragraph.
+
+        Second paragraph.
+      categories:
+        - Education
+        - Science
+      keywords:
+        - yourapp
+      url:
+        homepage: https://github.com/YourOrg/YourApp
+        bugtracker: https://github.com/YourOrg/YourApp/issues
+        donation: https://example.com/donate   # optional
+      screenshots:
+        - path: docs/screenshots/home.png
+        - path: docs/screenshots/settings.png
+          default: true                        # marks as type="default"
+      content_rating: oars-1.1                 # default
 ```
 
 ## Patches registry
@@ -177,6 +198,23 @@ package is found in any of your lock files.
 
 Project-level `patches:` entries always take priority over registry entries for
 the same package.
+
+## Metainfo generation
+
+When `manifest.metainfo.name` and `manifest.metainfo.summary` are set,
+`flutpak prepare` generates a valid AppStream XML file on the first run
+(see all available fields in the [Full config reference](#full-config-reference) above).
+
+**On subsequent `flutpak prepare --tag v1.2.3 --commit <sha>` runs:**
+- Screenshot URLs are pinned from `/main/` to the tag (or commit when no tag)
+- The `<release version="..." date="..."/>` entry is updated to the current date
+
+The file is never overwritten once it exists — edit it manually if needed.
+
+Validate the generated file with:
+```bash
+flutpak validate
+```
 
 ## Commands
 
@@ -201,6 +239,7 @@ flutpak prepare --tag v1.2.3 --commit abc1234567890 --sdk "$FLUTTER_ROOT"
 | `--no-sources` | Skip source regeneration (manifest update only). |
 | `--pub-only` | Skip Flutter SDK sources, generate only pub packages. |
 | `--flutter-only` | Skip pub sources, generate only Flutter SDK artifacts. |
+| `-n, --dry-run` | Print what would be done without writing any files. |
 | `-c, --config` | Path to config file (default: `flutpak.yaml`). |
 
 **Workflow:**
@@ -230,14 +269,16 @@ flutpak sources \
   --lock pubspec.lock \
   --lock "$FLUTTER_ROOT/packages/flutter_tools/pubspec.lock" \
   --sdk "$FLUTTER_ROOT" \
-  --output flatpak/generated-sources.json
+  --output flatpak
 ```
+
+`generated-sources.json` is always written as `<output>/generated-sources.json`.
 
 | Flag | Description |
 |---|---|
 | `-l, --lock` | `pubspec.lock` path (repeatable, `$ENV` expanded) |
 | `-s, --sdk` | Flutter SDK path |
-| `-o, --output` | Output JSON file |
+| `-o, --output` | Output directory (default: `flatpak`) |
 | `--pub-only` | Skip Flutter SDK sources |
 | `--flutter-only` | Skip pub sources |
 
@@ -246,7 +287,7 @@ flutpak sources \
 Generates sources for pub packages only.
 
 ```bash
-flutpak pub --lock pubspec.lock --output flatpak/pub-sources.json
+flutpak pub --lock pubspec.lock --output flatpak
 ```
 
 ### `flutter`
@@ -254,7 +295,7 @@ flutpak pub --lock pubspec.lock --output flatpak/pub-sources.json
 Generates sources for Flutter SDK artifacts only.
 
 ```bash
-flutpak flutter --sdk "$FLUTTER_ROOT" --output flatpak/flutter-sources.json
+flutpak flutter --sdk "$FLUTTER_ROOT" --output flatpak
 ```
 
 ### `sdk-ext`
@@ -269,6 +310,85 @@ flutpak sdk-ext \
   --output org.freedesktop.Sdk.Extension.flutter3.json
 ```
 
+### `lint`
+
+Lints the Flatpak manifest using `flatpak-builder-lint` (requires
+`org.flatpak.Builder` installed via Flatpak).
+
+```bash
+# Auto-detect manifest from config
+flutpak lint
+
+# Explicit path
+flutpak lint --manifest flatpak/io.github.YourOrg.YourApp.yml
+
+# Lint a built repo too
+flutpak lint --repo .flatpak-builder/repo
+```
+
+| Flag | Description |
+|---|---|
+| `-m, --manifest` | Path to manifest YAML (auto-detected if omitted). |
+| `-r, --repo` | Path to flatpak repo to lint (optional). |
+| `--manifest-only` | Only lint the manifest, skip repo lint. |
+| `--repo-only` | Only lint the repo, skip manifest lint. |
+| `-c, --config` | Path to config file. |
+
+Install the linter:
+```bash
+flatpak install flathub org.flatpak.Builder
+```
+
+### `validate`
+
+Validates the AppStream metainfo file using `appstream-util`.
+
+```bash
+# Auto-detect from config
+flutpak validate
+
+# Explicit path
+flutpak validate --metainfo flatpak/io.github.YourOrg.YourApp.metainfo.xml
+
+# Stricter checks
+flutpak validate --pedantic
+```
+
+| Flag | Description |
+|---|---|
+| `-m, --metainfo` | Path to metainfo XML (auto-detected from config if omitted). |
+| `--pedantic` | Pass `--pedantic` to `appstream-util` for stricter checks. |
+| `-c, --config` | Path to config file. |
+
+Install `appstream-util`:
+```bash
+sudo apt install appstream   # Debian/Ubuntu
+sudo dnf install appstream   # Fedora
+```
+
+### `export`
+
+Copies all files needed for a Flathub submission into a single directory:
+`<app_id>.yml`, `generated-sources.json`, `<app_id>.metainfo.xml` (if present),
+and `patches/`.
+
+```bash
+# Default output dir: flatpak-export/
+flutpak export
+
+# Custom output dir
+flutpak export --out /tmp/my-submission
+```
+
+| Flag | Description |
+|---|---|
+| `-o, --out` | Output directory (default: `flatpak-export/`). |
+| `-m, --manifest` | Path to manifest YAML (auto-detected if omitted). |
+| `-c, --config` | Path to config file. |
+
+`generated-sources.json` is mandatory — export exits with an error if it does not
+exist. Run `flutpak prepare` first.
+
 ### `manifest`
 
 Updates version-related fields in an existing manifest from `pubspec.yaml`.
@@ -279,7 +399,38 @@ flutpak manifest --manifest flatpak/io.github.YourOrg.YourApp.yml
 
 ## CI/CD integration
 
-### GitHub Actions
+### GitHub Actions — composite action (recommended)
+
+The `pin-manifest` composite action handles Flutter SDK setup, binary download,
+and `flutpak prepare` in one step. Add it to your release workflow:
+
+```yaml
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Pin Flatpak manifest
+        uses: o-murphy/flutpak/.github/actions/pin-manifest@main
+        with:
+          tag_name: ${{ github.ref_name }}        # e.g. v1.2.3
+          flutter_version_file: flatpak/flutter.version  # committed version file
+          # flutter_version: stable               # or explicit version
+          # config: flutpak.yaml                  # default: auto-detected
+          # validate: 'true'                      # run flutpak validate (default)
+```
+
+| Input | Description |
+|---|---|
+| `tag_name` | Tag to embed in the manifest (required) |
+| `flutter_version` | Flutter SDK version (e.g. `stable`, `3.41.9`) |
+| `flutter_version_file` | Path to committed version file (one of these two required) |
+| `commit` | Commit SHA (default: resolved from tag) |
+| `config` | Path to config file (default: auto-detected from CWD) |
+| `validate` | Run `flutpak validate` after prepare (default: `true`) |
+| `flutpak_version` | flutpak release tag to download (default: latest) |
+| `cache` | Cache Flutter SDK between runs (default: `true`) |
+
+### GitHub Actions — manual
 
 ```yaml
       - name: Build flutpak
