@@ -1,0 +1,242 @@
+import 'dart:io';
+import 'package:path/path.dart' as p;
+import '../config.dart';
+
+const String tagPlaceholder = '__FLATPAK_TAG__';
+const String commitPlaceholder = '__FLATPAK_COMMIT__';
+
+/// Generates a Flatpak application manifest YAML from [ManifestConfig].
+///
+/// Writes a human-readable manifest file using a structured template.
+/// Multi-line build commands use YAML block scalar (`|`) notation.
+class ManifestGenerator {
+  final ManifestConfig cfg;
+
+  /// Path to generated-sources.json relative to the project root.
+  final String generatedSourcesPath;
+  final List<PatchEntry> patchEntries;
+
+  ManifestGenerator({
+    required this.cfg,
+    required this.generatedSourcesPath,
+    this.patchEntries = const [],
+  });
+
+  /// Returns the manifest as a YAML string ready to write to disk.
+  String generate() {
+    final appName = cfg.appId.split('.').last;
+    final buf = StringBuffer();
+
+    _line(buf, 'app-id: ${cfg.appId}');
+    _line(buf, 'runtime: org.freedesktop.Platform');
+    _line(buf, "runtime-version: '${cfg.runtimeVersion}'");
+    _line(buf, 'sdk: org.freedesktop.Sdk');
+
+    if (cfg.sdkExtensions.isNotEmpty) {
+      _line(buf, 'sdk-extensions:');
+      for (final ext in cfg.sdkExtensions) {
+        _line(buf, '  - $ext');
+      }
+    }
+
+    _line(buf, 'command: ${cfg.command}');
+
+    if (cfg.finishArgs.isNotEmpty) {
+      _line(buf, 'finish-args:');
+      for (final arg in cfg.finishArgs) {
+        _line(buf, '  - $arg');
+      }
+    }
+
+    _line(buf, 'modules:');
+
+    // Extra modules (inline YAML or file paths).
+    for (final modPath in cfg.extraModules) {
+      final f = File(modPath);
+      if (f.existsSync()) {
+        final content = f.readAsStringSync().trimRight();
+        for (final rawLine in content.split('\n')) {
+          if (rawLine.trimLeft().startsWith('-') ||
+              rawLine.trimLeft().startsWith('#')) {
+            _line(buf, '  $rawLine');
+          } else {
+            _line(buf, '    $rawLine');
+          }
+        }
+      } else {
+        _line(buf, '  - $modPath');
+      }
+    }
+
+    // App module.
+    _line(buf, '  - name: $appName');
+    _line(buf, '    buildsystem: simple');
+    _buildOptions(buf, appName);
+    _buildCommands(buf, appName);
+    _sources(buf);
+
+    return buf.toString();
+  }
+
+  void _buildOptions(StringBuffer buf, String appName) {
+    buf.writeln('    build-options:');
+    buf.writeln('      arch:');
+    buf.writeln('        x86_64:');
+    buf.writeln('          env:');
+    buf.writeln('            BUNDLE_PATH: build/linux/x64/release/bundle');
+    buf.writeln('        aarch64:');
+    buf.writeln('          env:');
+    buf.writeln('            BUNDLE_PATH: build/linux/arm64/release/bundle');
+
+    final appendParts = <String>[];
+    String? prependLdLib = cfg.prependLdLibraryPath;
+
+    // Auto-detect llvm sdk-extension and add its paths.
+    for (final ext in cfg.sdkExtensions) {
+      final m = RegExp(r'llvm(\d+)').firstMatch(ext);
+      if (m != null) {
+        final ver = m.group(1)!;
+        appendParts.add('/usr/lib/sdk/llvm$ver/bin');
+        prependLdLib ??= '/usr/lib/sdk/llvm$ver/lib';
+      }
+    }
+    if (cfg.appendPath != null) appendParts.add(cfg.appendPath!);
+
+    if (appendParts.isNotEmpty) {
+      buf.writeln('      append-path: ${appendParts.join(':')}');
+    }
+    if (prependLdLib != null) {
+      buf.writeln('      prepend-ld-library-path: $prependLdLib');
+    }
+
+    buf.writeln('      env:');
+    buf.writeln('        PUB_CACHE: /run/build/$appName/.pub-cache');
+    for (final entry in cfg.env.entries) {
+      buf.writeln('        ${entry.key}: ${entry.value}');
+    }
+  }
+
+  void _buildCommands(StringBuffer buf, String appName) {
+    buf.writeln('    build-commands:');
+
+    // Flutter cache stamp copies.
+    final stamps = [
+      'engine-dart-sdk.stamp',
+      'material_fonts.stamp',
+      'gradle_wrapper.stamp',
+      'engine_stamp.stamp',
+      'flutter_sdk.stamp',
+      'font-subset.stamp',
+      'linux-sdk.stamp',
+    ];
+    final versionFiles = {
+      'engine-dart-sdk.stamp': 'engine.version',
+      'material_fonts.stamp': 'material_fonts.version',
+      'gradle_wrapper.stamp': 'gradle_wrapper.version',
+      'engine_stamp.stamp': 'engine.version',
+      'flutter_sdk.stamp': 'engine.version',
+      'font-subset.stamp': 'engine.version',
+      'linux-sdk.stamp': 'engine.version',
+    };
+    for (final stamp in stamps) {
+      final src = versionFiles[stamp]!;
+      buf.writeln(
+          '      - cp flutter/bin/internal/$src flutter/bin/cache/$stamp');
+    }
+
+    buf.writeln('      - setup-flutter.sh');
+    buf.writeln('      - flutter build linux --release --no-pub');
+    buf.writeln('      - mkdir -p /app/$appName');
+    buf.writeln('      - cp -r "\$BUNDLE_PATH"/. /app/$appName/');
+    buf.writeln(
+        '      - install -Dm755 flatpak/$appName-wrapper.sh /app/bin/${cfg.command}');
+    buf.writeln(
+        '      - install -Dm644 flatpak/${cfg.appId}.desktop'
+        ' /app/share/applications/${cfg.appId}.desktop');
+
+    // Icons.
+    for (final icon in cfg.icons) {
+      final ext = p.extension(icon.path);
+      final sizeDir = icon.size;
+      final iconDest =
+          '/app/share/icons/hicolor/$sizeDir/apps/${cfg.appId}$ext';
+      buf.writeln('      - install -Dm644 ${icon.path} $iconDest');
+    }
+
+    // Metainfo: version/date sed + install.
+    if (cfg.metainfo != null) {
+      final metainfoPath = cfg.metainfo!.path;
+      buf.writeln('      - |');
+      buf.writeln(
+          "        VERSION=\$(grep '^version:' pubspec.yaml | sed 's/version:[[:space:]]*//' | sed 's/+.*//')");
+      buf.writeln('        TODAY=\$(date +%Y-%m-%d)');
+      buf.writeln(
+          '        sed -i "s|<release version=\\"[^\\"]*\\" date=\\"[^\\"]*\\"/>|'
+          '<release version=\\"\${VERSION}\\" date=\\"\${TODAY}\\"/>|" $metainfoPath');
+      buf.writeln(
+          '      - install -Dm644 $metainfoPath'
+          ' /app/share/metainfo/${p.basename(metainfoPath)}');
+    }
+  }
+
+  void _sources(StringBuffer buf) {
+    buf.writeln('    sources:');
+
+    // App git source with placeholders.
+    buf.writeln('      - type: git');
+    if (cfg.repoUrl != null) {
+      buf.writeln('        url: ${cfg.repoUrl}');
+    }
+    buf.writeln('        tag: $tagPlaceholder');
+    buf.writeln('        commit: $commitPlaceholder');
+    buf.writeln('        disable-submodules: true');
+
+    // generated-sources.json reference (relative to manifest dir).
+    buf.writeln('      - ${p.basename(generatedSourcesPath)}');
+
+    // Patch sources from registry / project config.
+    for (final patch in patchEntries) {
+      final dest =
+          patch.version != null ? patch.dest(patch.version!) : null;
+      buf.writeln('      - type: patch');
+      buf.writeln('        path: ${patch.path}');
+      if (dest != null) {
+        buf.writeln('        dest: $dest');
+      }
+    }
+  }
+
+  static void _line(StringBuffer buf, String s) => buf.writeln(s);
+}
+
+/// Updates [_tagPlaceholder] / [_commitPlaceholder] in a manifest's raw YAML text.
+///
+/// If [tag] is null or empty, the `tag:` placeholder line is removed.
+String patchManifestPlaceholders(
+  String content, {
+  required String commit,
+  String? tag,
+}) {
+  var result = content;
+
+  if (tag != null && tag.isNotEmpty) {
+    result = result.replaceAll(tagPlaceholder, tag);
+  } else {
+    result = result.replaceAll(
+      RegExp(r'[ \t]*tag:\s*' + RegExp.escape(tagPlaceholder) + r'\n?'),
+      '',
+    );
+  }
+
+  result = result.replaceAll(commitPlaceholder, commit);
+  return result;
+}
+
+/// Pins screenshot URLs in a metainfo XML file from `/main/` to [ref].
+String patchMetainfoScreenshots(String content, {required String ref}) {
+  return content.replaceAllMapped(
+    RegExp(r'(raw\.githubusercontent\.com/[^/]+/[^/]+/)main/'),
+    (m) => '${m.group(1)}$ref/',
+  );
+}
+
