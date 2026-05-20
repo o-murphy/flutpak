@@ -7,6 +7,7 @@ import 'package:flutpak/src/commands/prepare_command.dart';
 import 'package:flutpak/src/commands/pub_command.dart';
 import 'package:flutpak/src/commands/sdk_ext_command.dart';
 import 'package:flutpak/src/commands/sources_command.dart';
+import 'package:flutpak/src/commands/verify_command.dart';
 Future<void> main(List<String> args) async {
   final runner = CommandRunner<void>(
     'flutpak',
@@ -14,6 +15,8 @@ Future<void> main(List<String> args) async {
         'Usage examples:\n'
         '  flutpak prepare          # generate everything from pubspec.yaml config\n'
         '  flutpak prepare --tag v0.1.14 --commit abc1234  # CI: pin tag/commit\n'
+        '  flutpak verify           # check manifest is pinned (no placeholders)\n'
+        '  flutpak verify --tag v0.1.14 --commit abc1234   # check exact values\n'
         '  flutpak sources          # pub + Flutter SDK → generated-sources.json\n'
         '  flutpak pub              # only pub packages\n'
         '  flutpak flutter          # only Flutter SDK artifacts\n'
@@ -23,6 +26,7 @@ Future<void> main(List<String> args) async {
         '  flutpak prepare --dry-run  # preview what prepare would do',
   )
     ..addCommand(PrepareCommand())
+    ..addCommand(VerifyCommand())
     ..addCommand(SourcesCommand())
     ..addCommand(PubCommand())
     ..addCommand(FlutterCommand())

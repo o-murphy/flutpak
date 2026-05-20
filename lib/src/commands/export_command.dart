@@ -83,8 +83,7 @@ class ExportCommand extends Command<void> {
     }
 
     // patches/
-    final flatpakDir = outputDir;
-    final patchesDir = Directory(p.join(flatpakDir, 'patches'));
+    final patchesDir = Directory(p.join(outputDir, 'patches'));
     if (patchesDir.existsSync()) {
       final destPatches = p.join(outDir, 'patches');
       _copyDir(patchesDir, Directory(destPatches));
@@ -126,16 +125,21 @@ class ExportCommand extends Command<void> {
 
   String? _resolveMetainfoPath(FlatpakGenConfig cfg, String baseDir) {
     if (cfg.manifest == null) return null;
-    final rel = cfg.manifest!.metainfo?.path ??
-        'flatpak/${cfg.manifest!.appId}.metainfo.xml';
-    return p.isAbsolute(rel) ? rel : p.join(baseDir, rel);
+    if (cfg.manifest!.metainfo?.path != null) {
+      final rel = cfg.manifest!.metainfo!.path!;
+      return p.isAbsolute(rel) ? rel : p.join(baseDir, rel);
+    }
+    final outputDir = _resolve(cfg.output, baseDir);
+    return p.join(outputDir, '${cfg.manifest!.appId}.metainfo.xml');
   }
 
   String? _detectManifestPath(FlatpakGenConfig cfg, String baseDir) {
     if (cfg.manifest != null) {
-      return p.join(baseDir, 'flatpak', '${cfg.manifest!.appId}.yml');
+      final outputDir = _resolve(cfg.output, baseDir);
+      return p.join(outputDir, '${cfg.manifest!.appId}.yml');
     }
-    final dir = Directory(p.join(baseDir, 'flatpak'));
+    final outputDir = _resolve(cfg.output, baseDir);
+    final dir = Directory(outputDir);
     if (!dir.existsSync()) return null;
     final candidates = dir
         .listSync()
