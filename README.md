@@ -315,35 +315,6 @@ flutpak sdk-ext \
   --output org.freedesktop.Sdk.Extension.flutter3.json
 ```
 
-### `lint`
-
-Lints the Flatpak manifest using `flatpak-builder-lint` (requires
-`org.flatpak.Builder` installed via Flatpak).
-
-```bash
-# Auto-detect manifest from config
-flutpak lint
-
-# Explicit path
-flutpak lint --manifest flatpak/io.github.YourOrg.YourApp.yml
-
-# Lint a built repo too
-flutpak lint --repo .flatpak-builder/repo
-```
-
-| Flag | Description |
-|---|---|
-| `-m, --manifest` | Path to manifest YAML (auto-detected if omitted). |
-| `-r, --repo` | Path to flatpak repo to lint (optional). |
-| `--manifest-only` | Only lint the manifest, skip repo lint. |
-| `--repo-only` | Only lint the repo, skip manifest lint. |
-| `-c, --config` | Path to config file. |
-
-Install the linter:
-```bash
-flatpak install flathub org.flatpak.Builder
-```
-
 ### `validate`
 
 Validates the AppStream metainfo file using `appstream-util`.
