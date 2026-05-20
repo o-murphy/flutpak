@@ -49,6 +49,14 @@ inputs:
       Installs appstream-util automatically. Set to false to skip.
     required: false
     default: 'true'
+  update_metainfo:
+    description: >
+      Pass --update-metainfo to flutpak prepare.
+      When true, rebuilds screenshot URLs (using --tag if set, else --commit)
+      and updates the <releases> section (only when --tag is set).
+      Default: false — CI re-runs never overwrite developer-curated metainfo.
+    required: false
+    default: 'false'
 
 runs:
   using: composite
@@ -126,11 +134,14 @@ runs:
       shell: bash
       run: |
         CONFIG="${{ inputs.config }}"
+        EXTRA_ARGS=()
+        [ "${{ inputs.update_metainfo }}" = "true" ] && EXTRA_ARGS+=(--update-metainfo)
         "$RUNNER_TEMP/flutpak" prepare \
           ${CONFIG:+--config "$CONFIG"} \
           --tag "${{ inputs.tag_name }}" \
           --commit "${{ steps.meta.outputs.commit }}" \
-          --sdk "$FLUTTER_ROOT"
+          --sdk "$FLUTTER_ROOT" \
+          "${EXTRA_ARGS[@]}"
 
     - name: Install appstream-util
       if: inputs.validate == 'true'

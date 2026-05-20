@@ -16,7 +16,8 @@ import '../utils/download_cache.dart';
 ///   2. Resolves patch entries (registry + project config)
 ///   3. Generates the manifest if it doesn't exist, or updates placeholders
 ///   4. Generates .desktop and metainfo on first run (with pubspec.yaml fallbacks)
-///   5. Pins metainfo screenshot URLs
+///   5. Pins metainfo screenshot URLs  (only with --update-metainfo)
+///   6. Updates <releases> in metainfo (only with --update-metainfo and --tag)
 class PrepareCommand extends Command<void> {
   @override
   final name = 'prepare';
@@ -24,7 +25,8 @@ class PrepareCommand extends Command<void> {
   final description =
       'Generate sources, resolve patches, and create/update the Flatpak manifest.\n'
       'On first run: generates the manifest, .desktop, and metainfo from config.\n'
-      'On subsequent runs: updates __FLATPAK_TAG__/__FLATPAK_COMMIT__ placeholders.';
+      'On subsequent runs: updates __FLATPAK_TAG__/__FLATPAK_COMMIT__ placeholders.\n'
+      'Pass --update-metainfo to also rebuild screenshot URLs and <releases>.';
 
   PrepareCommand() {
     argParser
@@ -41,6 +43,12 @@ class PrepareCommand extends Command<void> {
           abbr: 'c',
           help: 'Config file path.',
           defaultsTo: 'flutpak.yaml')
+      ..addFlag('update-metainfo',
+          help:
+              'Rebuild metainfo screenshot URLs and update the <releases> section.\n'
+              'Disabled by default so CI re-runs never overwrite developer-curated content.\n'
+              'Screenshots use --tag as ref if set, otherwise --commit.\n'
+              '<releases> is only updated when --tag is also provided.')
       ..addFlag('no-sources',
           help: 'Skip source regeneration (manifest update only).')
       ..addFlag('pub-only', help: 'Skip Flutter SDK sources.')
@@ -67,9 +75,14 @@ class PrepareCommand extends Command<void> {
     final pubOnly = argResults!['pub-only'] as bool;
     final flutterOnly = argResults!['flutter-only'] as bool;
     final dryRun = argResults!['dry-run'] as bool;
+    final updateMetainfo = argResults!['update-metainfo'] as bool;
 
     if (dryRun) {
-      _printDryRun(cfg, tag: tag, commit: commit, sdkPath: sdkPath);
+      _printDryRun(cfg,
+          tag: tag,
+          commit: commit,
+          sdkPath: sdkPath,
+          updateMetainfo: updateMetainfo);
       return;
     }
 
@@ -185,8 +198,10 @@ class PrepareCommand extends Command<void> {
           );
         }
 
-        // ── 7. Replace metainfo screenshot URLs from config ───────────────
-        if (manifestCfg.metainfo!.screenshots.isNotEmpty) {
+        // ── 7. Replace metainfo screenshot URLs from config ───────────
+        // Only when --update-metainfo is passed. Screenshots ref = tag if
+        // set, else commit hash. Safe to run locally with --commit HEAD.
+        if (updateMetainfo && manifestCfg.metainfo!.screenshots.isNotEmpty) {
           final ref = (tag != null && tag.isNotEmpty) ? tag : (commit ?? '');
           _replaceMetainfoScreenshots(
             metainfoPath,
@@ -195,8 +210,9 @@ class PrepareCommand extends Command<void> {
           );
         }
 
-        // ── 8. Update <releases> in metainfo ───────────────────────────
-        if (tag != null && tag.isNotEmpty) {
+        // ── 8. Update <releases> in metainfo ─────────────────────────
+        // Only when --update-metainfo and a proper --tag are both provided.
+        if (updateMetainfo && tag != null && tag.isNotEmpty) {
           _patchMetainfoReleasesSection(metainfoPath, tag, _tagDate(tag));
         }
       }
@@ -459,6 +475,7 @@ class PrepareCommand extends Command<void> {
     String? tag,
     String? commit,
     String? sdkPath,
+    bool updateMetainfo = false,
   }) {
     final ref = tag ?? commit?.substring(0, 12) ?? '(no ref)';
     stderr.writeln('dry-run: prepare  ref=$ref');
@@ -496,10 +513,10 @@ class PrepareCommand extends Command<void> {
         if (!File(metainfoPath).existsSync()) {
           stderr.writeln('  would create metainfo: $metainfoPath');
         }
-        if (manifestCfg.metainfo!.screenshots.isNotEmpty) {
+        if (updateMetainfo && manifestCfg.metainfo!.screenshots.isNotEmpty) {
           stderr.writeln('  would rebuild metainfo screenshots → $ref');
         }
-        if (tag != null && tag.isNotEmpty) {
+        if (updateMetainfo && tag != null && tag.isNotEmpty) {
           stderr.writeln('  would update metainfo releases → $tag');
         }
       }
