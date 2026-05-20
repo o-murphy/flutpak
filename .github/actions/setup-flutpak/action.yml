@@ -52,4 +52,4 @@ runs:
     - name: Verify installation
       shell: bash
       run: |
-        flutpak --version || echo "flutpak installed but --version not supported"
+        flutpak --help || echo "flutpak installed but --help not supported"
