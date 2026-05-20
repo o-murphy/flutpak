@@ -8,6 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 
+## [0.2.6] - 2026-05-20
+
+### Removed
+- `lint` command — use `flatpak run --command=flatpak-builder-lint org.flatpak.Builder`
+  directly; wrapping an official tool added complexity without value and
+  made it hard to keep up with upstream CLI changes (`--exceptions`,
+  `--user-exceptions`, etc.)
+
+
 ## [0.2.5] - 2026-05-20
 
 ### Fixed
@@ -124,7 +133,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   output files
 - MIT License
 
-[Unreleased]: https://github.com/o-murphy/flutpak/compare/v0.2.5...HEAD
+[Unreleased]: https://github.com/o-murphy/flutpak/compare/v0.2.6...HEAD
+[0.2.6]: https://github.com/o-murphy/flutpak/compare/v0.2.5...v0.2.6
 [0.2.5]: https://github.com/o-murphy/flutpak/compare/v0.2.4...v0.2.5
 [0.2.4]: https://github.com/o-murphy/flutpak/compare/v0.2.3...v0.2.4
 [0.2.3]: https://github.com/o-murphy/flutpak/compare/v0.2.2...v0.2.3
