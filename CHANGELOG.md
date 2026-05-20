@@ -8,6 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 
+## [0.2.4] - 2026-05-20
+
+### Fixed
+- `lint` command: auto-detect `flathub.json` in the manifest/repo directory and pass
+  `--user-exceptions` to `flatpak-builder-lint`, so local exception entries (e.g.
+  `appid-url-not-reachable`) are respected without a PR to the central Flathub
+  exceptions file
+
+
 ## [0.2.3] - 2026-05-20
 
 ### Fixed
@@ -105,7 +114,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   output files
 - MIT License
 
-[Unreleased]: https://github.com/o-murphy/flutpak/compare/v0.2.3...HEAD
+[Unreleased]: https://github.com/o-murphy/flutpak/compare/v0.2.4...HEAD
+[0.2.4]: https://github.com/o-murphy/flutpak/compare/v0.2.3...v0.2.4
 [0.2.3]: https://github.com/o-murphy/flutpak/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/o-murphy/flutpak/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/o-murphy/flutpak/compare/v0.2.0...v0.2.1

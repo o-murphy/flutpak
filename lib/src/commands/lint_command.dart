@@ -76,14 +76,25 @@ class LintCommand extends Command<void> {
   }
 
   bool _runLint(String subject, String path) {
-    final result = Process.runSync('flatpak', [
+    // Look for flathub.json in the same directory as the artifact being linted.
+    final dir = subject == 'manifest' ? p.dirname(path) : path;
+    final flathubJson = p.join(dir, 'flathub.json');
+    final hasExceptions = File(flathubJson).existsSync();
+
+    final args = [
       'run',
       '--filesystem=host',
       '--command=flatpak-builder-lint',
       'org.flatpak.Builder',
+      if (hasExceptions) ...[
+        '--user-exceptions',
+        flathubJson,
+      ],
       subject,
       path,
-    ]);
+    ];
+
+    final result = Process.runSync('flatpak', args);
     if (result.stdout.toString().trim().isNotEmpty) {
       stdout.write(result.stdout);
     }
