@@ -1,0 +1,55 @@
+name: Setup flutpak
+description: >
+  Installs flutpak binary globally as a standalone tool.
+  After this action, you can use 'flutpak' command directly
+  in subsequent steps.
+
+inputs:
+  version:
+    description: >
+      Version to install (tag, commit SHA, or branch).
+      If empty, uses the latest stable release.
+    required: false
+    default: ''
+  install_dir:
+    description: Directory to install flutpak binary
+    required: false
+    default: '/usr/local/bin'
+
+runs:
+  using: composite
+  steps:
+    - name: Resolve flutpak version
+      id: flutpak-version
+      shell: bash
+      run: |
+        VERSION="${{ inputs.version }}"
+        if [ -z "$VERSION" ]; then
+          VERSION=$(curl -fsSL https://api.github.com/repos/o-murphy/flutpak/releases/latest | jq -r .tag_name)
+        fi
+        echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+    - name: Set up Dart SDK
+      uses: dart-lang/setup-dart@v1
+      with:
+        sdk: stable
+
+    - name: Build and install flutpak
+      shell: bash
+      run: |
+        git clone https://github.com/o-murphy/flutpak.git "$RUNNER_TEMP/flutpak-src"
+        git -C "$RUNNER_TEMP/flutpak-src" fetch --tags
+        git -C "$RUNNER_TEMP/flutpak-src" checkout "${{ steps.flutpak-version.outputs.version }}"
+        
+        cd "$RUNNER_TEMP/flutpak-src"
+        dart pub get
+        dart compile exe bin/flutpak.dart -o "$RUNNER_TEMP/flutpak"
+        
+        sudo mkdir -p "${{ inputs.install_dir }}"
+        sudo mv "$RUNNER_TEMP/flutpak" "${{ inputs.install_dir }}/flutpak"
+        sudo chmod +x "${{ inputs.install_dir }}/flutpak"
+
+    - name: Verify installation
+      shell: bash
+      run: |
+        flutpak --version || echo "flutpak installed but --version not supported"
