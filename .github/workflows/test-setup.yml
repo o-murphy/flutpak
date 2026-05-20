@@ -1,0 +1,16 @@
+name: Test setup
+
+on:
+  push:
+    branches: 
+      - '*'
+  pull_request:
+
+jobs:
+  # ── Lint + unit tests ────────────────────────────────────────────────────────
+  test:
+    name: Smoke test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install flutpak
+        uses: ./.github/actions/setup-flutpak
