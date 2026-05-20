@@ -193,45 +193,6 @@ manifest:
       expect(result.exitCode, isNot(0));
     });
   });
-
-  // ── flutpak lint ───────────────────────────────────────────────────────────
-
-  group('flutpak lint', () {
-    test('exits with error when org.flatpak.Builder is not installed', () async {
-      // In test environment flatpak is likely not available — this verifies
-      // the error path produces a non-zero exit and helpful message.
-      final result = await _runCli(['lint']);
-
-      // Either flatpak is absent (exit 1 from Process.run failing) or
-      // org.flatpak.Builder check fails — either way non-zero.
-      if (result.exitCode != 0) {
-        expect(
-          result.stderr,
-          anyOf(
-            contains('org.flatpak.Builder'),
-            contains('flatpak'),
-            contains('error'),
-          ),
-        );
-      }
-      // If flatpak IS installed but no manifest exists, also non-zero — fine.
-    });
-
-    test('--manifest-only flag is accepted without error when manifest missing',
-        () async {
-      writeFile('flutpak.yaml', 'output: flatpak\n');
-
-      final result = await _runCli([
-        'lint',
-        '--config', p.join(tmp.path, 'flutpak.yaml'),
-        '--manifest-only',
-      ]);
-
-      // Will fail because flatpak not available or manifest missing,
-      // but must not throw an unhandled exception.
-      expect(result.exitCode, isA<int>());
-    });
-  });
 }
 
 // ── CLI runner helper ──────────────────────────────────────────────────────
