@@ -86,9 +86,10 @@ class LintCommand extends Command<void> {
       '--filesystem=host',
       '--command=flatpak-builder-lint',
       'org.flatpak.Builder',
+      '--exceptions',
       if (hasExceptions) ...[
         '--user-exceptions',
-        flathubJson,
+        p.absolute(flathubJson),
       ],
       subject,
       path,

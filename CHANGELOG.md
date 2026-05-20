@@ -8,6 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 
+## [0.2.5] - 2026-05-20
+
+### Fixed
+- `lint` command: pass both `--exceptions` and `--user-exceptions` to
+  `flatpak-builder-lint`; `--exceptions` is required to activate exception
+  filtering — without it `--user-exceptions` has no effect
+- `lint` command: use absolute path for `--user-exceptions` so it is
+  resolvable inside the Flatpak sandbox regardless of CWD
+
+
 ## [0.2.4] - 2026-05-20
 
 ### Fixed
@@ -114,7 +124,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   output files
 - MIT License
 
-[Unreleased]: https://github.com/o-murphy/flutpak/compare/v0.2.4...HEAD
+[Unreleased]: https://github.com/o-murphy/flutpak/compare/v0.2.5...HEAD
+[0.2.5]: https://github.com/o-murphy/flutpak/compare/v0.2.4...v0.2.5
 [0.2.4]: https://github.com/o-murphy/flutpak/compare/v0.2.3...v0.2.4
 [0.2.3]: https://github.com/o-murphy/flutpak/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/o-murphy/flutpak/compare/v0.2.1...v0.2.2
