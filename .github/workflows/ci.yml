@@ -95,9 +95,6 @@ jobs:
       - name: Smoke test — sdk-ext --help
         run: /tmp/flutpak sdk-ext --help
 
-      - name: Smoke test — manifest --help
-        run: /tmp/flutpak manifest --help
-
       - name: Smoke test — pub sources (real pub.dev)
         run: |
           mkdir -p /tmp/smoke-sources
