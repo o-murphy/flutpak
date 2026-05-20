@@ -6,8 +6,27 @@ on:
       - 'v*'
 
 jobs:
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+
+      - name: Install dependencies
+        run: dart pub get
+
+      - name: Run tests
+        run: dart test --exclude-tags "integration,flutter" --reporter=expanded
+
   prepare:
     name: Prepare release
+    needs: test
     runs-on: ubuntu-latest
     permissions:
       contents: write   # push version bump commit
@@ -29,9 +48,6 @@ jobs:
 
       - name: Install dependencies
         run: dart pub get
-
-      - name: Run tests
-        run: dart test --exclude-tags "integration,flutter" --reporter=expanded
 
       - name: Extract version and detect pre-release
         id: meta
@@ -83,7 +99,7 @@ jobs:
 
   build-binaries:
     name: Build binary (${{ matrix.arch }})
-    needs: prepare
+    needs: [test, prepare]
     strategy:
       matrix:
         include:
