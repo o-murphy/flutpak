@@ -20,15 +20,17 @@ void main() {
 
   bool fileExists(String rel) => File(p.join(tmp.path, rel)).existsSync();
 
-  // All prepare tests pass an absolute config path so prepare resolves all
-  // paths relative to tmp.path without needing a special workingDirectory.
+  // workingDirectory is set to tmp.path so that output paths in the config
+  // (e.g. "output: flatpak") resolve relative to the temp dir.
+  // The script path is absolute so dart can find it regardless of CWD.
   Future<_Result> runPrepare(List<String> extra) => _runCli(
         ['prepare', '--no-sources',
          '--config', p.join(tmp.path, 'flutpak.yaml'),
          ...extra],
+        workingDirectory: tmp.path,
       );
 
-  // ── metainfo generation ────────────────────────────────────────────────────
+  // ── metainfo generation ────────────────────────────────────────────────
 
   group('prepare metainfo generation', () {
     setUp(() {
@@ -49,7 +51,7 @@ manifest:
       - Education
 ''');
       // generated-sources.json must exist for prepare to proceed
-      writeFile('flatpak/generated-sources.json', '[]\n');
+      writeFile('flatpak/generated-sources.json', '[\n]\n');
     });
 
     test('creates metainfo.xml on first run', () async {
@@ -113,7 +115,7 @@ manifest:
     });
   });
 
-  // ── metainfo patching (screenshots + releases) ─────────────────────────────
+  // ── metainfo patching (screenshots + releases) ───────────────────────────
 
   group('prepare metainfo pinning', () {
     const metainfoXml = '''<?xml version="1.0" encoding="UTF-8"?>
@@ -144,7 +146,7 @@ manifest:
     screenshots:
       - path: docs/screen.png
 ''');
-      writeFile('flatpak/generated-sources.json', '[]\n');
+      writeFile('flatpak/generated-sources.json', '[\n]\n');
       writeFile('flatpak/io.example.App.metainfo.xml', metainfoXml);
     });
 
@@ -174,7 +176,7 @@ manifest:
     });
   });
 
-  // ── dry-run ────────────────────────────────────────────────────────────────
+  // ── dry-run ────────────────────────────────────────────────────────────────────
 
   group('prepare --dry-run', () {
     setUp(() {
@@ -215,13 +217,17 @@ manifest:
   });
 }
 
-// ── helpers ────────────────────────────────────────────────────────────────
+// ── helpers ────────────────────────────────────────────────────────────────────
+
+// Absolute path to the entry-point script, resolved from the test process CWD
+// (project root). Must be evaluated here, not inside the subprocess.
+final _flutpakScript = p.absolute('bin', 'flutpak.dart');
 
 Future<_Result> _runCli(List<String> args,
     {String? workingDirectory}) async {
   final result = await Process.run(
     Platform.executable,
-    ['run', 'bin/flutpak.dart', ...args],
+    ['run', _flutpakScript, ...args],
     workingDirectory: workingDirectory,
   );
   return _Result(

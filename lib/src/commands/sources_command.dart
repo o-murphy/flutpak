@@ -40,12 +40,14 @@ class SourcesCommand extends Command<void> {
   Future<void> run() async {
     final cfg = FlatpakGenConfig.load(argResults!['config'] as String);
 
-    final lockArg = argResults!['lock'] as List<String>;
-    final lockPaths = lockArg.isNotEmpty ? lockArg : cfg.pubLocks;
-
+    // Resolve SDK path first; it is needed for effectivePubLocks.
     final sdkPath = argResults!['sdk'] as String? ??
         cfg.flutterSdk ??
         Platform.environment['FLUTTER_ROOT'];
+
+    final lockArg = argResults!['lock'] as List<String>;
+    final lockPaths =
+        lockArg.isNotEmpty ? lockArg : cfg.effectivePubLocks(sdkPath);
 
     final outputDir = argResults!['output'] as String? ?? cfg.output;
     final outputFile = p.join(outputDir, 'generated-sources.json');

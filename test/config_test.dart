@@ -40,6 +40,55 @@ void main() {
       expect(cfg.flutterSdk, isNot(isEmpty));
     });
 
+    test('flutterSdk is null when \$VAR cannot be resolved', () {
+      // Use a variable name that is guaranteed not to be set.
+      final cfg = FlatpakGenConfig.fromYaml({
+        'flutter': {'sdk': r'$FLUTPAK_TEST_UNSET_VAR_XYZ/flutter'},
+      });
+      expect(cfg.flutterSdk, isNull);
+    });
+
+    test('pubLocks preserves unresolvable \$VAR paths for late resolution', () {
+      // Paths with unresolvable \$VAR are kept so effectivePubLocks() can
+      // substitute them later using the effective SDK path.
+      final cfg = FlatpakGenConfig.fromYaml({
+        'pub': {
+          'locks': [
+            'pubspec.lock',
+            r'$FLUTPAK_TEST_UNSET_VAR_XYZ/packages/flutter_tools/pubspec.lock',
+          ],
+        },
+      });
+      expect(cfg.pubLocks, hasLength(2));
+      expect(cfg.pubLocks.last, contains(r'$FLUTPAK_TEST_UNSET_VAR_XYZ'));
+    });
+
+    test('effectivePubLocks substitutes \$FLUTTER_ROOT with sdkPath', () {
+      final cfg = FlatpakGenConfig.fromYaml({
+        'pub': {
+          'locks': [
+            'pubspec.lock',
+            r'$FLUTTER_ROOT/packages/flutter_tools/pubspec.lock',
+          ],
+        },
+      });
+      final effective = cfg.effectivePubLocks('/home/user/flutter');
+      expect(effective, [
+        'pubspec.lock',
+        '/home/user/flutter/packages/flutter_tools/pubspec.lock',
+      ]);
+    });
+
+    test('effectivePubLocks returns pubLocks unchanged when sdkPath is null',
+        () {
+      final cfg = FlatpakGenConfig.fromYaml({
+        'pub': {
+          'locks': ['pubspec.lock'],
+        },
+      });
+      expect(cfg.effectivePubLocks(null), cfg.pubLocks);
+    });
+
     test('reads flutter patch from flutter.patch key', () {
       final cfg = FlatpakGenConfig.fromYaml({
         'flutter': {
@@ -166,6 +215,72 @@ flutpak:
       );
       expect(entry.dest('5.3.1'),
           '.pub-cache/hosted/pub.dev/objectbox_flutter_libs-5.3.1');
+    });
+  });
+
+  group('DesktopConfig.fromYaml', () {
+    test('parses all fields including comment and startup_wm_class', () {
+      final cfg = DesktopConfig.fromYaml({
+        'name': 'My App',
+        'comment': 'A great app',
+        'startup_wm_class': 'myapp',
+        'categories': ['Utility', 'Science'],
+      });
+      expect(cfg.name, 'My App');
+      expect(cfg.comment, 'A great app');
+      expect(cfg.startupWmClass, 'myapp');
+      expect(cfg.categories, ['Utility', 'Science']);
+    });
+
+    test('all fields are optional', () {
+      final cfg = DesktopConfig.fromYaml({});
+      expect(cfg.name, isNull);
+      expect(cfg.comment, isNull);
+      expect(cfg.startupWmClass, isNull);
+      expect(cfg.categories, isEmpty);
+    });
+  });
+
+  group('MetainfoConfig.fromYaml', () {
+    test('defaults metadata_license and project_license to MIT', () {
+      final cfg = MetainfoConfig.fromYaml({'name': 'App', 'summary': 'x'});
+      expect(cfg.metadataLicense, 'MIT');
+      expect(cfg.projectLicense, 'MIT');
+    });
+
+    test('parses custom project_license', () {
+      final cfg = MetainfoConfig.fromYaml({
+        'name': 'App',
+        'summary': 'x',
+        'metadata_license': 'MIT',
+        'project_license': 'GPL-3.0-only',
+      });
+      expect(cfg.metadataLicense, 'MIT');
+      expect(cfg.projectLicense, 'GPL-3.0-only');
+    });
+
+    test('parses supports list', () {
+      final cfg = MetainfoConfig.fromYaml({
+        'name': 'App',
+        'summary': 'x',
+        'supports': ['pointing', 'keyboard', 'touch'],
+      });
+      expect(cfg.supports, ['pointing', 'keyboard', 'touch']);
+    });
+
+    test('parses content_rating_attributes map', () {
+      final cfg = MetainfoConfig.fromYaml({
+        'name': 'App',
+        'summary': 'x',
+        'content_rating_attributes': {'violence-realistic': 'none'},
+      });
+      expect(cfg.contentRatingAttributes, {'violence-realistic': 'none'});
+    });
+
+    test('defaults supports and content_rating_attributes to empty', () {
+      final cfg = MetainfoConfig.fromYaml({'name': 'App', 'summary': 'x'});
+      expect(cfg.supports, isEmpty);
+      expect(cfg.contentRatingAttributes, isEmpty);
     });
   });
 

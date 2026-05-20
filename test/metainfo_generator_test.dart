@@ -11,6 +11,10 @@ MetainfoConfig _cfg({
   UrlConfig? url,
   List<ScreenshotConfig> screenshots = const [],
   String contentRating = 'oars-1.1',
+  Map<String, String> contentRatingAttributes = const {},
+  List<String> supports = const [],
+  String metadataLicense = 'MIT',
+  String projectLicense = 'MIT',
   String? repoSlug,
 }) =>
     MetainfoConfig(
@@ -23,6 +27,10 @@ MetainfoConfig _cfg({
       url: url,
       screenshots: screenshots,
       contentRating: contentRating,
+      contentRatingAttributes: contentRatingAttributes,
+      supports: supports,
+      metadataLicense: metadataLicense,
+      projectLicense: projectLicense,
       repoSlug: repoSlug,
     );
 
@@ -45,10 +53,54 @@ void main() {
       expect(xml, contains('<launchable type="desktop-id">$appId.desktop</launchable>'));
     });
 
-    test('emits OARS block with comment', () {
+    test('emits default metadata_license and project_license', () {
+      final xml = MetainfoGenerator(appId: appId, cfg: _cfg()).generate();
+      expect(xml, contains('<metadata_license>MIT</metadata_license>'));
+      expect(xml, contains('<project_license>MIT</project_license>'));
+    });
+
+    test('uses configured metadata_license and project_license', () {
+      final xml = MetainfoGenerator(
+        appId: appId,
+        cfg: _cfg(metadataLicense: 'MIT', projectLicense: 'GPL-3.0-only'),
+      ).generate();
+      expect(xml, contains('<metadata_license>MIT</metadata_license>'));
+      expect(xml, contains('<project_license>GPL-3.0-only</project_license>'));
+    });
+
+    test('emits self-closing OARS block with comment when no attributes', () {
       final xml = MetainfoGenerator(appId: appId, cfg: _cfg()).generate();
       expect(xml, contains('<content_rating type="oars-1.1"/>'));
       expect(xml, contains('hughsie.github.io/oars'));
+    });
+
+    test('emits content_rating with attribute children when set', () {
+      final xml = MetainfoGenerator(
+        appId: appId,
+        cfg: _cfg(contentRatingAttributes: {'violence-realistic': 'none'}),
+      ).generate();
+      expect(xml, contains('<content_rating type="oars-1.1">'));
+      expect(xml,
+          contains('<content_attribute id="violence-realistic">none</content_attribute>'));
+      expect(xml, contains('</content_rating>'));
+      expect(xml, isNot(contains('hughsie.github.io')));
+    });
+
+    test('emits supports block', () {
+      final xml = MetainfoGenerator(
+        appId: appId,
+        cfg: _cfg(supports: ['pointing', 'keyboard', 'touch']),
+      ).generate();
+      expect(xml, contains('<supports>'));
+      expect(xml, contains('<control>pointing</control>'));
+      expect(xml, contains('<control>keyboard</control>'));
+      expect(xml, contains('<control>touch</control>'));
+      expect(xml, contains('</supports>'));
+    });
+
+    test('omits supports block when empty', () {
+      final xml = MetainfoGenerator(appId: appId, cfg: _cfg()).generate();
+      expect(xml, isNot(contains('<supports>')));
     });
 
     test('escapes XML special characters in name and summary', () {
@@ -67,6 +119,16 @@ void main() {
       ).generate();
       expect(xml, contains('<p>First paragraph.</p>'));
       expect(xml, contains('<p>Second paragraph.</p>'));
+    });
+
+    test('collapses soft-wrap newlines within a paragraph to spaces', () {
+      final xml = MetainfoGenerator(
+        appId: appId,
+        cfg: _cfg(description: 'Line one\nLine two\n\nSecond paragraph.'),
+      ).generate();
+      expect(xml, contains('<p>Line one Line two</p>'));
+      expect(xml, contains('<p>Second paragraph.</p>'));
+      expect(xml, isNot(contains('<p>Line one\nLine two</p>')));
     });
 
     test('omits description block when null', () {
@@ -197,6 +259,18 @@ void main() {
     test('omits screenshots block when empty', () {
       final xml = MetainfoGenerator(appId: appId, cfg: _cfg()).generate();
       expect(xml, isNot(contains('<screenshots>')));
+    });
+
+    test('supports block appears after screenshots', () {
+      final xml = MetainfoGenerator(
+        appId: appId,
+        cfg: _cfg(
+          repoSlug: 'owner/repo',
+          screenshots: [ScreenshotConfig(path: 'docs/a.png')],
+          supports: ['pointing'],
+        ),
+      ).generate();
+      expect(xml.indexOf('<supports>'), greaterThan(xml.indexOf('<screenshots>')));
     });
 
     test('uses provided version in releases', () {
