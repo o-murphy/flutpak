@@ -2,17 +2,17 @@ import 'dart:io';
 import 'package:args/command_runner.dart';
 import '../config.dart';
 
-/// Validates the AppStream metainfo file using appstream-util.
+/// Validates the AppStream metainfo file using appstreamcli.
 ///
-/// Requires appstream-util to be installed:
+/// Requires appstreamcli to be installed:
 ///   sudo apt install appstream
 class ValidateCommand extends Command<void> {
   @override
   final name = 'validate';
   @override
   final description =
-      'Validate the AppStream metainfo file using appstream-util.\n'
-      'Requires appstream-util: sudo apt install appstream';
+      'Validate the AppStream metainfo file using appstreamcli.\n'
+      'Requires appstreamcli: sudo apt install appstream';
 
   ValidateCommand() {
     argParser
@@ -24,18 +24,22 @@ class ValidateCommand extends Command<void> {
           abbr: 'm',
           help: 'Path to metainfo XML (auto-detected from config if omitted).')
       ..addFlag('pedantic',
-          help: 'Pass --pedantic to appstream-util for stricter checks.');
+          help: 'Pass --pedantic to appstreamcli for stricter checks.')
+      ..addFlag('no-net',
+          help: 'Pass --no-net to appstreamcli (skip network checks).',
+          defaultsTo: true);
   }
 
   @override
   Future<void> run() async {
-    _checkAppstreamUtil();
+    _checkAppstreamCli();
 
     final cfg = FlatpakGenConfig.load(argResults!['config'] as String);
     final pedantic = argResults!['pedantic'] as bool;
+    final noNet = argResults!['no-net'] as bool;
 
-    final metainfoPath = argResults!['metainfo'] as String? ??
-        _resolveMetainfoPath(cfg);
+    final metainfoPath =
+        argResults!['metainfo'] as String? ?? _resolveMetainfoPath(cfg);
 
     if (metainfoPath == null) {
       stderr.writeln('error: metainfo path not found.\n'
@@ -53,11 +57,13 @@ class ValidateCommand extends Command<void> {
 
     final args = [
       'validate',
+      '--explain',
       if (pedantic) '--pedantic',
+      if (noNet) '--no-net',
       metainfoPath,
     ];
 
-    final result = Process.runSync('appstream-util', args);
+    final result = Process.runSync('appstreamcli', args);
 
     if (result.stdout.toString().trim().isNotEmpty) {
       stdout.write(result.stdout);
@@ -78,10 +84,10 @@ class ValidateCommand extends Command<void> {
         'flatpak/${cfg.manifest!.appId}.metainfo.xml';
   }
 
-  void _checkAppstreamUtil() {
-    final result = Process.runSync('appstream-util', ['--version']);
+  void _checkAppstreamCli() {
+    final result = Process.runSync('appstreamcli', ['--version']);
     if (result.exitCode != 0) {
-      stderr.writeln('error: appstream-util is not installed.\n'
+      stderr.writeln('error: appstreamcli is not installed.\n'
           'Install it with:\n'
           '  sudo apt install appstream   # Debian/Ubuntu\n'
           '  sudo dnf install appstream   # Fedora');

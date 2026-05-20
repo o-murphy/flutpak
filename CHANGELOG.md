@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 
+## [0.2.2] - 2026-05-20
+
+### Fixed
+- `validate` command: switched from `appstream-util` to `appstreamcli`
+  (the modern AppStream CLI available as `appstream` package on Debian/Ubuntu 22.04+).
+  Added `--explain` (always on) and `--no-net` (on by default) flags.
+
+
 ## [0.2.1] - 2026-05-19
 
 ### Added
@@ -89,7 +97,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   output files
 - MIT License
 
-[Unreleased]: https://github.com/o-murphy/flutpak/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/o-murphy/flutpak/compare/v0.2.2...HEAD
+[0.2.2]: https://github.com/o-murphy/flutpak/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/o-murphy/flutpak/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/o-murphy/flutpak/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/o-murphy/flutpak/releases/tag/v0.1.1
