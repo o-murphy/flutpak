@@ -16,10 +16,15 @@ class ManifestGenerator {
   final String generatedSourcesPath;
   final List<PatchEntry> patchEntries;
 
+  /// Directory path relative to the project source root used in install
+  /// commands (e.g. `flatpak`). Defaults to `flatpak`.
+  final String outputRelDir;
+
   ManifestGenerator({
     required this.cfg,
     required this.generatedSourcesPath,
     this.patchEntries = const [],
+    this.outputRelDir = 'flatpak',
   });
 
   /// Returns the manifest as a YAML string ready to write to disk.
@@ -150,9 +155,9 @@ class ManifestGenerator {
     buf.writeln('      - mkdir -p /app/$appName');
     buf.writeln('      - cp -r "\$BUNDLE_PATH"/. /app/$appName/');
     buf.writeln(
-        '      - install -Dm755 flatpak/$appName-wrapper.sh /app/bin/${cfg.command}');
+        '      - install -Dm755 $outputRelDir/$appName-wrapper.sh /app/bin/${cfg.command}');
     buf.writeln(
-        '      - install -Dm644 flatpak/${cfg.appId}.desktop'
+        '      - install -Dm644 $outputRelDir/${cfg.appId}.desktop'
         ' /app/share/applications/${cfg.appId}.desktop');
 
     // Icons.
@@ -164,20 +169,14 @@ class ManifestGenerator {
       buf.writeln('      - install -Dm644 ${icon.path} $iconDest');
     }
 
-    // Metainfo: version/date sed + install.
+    // Metainfo: <release> version/date is patched by `flutpak prepare --tag`
+    // before the build, so only a plain install is needed here.
     if (cfg.metainfo != null) {
-      final metainfoPath = cfg.metainfo!.path ??
-          'flatpak/${cfg.appId}.metainfo.xml';
-      buf.writeln('      - |');
+      final metainfoSrcPath =
+          cfg.metainfo!.path ?? '$outputRelDir/${cfg.appId}.metainfo.xml';
       buf.writeln(
-          "        VERSION=\$(grep '^version:' pubspec.yaml | sed 's/version:[[:space:]]*//' | sed 's/+.*//')");
-      buf.writeln('        TODAY=\$(date +%Y-%m-%d)');
-      buf.writeln(
-          '        sed -i "s|<release version=\\"[^\\"]*\\" date=\\"[^\\"]*\\"/>|'
-          '<release version=\\"\${VERSION}\\" date=\\"\${TODAY}\\"/>|" $metainfoPath');
-      buf.writeln(
-          '      - install -Dm644 $metainfoPath'
-          ' /app/share/metainfo/${p.basename(metainfoPath)}');
+          '      - install -Dm644 $metainfoSrcPath'
+          ' /app/share/metainfo/${p.basename(metainfoSrcPath)}');
     }
   }
 
@@ -203,7 +202,7 @@ class ManifestGenerator {
 
     // Patch sources from registry / project config.
     // Paths are made relative to the manifest directory so flatpak-builder
-    // can resolve them correctly (manifest lives in flatpak/).
+    // can resolve them correctly (manifest lives in outputRelDir/).
     final manifestDir = p.dirname(p.absolute(generatedSourcesPath));
     for (final patch in patchEntries) {
       final dest = patch.version != null ? patch.dest(patch.version!) : null;
@@ -239,7 +238,7 @@ class ManifestGenerator {
   static void _line(StringBuffer buf, String s) => buf.writeln(s);
 }
 
-/// Updates [_tagPlaceholder] / [_commitPlaceholder] in a manifest's raw YAML text.
+/// Updates [tagPlaceholder] / [commitPlaceholder] in a manifest's raw YAML text.
 ///
 /// If [tag] is null or empty, the `tag:` placeholder line is removed.
 String patchManifestPlaceholders(
@@ -337,8 +336,6 @@ String patchMetainfoReleases(String content, String tag, DateTime date) {
     RegExp(r'(<release\s[^/]*/?>)', multiLine: true),
     (m) {
       final original = m.group(1)!;
-      // Replace version="..." and date="..." attributes, preserving indentation
-      // by operating on the tag text only.
       var updated = original.replaceFirst(
         RegExp('version\\s*=\\s*["\'][^"\']*["\']'),
         'version="$version"',
@@ -351,4 +348,3 @@ String patchMetainfoReleases(String content, String tag, DateTime date) {
     },
   );
 }
-

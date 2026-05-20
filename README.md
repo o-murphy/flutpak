@@ -154,8 +154,10 @@ flutpak:
         dest: lib-prebuilt
         strip-components: 0
     desktop:
-      name: Your App           # optional; falls back to metainfo.name
-      categories:              # optional; falls back to metainfo.categories
+      name: Your App             # optional; falls back to metainfo.name or pubspec name
+      comment: A short summary   # optional; falls back to metainfo.summary or pubspec description
+      startup_wm_class: yourapp  # optional; defaults to manifest command
+      categories:                # optional; falls back to metainfo.categories
         - Utility
     icons:
       - size: 512x512
@@ -171,6 +173,8 @@ flutpak:
         First paragraph.
 
         Second paragraph.
+      metadata_license: MIT        # default; license of the metainfo file itself
+      project_license: MIT         # SPDX id for the project (e.g. GPL-3.0-only)
       categories:
         - Education
         - Science
@@ -183,11 +187,17 @@ flutpak:
       developer:
         id: io.github.YourOrg              # recommended for Flathub (AppStream 1.0)
         name: Your Name
+      supports:                            # input controls for <supports> block
+        - pointing
+        - keyboard
+        - touch
       screenshots:
         - path: docs/screenshots/home.png
         - path: docs/screenshots/settings.png
           default: true                        # marks as type="default"
-      content_rating: oars-1.1                 # default
+      content_rating: oars-1.1               # OARS type; default
+      content_rating_attributes:             # OARS values; omit to leave a comment placeholder
+        violence-realistic: none
 ```
 
 ## Patches registry
@@ -212,7 +222,6 @@ When `manifest.metainfo.name` and `manifest.metainfo.summary` are set,
 
 **On subsequent `flutpak prepare --tag v1.2.3 --commit <sha>` runs:**
 - Screenshot URLs are pinned from `/main/` to the tag (or commit when no tag)
-- The `<release version="..." date="..."/>` entry is updated to the current date
 
 The file is never overwritten once it exists — edit it manually if needed.
 

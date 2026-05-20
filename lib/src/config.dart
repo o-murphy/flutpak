@@ -99,7 +99,7 @@ class ScreenshotConfig {
 /// Full metainfo config — drives both generation and patching.
 class MetainfoConfig {
   /// Output path for the generated metainfo file (relative to project root).
-  /// Defaults to `flatpak/<app_id>.metainfo.xml`.
+  /// Defaults to `<output>/<app_id>.metainfo.xml`.
   final String? path;
 
   /// GitHub repo slug for raw screenshot URLs (e.g. "owner/repo").
@@ -116,9 +116,20 @@ class MetainfoConfig {
   final UrlConfig? url;
   final List<ScreenshotConfig> screenshots;
 
+  /// License for the metainfo file itself (almost always "MIT").
+  final String metadataLicense;
+
+  /// SPDX license identifier for the project, e.g. "GPL-3.0-only".
+  final String projectLicense;
+
   /// OARS content-rating type, e.g. "oars-1.1".
-  /// A blank OARS block is emitted; fill in via https://hughsie.github.io/oars/
   final String contentRating;
+
+  /// OARS content-rating attributes, e.g. {'violence-realistic': 'none'}.
+  final Map<String, String> contentRatingAttributes;
+
+  /// Supported input controls for <supports>, e.g. ['pointing', 'keyboard', 'touch'].
+  final List<String> supports;
 
   bool get canGenerate => name != null && summary != null;
 
@@ -133,7 +144,11 @@ class MetainfoConfig {
     this.keywords = const [],
     this.url,
     this.screenshots = const [],
+    this.metadataLicense = 'MIT',
+    this.projectLicense = 'MIT',
     this.contentRating = 'oars-1.1',
+    this.contentRatingAttributes = const {},
+    this.supports = const [],
   });
 
   factory MetainfoConfig.fromYaml(Map yaml) {
@@ -153,7 +168,14 @@ class MetainfoConfig {
           : null,
       screenshots:
           screensRaw.map((e) => ScreenshotConfig.fromYaml(e)).toList(),
+      metadataLicense: yaml['metadata_license'] as String? ?? 'MIT',
+      projectLicense: yaml['project_license'] as String? ?? 'MIT',
       contentRating: yaml['content_rating'] as String? ?? 'oars-1.1',
+      contentRatingAttributes:
+          (yaml['content_rating_attributes'] as Map?)
+              ?.map((k, v) => MapEntry(k as String, v.toString())) ??
+          {},
+      supports: (yaml['supports'] as List?)?.cast<String>() ?? [],
     );
   }
 }
@@ -174,17 +196,34 @@ class IconConfig {
 }
 
 /// Config for desktop entry metadata.
-/// `name` and `categories` fall back to `MetainfoConfig` values when omitted.
+/// `name`, `comment`, and `categories` fall back to `MetainfoConfig` or
+/// pubspec.yaml values when omitted.
 class DesktopConfig {
   final String? name;
+
+  /// Maps to `Comment=` in the .desktop file.
+  /// Falls back to `MetainfoConfig.summary` or pubspec `description` when omitted.
+  final String? comment;
+
+  /// Maps to `StartupWMClass=` in the .desktop file.
+  /// Defaults to the manifest `command` when omitted.
+  final String? startupWmClass;
+
   final List<String> categories;
 
-  const DesktopConfig({this.name, this.categories = const []});
+  const DesktopConfig({
+    this.name,
+    this.comment,
+    this.startupWmClass,
+    this.categories = const [],
+  });
 
   factory DesktopConfig.fromYaml(Map yaml) {
     final cats = (yaml['categories'] as List?)?.cast<String>() ?? [];
     return DesktopConfig(
       name: yaml['name'] as String?,
+      comment: yaml['comment'] as String?,
+      startupWmClass: yaml['startup_wm_class'] as String?,
       categories: cats,
     );
   }
@@ -293,9 +332,13 @@ class ManifestConfig {
 /// Parsed contents of `flutpak:` in `pubspec.yaml` or `flutpak.yaml`.
 class FlatpakGenConfig {
   /// Directory where flatpak artifacts are written.
-  /// Defaults to `flatpak/`. Generated sources file is always
-  /// `<output>/generated-sources.json`.
+  /// Defaults to `flatpak/`. All generated files (sources, manifest, desktop,
+  /// metainfo) live inside this directory unless overridden by per-file paths.
   final String output;
+
+  /// Lock file paths after env-var substitution at config-load time.
+  /// Paths that still contain `\$FLUTTER_ROOT` (because the env var was not set)
+  /// are preserved and resolved lazily via [effectivePubLocks].
   final List<String> pubLocks;
   final String? flutterSdk;
   final String? patchPath;
@@ -319,11 +362,28 @@ class FlatpakGenConfig {
     this.manifest,
   });
 
+  /// Returns lock paths with any remaining `\$FLUTTER_ROOT` placeholders
+  /// substituted by [sdkPath]. Use this instead of [pubLocks] whenever
+  /// the effective SDK path is known (e.g. from the `--sdk` CLI flag).
+  List<String> effectivePubLocks(String? sdkPath) {
+    if (sdkPath == null) return pubLocks;
+    return pubLocks
+        .map((l) => l.replaceAll(r'$FLUTTER_ROOT', sdkPath))
+        .toList();
+  }
+
   factory FlatpakGenConfig.fromYaml(Map yaml) {
     String resolve(String s) => s.replaceAllMapped(
           RegExp(r'\$(\w+)'),
           (m) => Platform.environment[m.group(1)!] ?? m.group(0)!,
         );
+
+    // Returns null if any \$VAR placeholder remains after substitution.
+    // Used only for flutterSdk to avoid PathNotFoundException crashes.
+    String? tryResolve(String s) {
+      final result = resolve(s);
+      return RegExp(r'\$[A-Za-z_]\w*').hasMatch(result) ? null : result;
+    }
 
     final pub = yaml['pub'] as Map? ?? {};
     final flutter = yaml['flutter'] as Map? ?? {};
@@ -336,9 +396,13 @@ class FlatpakGenConfig {
 
     return FlatpakGenConfig(
       output: yaml['output'] as String? ?? 'flatpak',
+      // Substitute env vars that ARE set; keep \$FLUTTER_ROOT literally when
+      // not set — effectivePubLocks() resolves it with the CLI --sdk value.
       pubLocks: rawLocks.map(resolve).toList(),
+      // tryResolve returns null when \$FLUTTER_ROOT is unset, preventing a
+      // crash in FlutterSdkGenerator when the literal path is used.
       flutterSdk: flutter['sdk'] != null
-          ? resolve(flutter['sdk'] as String)
+          ? tryResolve(flutter['sdk'] as String)
           : Platform.environment['FLUTTER_ROOT'],
       patchPath: (flutter['patch'] ?? yaml['patch_path']) as String?,
       flutterVersionFile: yaml['flutter_version_file'] as String?,
@@ -349,7 +413,7 @@ class FlatpakGenConfig {
     );
   }
 
-  /// Loads config from pubspec.yaml (`flatpak_gen:` section) or flatpak_gen.yaml.
+  /// Loads config from pubspec.yaml (`flutpak:` section) or flutpak.yaml.
   ///
   /// Throws if both sources are found (ambiguous config).
   /// Falls back to sensible defaults if neither exists.

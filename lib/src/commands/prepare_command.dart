@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:args/command_runner.dart';
 import 'package:path/path.dart' as p;
+import 'package:yaml/yaml.dart';
 import '../config.dart';
 import '../generators/flutter_sdk.dart';
 import '../generators/manifest_generator.dart';
@@ -14,14 +15,15 @@ import '../utils/download_cache.dart';
 ///   1. Generates generated-sources.json (pub + Flutter SDK)
 ///   2. Resolves patch entries (registry + project config)
 ///   3. Generates the manifest if it doesn't exist, or updates placeholders
-///   4. Pins metainfo screenshot URLs
+///   4. Generates .desktop and metainfo on first run (with pubspec.yaml fallbacks)
+///   5. Pins metainfo screenshot URLs
 class PrepareCommand extends Command<void> {
   @override
   final name = 'prepare';
   @override
   final description =
       'Generate sources, resolve patches, and create/update the Flatpak manifest.\n'
-      'On first run: generates the manifest from pubspec.yaml flatpak_gen.manifest config.\n'
+      'On first run: generates the manifest, .desktop, and metainfo from config.\n'
       'On subsequent runs: updates __FLATPAK_TAG__/__FLATPAK_COMMIT__ placeholders.';
 
   PrepareCommand() {
@@ -51,6 +53,8 @@ class PrepareCommand extends Command<void> {
   @override
   Future<void> run() async {
     final configPath = argResults!['config'] as String;
+    // configDir is only used to locate the config file itself and load it.
+    // All output/asset paths from the config are resolved relative to CWD.
     final configDir = p.dirname(p.absolute(configPath));
     final cfg = FlatpakGenConfig.load(configPath, configDir);
 
@@ -65,19 +69,25 @@ class PrepareCommand extends Command<void> {
     final dryRun = argResults!['dry-run'] as bool;
 
     if (dryRun) {
-      _printDryRun(cfg, configDir: configDir, tag: tag, commit: commit,
-          sdkPath: sdkPath);
+      _printDryRun(cfg, tag: tag, commit: commit, sdkPath: sdkPath);
       return;
     }
 
-    // cfg.output is a directory; sources file lives inside it.
-    final outputDir = _resolve(cfg.output, configDir);
+    // cfg.output is resolved relative to CWD so that "output: flatpak" always
+    // means ./flatpak/ regardless of where the config file lives.
+    final outputDir = p.absolute(cfg.output);
     final sourcesPath = p.join(outputDir, 'generated-sources.json');
 
-    // ── 1. Resolve patch entries ─────────────────────────────────────────────
+    // Read pubspec.yaml from CWD (project root), not from the config directory.
+    final pubspec = _readPubspecFallbacks(Directory.current.path);
+
+    // Lock paths with $FLUTTER_ROOT substituted from the effective SDK path.
+    final effectiveLocks = cfg.effectivePubLocks(sdkPath);
+
+    // ── 1. Resolve patch entries ────────────────────────────────────────────
     final patchesDir = p.join(outputDir, 'patches');
     final patchEntries = resolvePatchEntries(
-      lockPaths: cfg.pubLocks,
+      lockPaths: effectiveLocks,
       patchesDir: patchesDir,
       projectPatches: cfg.patches,
     );
@@ -85,76 +95,90 @@ class PrepareCommand extends Command<void> {
       stderr.writeln('patches: ${patchEntries.length} entries resolved');
     }
 
-    // ── 2. Generate sources ──────────────────────────────────────────────────
+    // ── 2. Generate sources ──────────────────────────────────────────────
     if (!noSources) {
       await _generateSources(
-        cfg: cfg,
+        lockPaths: effectiveLocks,
         outputDir: outputDir,
         sourcesPath: sourcesPath,
         sdkPath: sdkPath,
+        patchPath: cfg.patchPath,
         pubOnly: pubOnly,
         flutterOnly: flutterOnly,
       );
     }
 
-    // ── 3. Write flutter version file ────────────────────────────────────────
+    // ── 3. Write flutter version file ────────────────────────────────────
     if (sdkPath != null && cfg.flutterVersionFile != null) {
       _writeFlutterVersionFile(
-          sdkPath, _resolve(cfg.flutterVersionFile!, configDir));
+          sdkPath, p.absolute(cfg.flutterVersionFile!));
     }
 
-    // ── 4. Create or update manifest ─────────────────────────────────────────
+    // ── 4. Create or update manifest ───────────────────────────────────
     final manifestCfg = cfg.manifest;
     if (manifestCfg != null) {
-      final manifestPath =
-          p.join(configDir, 'flatpak', '${manifestCfg.appId}.yml');
+      final manifestPath = p.join(outputDir, '${manifestCfg.appId}.yml');
       final manifestFile = File(manifestPath);
 
-      if (!manifestFile.existsSync()) {
+      final manifestCreated = !manifestFile.existsSync();
+      if (manifestCreated) {
         _generateManifest(
           manifestCfg: manifestCfg,
           manifestPath: manifestPath,
           generatedSourcesPath: sourcesPath,
           patchEntries: patchEntries,
+          outputRelDir: cfg.output,
         );
-        stderr.writeln('✓  manifest created: $manifestPath');
-      } else {
-        if (commit == null) {
-          final content = manifestFile.readAsStringSync();
-          if (content.contains('__FLATPAK_COMMIT__')) {
-            stderr.writeln(
-                '⚠  commit hash unknown (not in a git repo and --commit not set);\n'
-                '   __FLATPAK_COMMIT__ placeholder will remain in $manifestPath');
-          }
+      }
+
+      // Substitute placeholders for both first-run and subsequent runs.
+      if (commit == null) {
+        final content = manifestFile.readAsStringSync();
+        if (content.contains('__FLATPAK_COMMIT__')) {
+          stderr.writeln(
+              '⚠  commit hash unknown (not in a git repo and --commit not set);\n'
+              '   __FLATPAK_COMMIT__ placeholder will remain in $manifestPath');
         }
+      } else {
         _updateManifestPlaceholders(
           manifestFile: manifestFile,
           tag: tag,
           commit: commit,
         );
-        stderr.writeln('✓  manifest updated: $manifestPath');
       }
 
-      // ── 5. Generate .desktop file (first run only) ────────────────────────
-      final desktopPath =
-          p.join(configDir, 'flatpak', '${manifestCfg.appId}.desktop');
+      stderr.writeln(
+          '✓  manifest ${manifestCreated ? 'created' : 'updated'}: $manifestPath');
+
+      // ── 5. Generate .desktop file (first run only) ───────────────────
+      final desktopPath = p.join(outputDir, '${manifestCfg.appId}.desktop');
       if (!File(desktopPath).existsSync()) {
-        _generateDesktopFile(manifestCfg: manifestCfg, desktopPath: desktopPath);
+        _generateDesktopFile(
+          manifestCfg: manifestCfg,
+          desktopPath: desktopPath,
+          pubspec: pubspec,
+        );
       }
 
-      // ── 6. Generate metainfo (first run only) ─────────────────────────────
+      // ── 6. Generate metainfo (first run only) ──────────────────────
       if (manifestCfg.metainfo != null) {
-        final metainfoPath = _resolve(
-          manifestCfg.metainfo!.path ??
-              'flatpak/${manifestCfg.appId}.metainfo.xml',
-          configDir,
-        );
+        final metainfoPath = manifestCfg.metainfo!.path != null
+            ? p.absolute(manifestCfg.metainfo!.path!)
+            : p.join(outputDir, '${manifestCfg.appId}.metainfo.xml');
         final metainfoFile = File(metainfoPath);
-        if (!metainfoFile.existsSync() && manifestCfg.metainfo!.canGenerate) {
+
+        final effectiveName =
+            manifestCfg.metainfo!.name ?? pubspec['name'];
+        final effectiveSummary =
+            manifestCfg.metainfo!.summary ?? pubspec['description'];
+
+        if (!metainfoFile.existsSync() && effectiveName != null) {
           _generateMetainfo(
             appId: manifestCfg.appId,
             metainfoPath: metainfoPath,
             cfg: manifestCfg.metainfo!,
+            overrideName: effectiveName,
+            overrideSummary: effectiveSummary,
             tag: tag,
             releaseDate: _tagDate(tag),
             ref: tag ?? commit,
@@ -171,7 +195,7 @@ class PrepareCommand extends Command<void> {
           );
         }
 
-        // ── 8. Update <releases> in metainfo ───────────────────────────────
+        // ── 8. Update <releases> in metainfo ───────────────────────────
         if (tag != null && tag.isNotEmpty) {
           _patchMetainfoReleasesSection(metainfoPath, tag, _tagDate(tag));
         }
@@ -182,7 +206,7 @@ class PrepareCommand extends Command<void> {
       _patchAnyExistingManifest(
         tag: tag,
         commit: commit,
-        flatpakDir: p.join(configDir, 'flatpak'),
+        flatpakDir: outputDir,
       );
     }
 
@@ -191,10 +215,11 @@ class PrepareCommand extends Command<void> {
   }
 
   Future<void> _generateSources({
-    required FlatpakGenConfig cfg,
+    required List<String> lockPaths,
     required String outputDir,
     required String sourcesPath,
     String? sdkPath,
+    String? patchPath,
     required bool pubOnly,
     required bool flutterOnly,
   }) async {
@@ -204,7 +229,7 @@ class PrepareCommand extends Command<void> {
     try {
       if (!flutterOnly) {
         final pubSources =
-            await PubSourcesGenerator(lockFilePaths: cfg.pubLocks).generate();
+            await PubSourcesGenerator(lockFilePaths: lockPaths).generate();
         allSources.addAll(pubSources.map((s) => s.toJson()));
         stderr.writeln('pub: ${pubSources.length} entries');
       }
@@ -216,7 +241,7 @@ class PrepareCommand extends Command<void> {
         } else {
           final flutterSources = await FlutterSdkGenerator(
             sdkPath: sdkPath,
-            patchPath: cfg.patchPath,
+            patchPath: patchPath,
             outputDir: outputDir,
             cache: cache,
           ).generate();
@@ -241,11 +266,13 @@ class PrepareCommand extends Command<void> {
     required String manifestPath,
     required String generatedSourcesPath,
     required List<PatchEntry> patchEntries,
+    String outputRelDir = 'flatpak',
   }) {
     final generator = ManifestGenerator(
       cfg: manifestCfg,
       generatedSourcesPath: generatedSourcesPath,
       patchEntries: patchEntries,
+      outputRelDir: outputRelDir,
     );
     File(manifestPath)
       ..createSync(recursive: true)
@@ -348,6 +375,8 @@ class PrepareCommand extends Command<void> {
     required String appId,
     required String metainfoPath,
     required MetainfoConfig cfg,
+    String? overrideName,
+    String? overrideSummary,
     String? tag,
     DateTime? releaseDate,
     String? ref,
@@ -357,6 +386,8 @@ class PrepareCommand extends Command<void> {
       cfg: cfg,
       version: tag,
       releaseDate: releaseDate ?? DateTime.now().toUtc(),
+      overrideName: overrideName,
+      overrideSummary: overrideSummary,
     ).generate(ref: ref);
     File(metainfoPath)
       ..createSync(recursive: true)
@@ -367,37 +398,64 @@ class PrepareCommand extends Command<void> {
   void _generateDesktopFile({
     required ManifestConfig manifestCfg,
     required String desktopPath,
+    Map<String, String?> pubspec = const {},
   }) {
-    // name and categories fall back to metainfo config when not set in desktop.
-    final name = manifestCfg.desktop?.name ?? manifestCfg.metainfo?.name;
+    final name = manifestCfg.desktop?.name ??
+        manifestCfg.metainfo?.name ??
+        pubspec['name'];
+    final comment = manifestCfg.desktop?.comment ??
+        manifestCfg.metainfo?.summary ??
+        pubspec['description'];
     final categories = (manifestCfg.desktop?.categories.isNotEmpty == true)
         ? manifestCfg.desktop!.categories
         : (manifestCfg.metainfo?.categories ?? []);
+    final startupWmClass =
+        manifestCfg.desktop?.startupWmClass ?? manifestCfg.command;
 
     if (name == null) {
-      stderr.writeln('⚠  desktop file skipped: no name in desktop or metainfo config');
+      stderr.writeln('⚠  desktop file skipped: no name available '
+          '(set manifest.desktop.name, manifest.metainfo.name, '
+          'or add name: to pubspec.yaml)');
       return;
     }
 
     final buf = StringBuffer();
-    buf.writeln('# Generated by flutpak — https://github.com/o-murphy/flutpak');
+    buf.writeln(
+        '# Generated by flutpak — https://github.com/o-murphy/flutpak');
     buf.writeln('[Desktop Entry]');
     buf.writeln('Type=Application');
     buf.writeln('Name=$name');
+    if (comment != null && comment.isNotEmpty) buf.writeln('Comment=$comment');
     buf.writeln('Exec=${manifestCfg.command}');
     buf.writeln('Icon=${manifestCfg.appId}');
     if (categories.isNotEmpty) {
-      buf.writeln('Categories=${categories.join(';')};');
+      buf.writeln('Categories=${categories.join(";")};');
     }
+    buf.writeln('StartupWMClass=$startupWmClass');
     File(desktopPath)
       ..createSync(recursive: true)
       ..writeAsStringSync(buf.toString());
     stderr.writeln('✓  desktop file created: $desktopPath');
   }
 
+  /// Reads `name` and `description` from the project pubspec.yaml.
+  Map<String, String?> _readPubspecFallbacks(String dir) {
+    final f = File(p.join(dir, 'pubspec.yaml'));
+    if (!f.existsSync()) return const {};
+    try {
+      final yaml = loadYaml(f.readAsStringSync());
+      if (yaml is! Map) return const {};
+      return {
+        'name': yaml['name']?.toString(),
+        'description': yaml['description']?.toString(),
+      };
+    } catch (_) {
+      return const {};
+    }
+  }
+
   void _printDryRun(
     FlatpakGenConfig cfg, {
-    required String configDir,
     String? tag,
     String? commit,
     String? sdkPath,
@@ -406,9 +464,10 @@ class PrepareCommand extends Command<void> {
     stderr.writeln('dry-run: prepare  ref=$ref');
     stderr.writeln('');
 
-    final outputDir = _resolve(cfg.output, configDir);
-    stderr.writeln('  would write: ${p.join(outputDir, 'generated-sources.json')}');
-    for (final lock in cfg.pubLocks) {
+    final outputDir = p.absolute(cfg.output);
+    stderr.writeln(
+        '  would write: ${p.join(outputDir, 'generated-sources.json')}');
+    for (final lock in cfg.effectivePubLocks(sdkPath)) {
       stderr.writeln('    pub lock: $lock');
     }
     if (sdkPath != null) {
@@ -419,27 +478,22 @@ class PrepareCommand extends Command<void> {
 
     final manifestCfg = cfg.manifest;
     if (manifestCfg != null) {
-      final manifestPath =
-          p.join(configDir, 'flatpak', '${manifestCfg.appId}.yml');
+      final manifestPath = p.join(outputDir, '${manifestCfg.appId}.yml');
       final manifestExists = File(manifestPath).existsSync();
       stderr.writeln(manifestExists
           ? '  would update placeholders: $manifestPath'
-          : '  would create manifest: $manifestPath');
+          : '  would create manifest (and pin placeholders): $manifestPath');
 
-      final desktopPath =
-          p.join(configDir, 'flatpak', '${manifestCfg.appId}.desktop');
+      final desktopPath = p.join(outputDir, '${manifestCfg.appId}.desktop');
       if (!File(desktopPath).existsSync()) {
         stderr.writeln('  would create desktop file: $desktopPath');
       }
 
       if (manifestCfg.metainfo != null) {
-        final metainfoPath = _resolve(
-          manifestCfg.metainfo!.path ??
-              'flatpak/${manifestCfg.appId}.metainfo.xml',
-          configDir,
-        );
-        if (!File(metainfoPath).existsSync() &&
-            manifestCfg.metainfo!.canGenerate) {
+        final metainfoPath = manifestCfg.metainfo!.path != null
+            ? p.absolute(manifestCfg.metainfo!.path!)
+            : p.join(outputDir, '${manifestCfg.appId}.metainfo.xml');
+        if (!File(metainfoPath).existsSync()) {
           stderr.writeln('  would create metainfo: $metainfoPath');
         }
         if (manifestCfg.metainfo!.screenshots.isNotEmpty) {
@@ -451,17 +505,14 @@ class PrepareCommand extends Command<void> {
       }
 
       if (cfg.flutterVersionFile != null) {
-        stderr
-            .writeln('  would write: ${_resolve(cfg.flutterVersionFile!, configDir)}');
+        stderr.writeln(
+            '  would write: ${p.absolute(cfg.flutterVersionFile!)}');
       }
     }
 
     stderr.writeln('');
     stderr.writeln('(dry-run: no files written)');
   }
-
-  static String _resolve(String path, String base) =>
-      p.isAbsolute(path) ? path : p.join(base, path);
 
   String? _gitHead() {
     try {

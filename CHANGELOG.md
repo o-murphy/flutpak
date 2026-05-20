@@ -8,6 +8,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 
+## [0.2.7] - 2026-05-20
+
+### Added
+- `DesktopConfig`: new `comment` field → `Comment=` in `.desktop` file (falls back to
+  `metainfo.summary` or pubspec `description` when omitted)
+- `DesktopConfig`: new `startup_wm_class` field → `StartupWMClass=` in `.desktop` file
+  (defaults to `manifest.command` when omitted)
+- `MetainfoConfig`: new `metadata_license` field (default: `MIT`) — controls
+  `<metadata_license>` in generated XML
+- `MetainfoConfig`: new `project_license` field (default: `MIT`) — controls
+  `<project_license>` in generated XML (e.g. set to `GPL-3.0-only` for GPL apps)
+- `MetainfoConfig`: new `supports` list — emits
+  `<supports><control>…</control></supports>` block
+  (e.g. `[pointing, keyboard, touch]`)
+- `MetainfoConfig`: new `content_rating_attributes` map — emits
+  `<content_attribute id="…">value</content_attribute>` children inside
+  `<content_rating>`; when empty a comment placeholder is written instead
+- `.desktop` and metainfo generation now fall back to pubspec.yaml `name` /
+  `description` when the corresponding config fields are absent
+
+### Fixed
+- `$VAR` env placeholders that remain unresolved at runtime (e.g. `$FLUTTER_ROOT`
+  not set) now yield `null` instead of the literal string, preventing a
+  `PathNotFoundException` crash in `FlutterSdkGenerator`
+- Lock file paths containing unresolvable `$VAR` references are silently skipped
+  instead of triggering a `⚠ lock file not found: $FLUTTER_ROOT/…` warning
+- `output:` directory now controls paths for **all** generated artifacts —
+  manifest, `.desktop`, and metainfo — not just `generated-sources.json`
+
+
 ## [0.2.6] - 2026-05-20
 
 ### Removed
@@ -135,7 +165,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   output files
 - MIT License
 
-[Unreleased]: https://github.com/o-murphy/flutpak/compare/v0.2.6...HEAD
+[Unreleased]: https://github.com/o-murphy/flutpak/compare/v0.2.7...HEAD
+[0.2.7]: https://github.com/o-murphy/flutpak/compare/v0.2.6...v0.2.7
 [0.2.6]: https://github.com/o-murphy/flutpak/compare/v0.2.5...v0.2.6
 [0.2.5]: https://github.com/o-murphy/flutpak/compare/v0.2.4...v0.2.5
 [0.2.4]: https://github.com/o-murphy/flutpak/compare/v0.2.3...v0.2.4

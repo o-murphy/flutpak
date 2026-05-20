@@ -1,7 +1,8 @@
-name: Pin Flatpak Manifest
+name: Prepare Flatpak Manifest
 description: >
   Generates Flatpak sources and pins manifest placeholders to a tag/commit.
-  Uses a pre-compiled flutpak binary from GitHub releases — no Dart SDK required.
+  Builds the flutpak binary from source at flutpak_ref
+  (defaults to the latest stable release if not specified).
 
 inputs:
   tag_name:
@@ -32,14 +33,10 @@ inputs:
       One of flutter_version or flutter_version_file must be provided.
     required: false
     default: ''
-  flutpak_version:
-    description: flutpak release tag to download (empty = latest stable)
-    required: false
-    default: ''
-  flutpak_binary:
+  flutpak_ref:
     description: >
-      Path to a pre-built flutpak binary. When set, skips the download steps.
-      Intended for CI testing of the action itself.
+      Git ref (tag, commit SHA, or branch) to build flutpak from.
+      If empty, uses the latest stable release tag.
     required: false
     default: ''
   cache:
@@ -56,28 +53,30 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Resolve flutpak version
-      id: flutpak-ver
-      if: inputs.flutpak_binary == ''
+    - name: Resolve flutpak ref
+      id: flutpak-ref
       shell: bash
       run: |
-        VERSION="${{ inputs.flutpak_version }}"
-        if [ -z "$VERSION" ]; then
-          VERSION=$(curl -fsSL https://api.github.com/repos/o-murphy/flutpak/releases/latest | jq -r .tag_name)
+        REF="${{ inputs.flutpak_ref }}"
+        if [ -z "$REF" ]; then
+          REF=$(curl -fsSL https://api.github.com/repos/o-murphy/flutpak/releases/latest | jq -r .tag_name)
         fi
-        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "ref=$REF" >> "$GITHUB_OUTPUT"
 
-    - name: Download flutpak binary
-      if: inputs.flutpak_binary == ''
+    - name: Set up Dart SDK
+      uses: dart-lang/setup-dart@v1
+      with:
+        sdk: stable
+
+    - name: Build flutpak binary
       shell: bash
       run: |
-        case "${{ runner.arch }}" in
-          ARM64) ARCH=arm64 ;;
-          *)     ARCH=x64   ;;
-        esac
-        curl -fsSL \
-          "https://github.com/o-murphy/flutpak/releases/download/${{ steps.flutpak-ver.outputs.version }}/flutpak-linux-${ARCH}" \
-          -o "$RUNNER_TEMP/flutpak"
+        git clone https://github.com/o-murphy/flutpak.git "$RUNNER_TEMP/flutpak-src"
+        git -C "$RUNNER_TEMP/flutpak-src" fetch --tags
+        git -C "$RUNNER_TEMP/flutpak-src" checkout "${{ steps.flutpak-ref.outputs.ref }}"
+        cd "$RUNNER_TEMP/flutpak-src"
+        dart pub get
+        dart compile exe bin/flutpak.dart -o "$RUNNER_TEMP/flutpak"
         chmod +x "$RUNNER_TEMP/flutpak"
 
     - name: Resolve commit SHA
@@ -86,11 +85,14 @@ runs:
       run: |
         COMMIT="${{ inputs.commit }}"
         if [ -z "$COMMIT" ]; then
-          COMMIT=$(git rev-parse "${{ inputs.tag_name }}" 2>/dev/null || \
-            { git fetch origin tag "${{ inputs.tag_name }}" --no-tags >/dev/null 2>&1 && \
-              git rev-parse "${{ inputs.tag_name }}"; })
+          COMMIT=$(
+            git rev-parse "${{ inputs.tag_name }}" 2>/dev/null || \
+            (git fetch origin tag "${{ inputs.tag_name }}" --no-tags >/dev/null 2>&1 && \
+             git rev-parse "${{ inputs.tag_name }}" 2>/dev/null) || \
+            true
+          )
         fi
-        echo "commit=$COMMIT" >> $GITHUB_OUTPUT
+        echo "commit=$COMMIT" >> "$GITHUB_OUTPUT"
 
     - name: Resolve Flutter version
       id: flutter-ver
@@ -104,7 +106,7 @@ runs:
           echo "::error::Either flutter_version or flutter_version_file must be provided"
           exit 1
         fi
-        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
     - name: Setup Flutter
       uses: o-murphy/flutpak/.github/actions/flutter@main
@@ -123,9 +125,8 @@ runs:
     - name: Run flutpak prepare
       shell: bash
       run: |
-        FLUTPAK="${{ inputs.flutpak_binary || format('{0}/flutpak', runner.temp) }}"
         CONFIG="${{ inputs.config }}"
-        "$FLUTPAK" prepare \
+        "$RUNNER_TEMP/flutpak" prepare \
           ${CONFIG:+--config "$CONFIG"} \
           --tag "${{ inputs.tag_name }}" \
           --commit "${{ steps.meta.outputs.commit }}" \
@@ -140,7 +141,6 @@ runs:
       if: inputs.validate == 'true'
       shell: bash
       run: |
-        FLUTPAK="${{ inputs.flutpak_binary || format('{0}/flutpak', runner.temp) }}"
         CONFIG="${{ inputs.config }}"
-        "$FLUTPAK" validate \
+        "$RUNNER_TEMP/flutpak" validate \
           ${CONFIG:+--config "$CONFIG"}
