@@ -96,139 +96,6 @@ class ScreenshotConfig {
   }
 }
 
-/// Full metainfo config — drives both generation and patching.
-class MetainfoConfig {
-  /// Output path for the generated metainfo file (relative to project root).
-  /// Defaults to `<output>/<app_id>.metainfo.xml`.
-  final String? path;
-
-  /// GitHub repo slug for raw screenshot URLs (e.g. "owner/repo").
-  final String? repoSlug;
-
-  // ── Generation fields ────────────────────────────────────────────────────
-
-  final String? name;
-  final String? summary;
-  final String? description;
-  final DeveloperConfig? developer;
-  final List<String> categories;
-  final List<String> keywords;
-  final UrlConfig? url;
-  final List<ScreenshotConfig> screenshots;
-
-  /// License for the metainfo file itself (almost always "MIT").
-  final String metadataLicense;
-
-  /// SPDX license identifier for the project, e.g. "GPL-3.0-only".
-  final String projectLicense;
-
-  /// OARS content-rating type, e.g. "oars-1.1".
-  final String contentRating;
-
-  /// OARS content-rating attributes, e.g. {'violence-realistic': 'none'}.
-  final Map<String, String> contentRatingAttributes;
-
-  /// Supported input controls for <supports>, e.g. ['pointing', 'keyboard', 'touch'].
-  final List<String> supports;
-
-  bool get canGenerate => name != null && summary != null;
-
-  const MetainfoConfig({
-    this.path,
-    this.repoSlug,
-    this.name,
-    this.summary,
-    this.description,
-    this.developer,
-    this.categories = const [],
-    this.keywords = const [],
-    this.url,
-    this.screenshots = const [],
-    this.metadataLicense = 'MIT',
-    this.projectLicense = 'MIT',
-    this.contentRating = 'oars-1.1',
-    this.contentRatingAttributes = const {},
-    this.supports = const [],
-  });
-
-  factory MetainfoConfig.fromYaml(Map yaml) {
-    final rawScreenshots = yaml['screenshots'];
-    final screensRaw = rawScreenshots is List ? rawScreenshots : [];
-    return MetainfoConfig(
-      path: yaml['path'] as String?,
-      repoSlug: yaml['repo_slug'] as String?,
-      name: yaml['name'] as String?,
-      summary: yaml['summary'] as String?,
-      description: yaml['description'] as String?,
-      categories: (yaml['categories'] as List?)?.cast<String>() ?? [],
-      keywords: (yaml['keywords'] as List?)?.cast<String>() ?? [],
-      url: yaml['url'] != null ? UrlConfig.fromYaml(yaml['url'] as Map) : null,
-      developer: yaml['developer'] != null
-          ? DeveloperConfig.fromYaml(yaml['developer'])
-          : null,
-      screenshots:
-          screensRaw.map((e) => ScreenshotConfig.fromYaml(e)).toList(),
-      metadataLicense: yaml['metadata_license'] as String? ?? 'MIT',
-      projectLicense: yaml['project_license'] as String? ?? 'MIT',
-      contentRating: yaml['content_rating'] as String? ?? 'oars-1.1',
-      contentRatingAttributes:
-          (yaml['content_rating_attributes'] as Map?)
-              ?.map((k, v) => MapEntry(k as String, v.toString())) ??
-          {},
-      supports: (yaml['supports'] as List?)?.cast<String>() ?? [],
-    );
-  }
-}
-
-/// Config for an icon install entry.
-class IconConfig {
-  final String size;
-  final String path;
-
-  const IconConfig({required this.size, required this.path});
-
-  factory IconConfig.fromYaml(Map yaml) {
-    return IconConfig(
-      size: yaml['size'] as String,
-      path: yaml['path'] as String,
-    );
-  }
-}
-
-/// Config for desktop entry metadata.
-/// `name`, `comment`, and `categories` fall back to `MetainfoConfig` or
-/// pubspec.yaml values when omitted.
-class DesktopConfig {
-  final String? name;
-
-  /// Maps to `Comment=` in the .desktop file.
-  /// Falls back to `MetainfoConfig.summary` or pubspec `description` when omitted.
-  final String? comment;
-
-  /// Maps to `StartupWMClass=` in the .desktop file.
-  /// Defaults to the manifest `command` when omitted.
-  final String? startupWmClass;
-
-  final List<String> categories;
-
-  const DesktopConfig({
-    this.name,
-    this.comment,
-    this.startupWmClass,
-    this.categories = const [],
-  });
-
-  factory DesktopConfig.fromYaml(Map yaml) {
-    final cats = (yaml['categories'] as List?)?.cast<String>() ?? [];
-    return DesktopConfig(
-      name: yaml['name'] as String?,
-      comment: yaml['comment'] as String?,
-      startupWmClass: yaml['startup_wm_class'] as String?,
-      categories: cats,
-    );
-  }
-}
-
 /// Config for manifest generation (`flutpak.manifest:` section).
 class ManifestConfig {
   final String appId;
@@ -249,10 +116,6 @@ class ManifestConfig {
   /// Environment variables for build-options.env.
   final Map<String, String> env;
 
-  final DesktopConfig? desktop;
-  final List<IconConfig> icons;
-  final MetainfoConfig? metainfo;
-
   /// Git repository URL for the app source entry.
   final String? repoUrl;
 
@@ -271,9 +134,6 @@ class ManifestConfig {
     this.appendPath,
     this.prependLdLibraryPath,
     this.env = const {},
-    this.desktop,
-    this.icons = const [],
-    this.metainfo,
     this.repoUrl,
     this.extraSources = const [],
   });
@@ -301,7 +161,6 @@ class ManifestConfig {
         .map((k, v) => MapEntry(k as String, v.toString()));
     final envMap = {...envTop, ...envOpts};
 
-    final iconsRaw = yaml['icons'] as List? ?? [];
     final extraSourcesRaw = yaml['extra_sources'] as List? ?? [];
 
     return ManifestConfig(
@@ -314,13 +173,6 @@ class ManifestConfig {
       appendPath: buildOpts['append_path'] as String?,
       prependLdLibraryPath: buildOpts['prepend_ld_library_path'] as String?,
       env: envMap,
-      desktop: yaml['desktop'] != null
-          ? DesktopConfig.fromYaml(yaml['desktop'] as Map)
-          : null,
-      icons: iconsRaw.map((e) => IconConfig.fromYaml(e as Map)).toList(),
-      metainfo: yaml['metainfo'] != null
-          ? MetainfoConfig.fromYaml(yaml['metainfo'] as Map)
-          : null,
       repoUrl: yaml['repo_url'] as String?,
       extraSources: extraSourcesRaw
           .map((e) => Map<String, dynamic>.from(e as Map))
@@ -388,7 +240,8 @@ class FlatpakGenConfig {
     final pub = yaml['pub'] as Map? ?? {};
     final flutter = yaml['flutter'] as Map? ?? {};
 
-    final rawLocks = (pub['locks'] as List?)?.cast<String>() ?? ['pubspec.lock'];
+    final rawLocks =
+        (pub['locks'] as List?)?.cast<String>() ?? ['pubspec.lock'];
 
     final patchesRaw = yaml['patches'] as List? ?? [];
     final patchEntries =

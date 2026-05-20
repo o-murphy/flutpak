@@ -10,13 +10,13 @@ class FlutterCommand extends Command<void> {
   @override
   final name = 'flutter';
   @override
-  final description = 'Generate Flutter SDK sources from a local Flutter install.';
+  final description =
+      'Generate Flutter SDK sources from a local Flutter install.';
 
   FlutterCommand() {
     argParser
       ..addOption('sdk',
-          abbr: 's',
-          help: 'Path to Flutter SDK. Defaults to \$FLUTTER_ROOT.')
+          abbr: 's', help: 'Path to Flutter SDK. Defaults to \$FLUTTER_ROOT.')
       ..addOption('output',
           abbr: 'o',
           help: 'Output directory (generated-sources.json is written inside).',
@@ -25,9 +25,7 @@ class FlutterCommand extends Command<void> {
           help: 'Path to shared.sh.patch. '
               'Omit to use the built-in patch (written next to the output file).')
       ..addOption('config',
-          abbr: 'c',
-          help: 'Config file.',
-          defaultsTo: 'flutpak.yaml');
+          abbr: 'c', help: 'Config file.', defaultsTo: 'flutpak.yaml');
   }
 
   @override

@@ -16,8 +16,7 @@ class SdkExtCommand extends Command<void> {
   SdkExtCommand() {
     argParser
       ..addOption('sdk',
-          abbr: 's',
-          help: 'Flutter SDK path. Defaults to \$FLUTTER_ROOT.')
+          abbr: 's', help: 'Flutter SDK path. Defaults to \$FLUTTER_ROOT.')
       ..addOption('runtime-version',
           abbr: 'r',
           help: 'Freedesktop SDK runtime version (e.g. 25.08).',
@@ -29,9 +28,7 @@ class SdkExtCommand extends Command<void> {
       ..addOption('patch',
           help: 'Relative path to shared.sh.patch to embed in sources.')
       ..addOption('config',
-          abbr: 'c',
-          help: 'Config file.',
-          defaultsTo: 'flutpak.yaml');
+          abbr: 'c', help: 'Config file.', defaultsTo: 'flutpak.yaml');
   }
 
   @override
@@ -68,8 +65,7 @@ class SdkExtCommand extends Command<void> {
         ..writeAsStringSync('$json\n');
 
       stderr.writeln('✓  SDK Extension manifest → $output');
-      stderr.writeln(
-          '   App ID: ${manifest['id']}  runtime: $runtimeVersion');
+      stderr.writeln('   App ID: ${manifest['id']}  runtime: $runtimeVersion');
     } finally {
       cache.dispose();
     }

@@ -145,8 +145,7 @@ class FlutterSdkGenerator {
     ));
 
     // 5. engine_stamp.json (type: file)
-    final stampUrl =
-        '$_infraBase/flutter/$engineHash/engine_stamp.json';
+    final stampUrl = '$_infraBase/flutter/$engineHash/engine_stamp.json';
     final stampSha256 = await _cache.sha256For(stampUrl);
     sources.add(FileSource(
       url: stampUrl,
@@ -286,7 +285,8 @@ class FlutterSdkGenerator {
   }
 
   static String? _gitRevParse(String repoPath) {
-    final result = Process.runSync('git', ['-C', repoPath, 'rev-parse', 'HEAD']);
+    final result =
+        Process.runSync('git', ['-C', repoPath, 'rev-parse', 'HEAD']);
     if (result.exitCode != 0) return null;
     return (result.stdout as String).trim();
   }

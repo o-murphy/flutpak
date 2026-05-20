@@ -10,7 +10,6 @@ library flutpak;
 export 'src/config.dart';
 export 'src/generators/flutter_sdk.dart';
 export 'src/generators/manifest_generator.dart';
-export 'src/generators/metainfo_generator.dart';
 export 'src/generators/pub_sources.dart';
 export 'src/generators/sdk_extension.dart';
 export 'src/models/flatpak_source.dart';

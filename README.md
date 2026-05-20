@@ -153,51 +153,6 @@ flutpak:
         sha256: def456...
         dest: lib-prebuilt
         strip-components: 0
-    desktop:
-      name: Your App             # optional; falls back to metainfo.name or pubspec name
-      comment: A short summary   # optional; falls back to metainfo.summary or pubspec description
-      startup_wm_class: yourapp  # optional; defaults to manifest command
-      categories:                # optional; falls back to metainfo.categories
-        - Utility
-    icons:
-      - size: 512x512
-        path: assets/icon_512x512.png
-    metainfo:
-      path: flatpak/io.github.YourOrg.YourApp.metainfo.xml  # optional; default derived from app_id
-      repo_slug: YourOrg/YourApp   # screenshot <image> URLs rebuilt from config on every prepare
-      # Fields below drive automatic metainfo.xml generation on first run.
-      # Generation requires at minimum name + summary.
-      name: Your App
-      summary: A brief one-liner
-      description: |
-        First paragraph.
-
-        Second paragraph.
-      metadata_license: MIT        # default; license of the metainfo file itself
-      project_license: MIT         # SPDX id for the project (e.g. GPL-3.0-only)
-      categories:
-        - Education
-        - Science
-      keywords:
-        - yourapp
-      url:
-        homepage: https://github.com/YourOrg/YourApp
-        bugtracker: https://github.com/YourOrg/YourApp/issues
-        donation: https://example.com/donate   # optional
-      developer:
-        id: io.github.YourOrg              # recommended for Flathub (AppStream 1.0)
-        name: Your Name
-      supports:                            # input controls for <supports> block
-        - pointing
-        - keyboard
-        - touch
-      screenshots:
-        - path: docs/screenshots/home.png
-        - path: docs/screenshots/settings.png
-          default: true                        # marks as type="default"
-      content_rating: oars-1.1               # OARS type; default
-      content_rating_attributes:             # OARS values; omit to leave a comment placeholder
-        violence-realistic: none
 ```
 
 ## Patches registry

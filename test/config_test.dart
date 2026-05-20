@@ -172,8 +172,7 @@ pub:
       expect(cfg.output, 'flatpak/gen');
     });
 
-    test('throws when both pubspec.yaml section and flutpak.yaml exist',
-        () {
+    test('throws when both pubspec.yaml section and flutpak.yaml exist', () {
       File('${tmpDir.path}/pubspec.yaml').writeAsStringSync('''
 name: myapp
 flutpak:
@@ -181,8 +180,7 @@ flutpak:
 ''');
       File('${tmpDir.path}/flutpak.yaml')
           .writeAsStringSync('output: flatpak/b\n');
-      expect(
-          () => FlatpakGenConfig.load('flutpak.yaml', tmpDir.path),
+      expect(() => FlatpakGenConfig.load('flutpak.yaml', tmpDir.path),
           throwsStateError);
     });
 
@@ -218,104 +216,7 @@ flutpak:
     });
   });
 
-  group('DesktopConfig.fromYaml', () {
-    test('parses all fields including comment and startup_wm_class', () {
-      final cfg = DesktopConfig.fromYaml({
-        'name': 'My App',
-        'comment': 'A great app',
-        'startup_wm_class': 'myapp',
-        'categories': ['Utility', 'Science'],
-      });
-      expect(cfg.name, 'My App');
-      expect(cfg.comment, 'A great app');
-      expect(cfg.startupWmClass, 'myapp');
-      expect(cfg.categories, ['Utility', 'Science']);
-    });
-
-    test('all fields are optional', () {
-      final cfg = DesktopConfig.fromYaml({});
-      expect(cfg.name, isNull);
-      expect(cfg.comment, isNull);
-      expect(cfg.startupWmClass, isNull);
-      expect(cfg.categories, isEmpty);
-    });
-  });
-
-  group('MetainfoConfig.fromYaml', () {
-    test('defaults metadata_license and project_license to MIT', () {
-      final cfg = MetainfoConfig.fromYaml({'name': 'App', 'summary': 'x'});
-      expect(cfg.metadataLicense, 'MIT');
-      expect(cfg.projectLicense, 'MIT');
-    });
-
-    test('parses custom project_license', () {
-      final cfg = MetainfoConfig.fromYaml({
-        'name': 'App',
-        'summary': 'x',
-        'metadata_license': 'MIT',
-        'project_license': 'GPL-3.0-only',
-      });
-      expect(cfg.metadataLicense, 'MIT');
-      expect(cfg.projectLicense, 'GPL-3.0-only');
-    });
-
-    test('parses supports list', () {
-      final cfg = MetainfoConfig.fromYaml({
-        'name': 'App',
-        'summary': 'x',
-        'supports': ['pointing', 'keyboard', 'touch'],
-      });
-      expect(cfg.supports, ['pointing', 'keyboard', 'touch']);
-    });
-
-    test('parses content_rating_attributes map', () {
-      final cfg = MetainfoConfig.fromYaml({
-        'name': 'App',
-        'summary': 'x',
-        'content_rating_attributes': {'violence-realistic': 'none'},
-      });
-      expect(cfg.contentRatingAttributes, {'violence-realistic': 'none'});
-    });
-
-    test('defaults supports and content_rating_attributes to empty', () {
-      final cfg = MetainfoConfig.fromYaml({'name': 'App', 'summary': 'x'});
-      expect(cfg.supports, isEmpty);
-      expect(cfg.contentRatingAttributes, isEmpty);
-    });
-  });
-
   group('ManifestConfig.fromYaml', () {
-    test('parses icons', () {
-      final cfg = ManifestConfig.fromYaml({
-        'app_id': 'io.github.example.app',
-        'runtime_version': '25.08',
-        'command': 'app',
-        'icons': [
-          {'size': '512x512', 'path': 'assets/icon_512x512.png'},
-        ],
-      });
-      expect(cfg.icons, hasLength(1));
-      expect(cfg.icons.first.size, '512x512');
-    });
-
-    test('parses metainfo screenshots', () {
-      final cfg = ManifestConfig.fromYaml({
-        'app_id': 'io.github.example.app',
-        'runtime_version': '25.08',
-        'command': 'app',
-        'metainfo': {
-          'name': 'My App',
-          'summary': 'A great app',
-          'screenshots': [
-            {'path': 'docs/screenshots/home.png'},
-            {'path': 'docs/screenshots/settings.png', 'default': true},
-          ],
-        },
-      });
-      expect(cfg.metainfo!.screenshots, hasLength(2));
-      expect(cfg.metainfo!.screenshots.last.default_, true);
-    });
-
     test('parses build_options env and append_path', () {
       final cfg = ManifestConfig.fromYaml({
         'app_id': 'io.example.app',
@@ -330,20 +231,6 @@ flutpak:
       });
       expect(cfg.appendPath, '/custom/bin');
       expect(cfg.env['MY_VAR'], 'value');
-    });
-
-    test('parses metainfo config', () {
-      final cfg = ManifestConfig.fromYaml({
-        'app_id': 'io.example.app',
-        'runtime_version': '25.08',
-        'command': 'app',
-        'metainfo': {
-          'path': 'flatpak/io.example.app.metainfo.xml',
-          'repo_slug': 'owner/repo',
-        },
-      });
-      expect(cfg.metainfo!.path, 'flatpak/io.example.app.metainfo.xml');
-      expect(cfg.metainfo!.repoSlug, 'owner/repo');
     });
   });
 }

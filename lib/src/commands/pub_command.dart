@@ -22,9 +22,7 @@ class PubCommand extends Command<void> {
           help: 'Output directory (generated-sources.json is written inside).',
           defaultsTo: null)
       ..addOption('config',
-          abbr: 'c',
-          help: 'Config file.',
-          defaultsTo: 'flutpak.yaml');
+          abbr: 'c', help: 'Config file.', defaultsTo: 'flutpak.yaml');
   }
 
   @override

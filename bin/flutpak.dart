@@ -1,13 +1,11 @@
 import 'dart:io';
 import 'package:args/command_runner.dart';
-import 'package:flutpak/src/commands/export_command.dart';
 import 'package:flutpak/src/commands/flutter_command.dart';
-import 'package:flutpak/src/commands/manifest_command.dart';
 import 'package:flutpak/src/commands/prepare_command.dart';
 import 'package:flutpak/src/commands/pub_command.dart';
 import 'package:flutpak/src/commands/sdk_ext_command.dart';
 import 'package:flutpak/src/commands/sources_command.dart';
-import 'package:flutpak/src/commands/verify_command.dart';
+
 Future<void> main(List<String> args) async {
   final runner = CommandRunner<void>(
     'flutpak',
@@ -15,24 +13,17 @@ Future<void> main(List<String> args) async {
         'Usage examples:\n'
         '  flutpak prepare          # generate everything from pubspec.yaml config\n'
         '  flutpak prepare --tag v0.1.14 --commit abc1234  # CI: pin tag/commit\n'
-        '  flutpak verify           # check manifest is pinned (no placeholders)\n'
-        '  flutpak verify --tag v0.1.14 --commit abc1234   # check exact values\n'
         '  flutpak sources          # pub + Flutter SDK → generated-sources.json\n'
         '  flutpak pub              # only pub packages\n'
         '  flutpak flutter          # only Flutter SDK artifacts\n'
         '  flutpak sdk-ext          # Flutter SDK Extension manifest for Flathub\n'
-        '  flutpak manifest -m app.yml  # sync version + regenerate sources\n'
-        '  flutpak export           # export submission files to flatpak-export/\n'
         '  flutpak prepare --dry-run  # preview what prepare would do',
   )
     ..addCommand(PrepareCommand())
-    ..addCommand(VerifyCommand())
     ..addCommand(SourcesCommand())
     ..addCommand(PubCommand())
     ..addCommand(FlutterCommand())
-    ..addCommand(SdkExtCommand())
-    ..addCommand(ManifestCommand())
-    ..addCommand(ExportCommand());
+    ..addCommand(SdkExtCommand());
 
   // Default to 'sources' when no subcommand given
   final effectiveArgs =
