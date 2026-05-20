@@ -150,34 +150,18 @@ class ManifestGenerator {
           '      - cp flutter/bin/internal/$src flutter/bin/cache/$stamp');
     }
 
-    buf.writeln('      - setup-flutter.sh');
-    buf.writeln('      - flutter build linux --release --no-pub');
-    buf.writeln('      - mkdir -p /app/$appName');
-    buf.writeln('      - cp -r "\$BUNDLE_PATH"/. /app/$appName/');
-    buf.writeln(
-        '      - install -Dm755 $outputRelDir/$appName-wrapper.sh /app/bin/${cfg.command}');
-    buf.writeln(
-        '      - install -Dm644 $outputRelDir/${cfg.appId}.desktop'
-        ' /app/share/applications/${cfg.appId}.desktop');
-
-    // Icons.
-    for (final icon in cfg.icons) {
-      final ext = p.extension(icon.path);
-      final sizeDir = icon.size;
-      final iconDest =
-          '/app/share/icons/hicolor/$sizeDir/apps/${cfg.appId}$ext';
-      buf.writeln('      - install -Dm644 ${icon.path} $iconDest');
-    }
-
-    // Metainfo: <release> version/date is patched by `flutpak prepare --tag`
-    // before the build, so only a plain install is needed here.
-    if (cfg.metainfo != null) {
-      final metainfoSrcPath =
-          cfg.metainfo!.path ?? '$outputRelDir/${cfg.appId}.metainfo.xml';
-      buf.writeln(
-          '      - install -Dm644 $metainfoSrcPath'
-          ' /app/share/metainfo/${p.basename(metainfoSrcPath)}');
-    }
+    buf
+      ..writeln('      - setup-flutter.sh')
+      ..writeln('      - flutter build linux --release --no-pub')
+      ..writeln('      - mkdir -p /app/$appName')
+      ..writeln('      - cp -r "\$BUNDLE_PATH"/. /app/$appName/')
+      ..writeln(
+          '      - install -Dm644 app/share/metainfo/${cfg.appId}.metainfo.xml /app/share/metainfo/${cfg.appId}.metainfo.xml')
+      ..writeln(
+          '      - install -Dm644 app/share/applications/${cfg.appId}.desktop /app/share/applications/${cfg.appId}.desktop')
+      ..writeln(
+          '      - install -Dm644 app/share/icons/hicolor/512x512/apps/${cfg.appId}.png /app/share/icons/hicolor/512x512/apps/${cfg.appId}.png');
+    // ..writeln('      - cp -r app/* /app/');
   }
 
   void _sources(StringBuffer buf) {
@@ -217,8 +201,8 @@ class ManifestGenerator {
 
   /// Writes a Map as indented YAML key-value pairs with a leading `- ` on the
   /// first key (list item syntax).
-  static void _writeYamlMap(
-      StringBuffer buf, Map<String, dynamic> map, {required String indent}) {
+  static void _writeYamlMap(StringBuffer buf, Map<String, dynamic> map,
+      {required String indent}) {
     var first = true;
     for (final entry in map.entries) {
       final value = entry.value;

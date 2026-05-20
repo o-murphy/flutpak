@@ -124,23 +124,6 @@ void main() {
           contains('.pub-cache/hosted/pub.dev/objectbox_flutter_libs-5.3.1'));
     });
 
-    test('includes icon install command', () {
-      final cfg = ManifestConfig(
-        appId: 'io.github.example.myapp',
-        runtimeVersion: '25.08',
-        command: 'myapp',
-        icons: [IconConfig(size: '512x512', path: 'assets/icon_512x512.png')],
-      );
-      final yaml = ManifestGenerator(
-        cfg: cfg,
-        generatedSourcesPath: 'flatpak/generated-sources.json',
-      ).generate();
-
-      expect(yaml, contains('assets/icon_512x512.png'));
-      expect(yaml,
-          contains('/app/share/icons/hicolor/512x512/apps/io.github.example.myapp'));
-    });
-
     test('includes Flutter cache stamp copy commands', () {
       final yaml = ManifestGenerator(
         cfg: _baseConfig(),

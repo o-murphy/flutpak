@@ -103,7 +103,8 @@ class PubSourcesGenerator {
     );
 
     if (response.statusCode != 200) {
-      throw Exception('pub.dev API error $name@$version: ${response.statusCode}');
+      throw Exception(
+          'pub.dev API error $name@$version: ${response.statusCode}');
     }
 
     final json = jsonDecode(response.body) as Map<String, dynamic>;

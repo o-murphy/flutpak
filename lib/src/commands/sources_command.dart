@@ -18,20 +18,15 @@ class SourcesCommand extends Command<void> {
   SourcesCommand() {
     argParser
       ..addMultiOption('lock',
-          abbr: 'l',
-          help: 'pubspec.lock paths (glob and \$ENV supported).')
+          abbr: 'l', help: 'pubspec.lock paths (glob and \$ENV supported).')
       ..addOption('sdk',
-          abbr: 's',
-          help: 'Flutter SDK path. Defaults to \$FLUTTER_ROOT.')
+          abbr: 's', help: 'Flutter SDK path. Defaults to \$FLUTTER_ROOT.')
       ..addOption('output',
           abbr: 'o',
           help: 'Output directory (generated-sources.json is written inside).')
-      ..addOption('patch',
-          help: 'Relative path to shared.sh.patch.')
+      ..addOption('patch', help: 'Relative path to shared.sh.patch.')
       ..addOption('config',
-          abbr: 'c',
-          help: 'Config file.',
-          defaultsTo: 'flutpak.yaml')
+          abbr: 'c', help: 'Config file.', defaultsTo: 'flutpak.yaml')
       ..addFlag('pub-only', help: 'Skip Flutter SDK sources.')
       ..addFlag('flutter-only', help: 'Skip pub sources.');
   }
@@ -86,8 +81,7 @@ class SourcesCommand extends Command<void> {
       cache.dispose();
     }
 
-    final json =
-        const JsonEncoder.withIndent('    ').convert(allSources);
+    final json = const JsonEncoder.withIndent('    ').convert(allSources);
     File(outputFile)
       ..createSync(recursive: true)
       ..writeAsStringSync('$json\n');

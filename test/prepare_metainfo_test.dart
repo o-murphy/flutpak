@@ -15,166 +15,21 @@ void main() {
     return f;
   }
 
-  String readFile(String rel) =>
-      File(p.join(tmp.path, rel)).readAsStringSync();
-
   bool fileExists(String rel) => File(p.join(tmp.path, rel)).existsSync();
 
   // workingDirectory is set to tmp.path so that output paths in the config
   // (e.g. "output: flatpak") resolve relative to the temp dir.
   // The script path is absolute so dart can find it regardless of CWD.
   Future<_Result> runPrepare(List<String> extra) => _runCli(
-        ['prepare', '--no-sources',
-         '--config', p.join(tmp.path, 'flutpak.yaml'),
-         ...extra],
+        [
+          'prepare',
+          '--no-sources',
+          '--config',
+          p.join(tmp.path, 'flutpak.yaml'),
+          ...extra
+        ],
         workingDirectory: tmp.path,
       );
-
-  // ── metainfo generation ────────────────────────────────────────────────
-
-  group('prepare metainfo generation', () {
-    setUp(() {
-      writeFile('flutpak.yaml', '''
-output: flatpak
-manifest:
-  app_id: io.example.App
-  runtime_version: "25.08"
-  command: app
-  metainfo:
-    name: My App
-    summary: A great app
-    description: |
-      First paragraph.
-
-      Second paragraph.
-    categories:
-      - Education
-''');
-      // generated-sources.json must exist for prepare to proceed
-      writeFile('flatpak/generated-sources.json', '[\n]\n');
-    });
-
-    test('creates metainfo.xml on first run', () async {
-      final result = await runPrepare([]);
-      expect(result.exitCode, 0, reason: result.stderr);
-      expect(fileExists('flatpak/io.example.App.metainfo.xml'), isTrue);
-    });
-
-    test('metainfo contains app-id', () async {
-      await runPrepare([]);
-      expect(
-        readFile('flatpak/io.example.App.metainfo.xml'),
-        contains('<id>io.example.App</id>'),
-      );
-    });
-
-    test('metainfo contains name and summary', () async {
-      await runPrepare([]);
-      final xml = readFile('flatpak/io.example.App.metainfo.xml');
-      expect(xml, contains('<name>My App</name>'));
-      expect(xml, contains('<summary>A great app</summary>'));
-    });
-
-    test('metainfo contains description paragraphs', () async {
-      await runPrepare([]);
-      final xml = readFile('flatpak/io.example.App.metainfo.xml');
-      expect(xml, contains('<p>First paragraph.</p>'));
-      expect(xml, contains('<p>Second paragraph.</p>'));
-    });
-
-    test('metainfo contains category', () async {
-      await runPrepare([]);
-      expect(
-        readFile('flatpak/io.example.App.metainfo.xml'),
-        contains('<category>Education</category>'),
-      );
-    });
-
-    test('does not overwrite existing metainfo', () async {
-      writeFile('flatpak/io.example.App.metainfo.xml',
-          '<!-- custom -->\n<component/>\n');
-      await runPrepare([]);
-      expect(
-        readFile('flatpak/io.example.App.metainfo.xml'),
-        contains('<!-- custom -->'),
-      );
-    });
-
-    test('does not generate metainfo when name missing', () async {
-      writeFile('flutpak.yaml', '''
-output: flatpak
-manifest:
-  app_id: io.example.App
-  runtime_version: "25.08"
-  command: app
-  metainfo:
-    summary: A great app
-''');
-      await runPrepare([]);
-      expect(fileExists('flatpak/io.example.App.metainfo.xml'), isFalse);
-    });
-  });
-
-  // ── metainfo patching (screenshots + releases) ───────────────────────────
-
-  group('prepare metainfo pinning', () {
-    const metainfoXml = '''<?xml version="1.0" encoding="UTF-8"?>
-<component type="desktop-application">
-  <id>io.example.App</id>
-  <screenshots>
-    <screenshot type="default">
-      <image>https://raw.githubusercontent.com/owner/repo/main/docs/screen.png</image>
-    </screenshot>
-  </screenshots>
-  <releases>
-    <release version="0.0.1" date="2020-01-01"/>
-  </releases>
-</component>
-''';
-
-    setUp(() {
-      writeFile('flutpak.yaml', '''
-output: flatpak
-manifest:
-  app_id: io.example.App
-  runtime_version: "25.08"
-  command: app
-  metainfo:
-    name: My App
-    summary: A great app
-    repo_slug: owner/repo
-    screenshots:
-      - path: docs/screen.png
-''');
-      writeFile('flatpak/generated-sources.json', '[\n]\n');
-      writeFile('flatpak/io.example.App.metainfo.xml', metainfoXml);
-    });
-
-    test('pins screenshot URLs to commit when --commit passed', () async {
-      final result = await runPrepare(['--commit', 'abc1234567890']);
-      expect(result.exitCode, 0, reason: result.stderr);
-      final xml = readFile('flatpak/io.example.App.metainfo.xml');
-      expect(xml, contains('/abc1234567890/'));
-      expect(xml, isNot(contains('/main/')));
-    });
-
-    test('pins screenshot URLs to tag when --tag passed', () async {
-      final result =
-          await runPrepare(['--tag', 'v1.2.3', '--commit', 'abc1234567890']);
-      expect(result.exitCode, 0, reason: result.stderr);
-      final xml = readFile('flatpak/io.example.App.metainfo.xml');
-      expect(xml, contains('/v1.2.3/'));
-    });
-
-    test('updates releases when --tag passed', () async {
-      final result =
-          await runPrepare(['--tag', 'v1.2.3', '--commit', 'abc1234567890']);
-      expect(result.exitCode, 0, reason: result.stderr);
-      final xml = readFile('flatpak/io.example.App.metainfo.xml');
-      expect(xml, contains('version="1.2.3"'));
-      expect(xml, isNot(contains('version="0.0.1"')));
-    });
-  });
 
   // ── dry-run ────────────────────────────────────────────────────────────────────
 
@@ -186,9 +41,6 @@ manifest:
   app_id: io.example.App
   runtime_version: "25.08"
   command: app
-  metainfo:
-    name: My App
-    summary: A great app
 ''');
     });
 
@@ -197,7 +49,6 @@ manifest:
       expect(result.exitCode, 0, reason: result.stderr);
       expect(fileExists('flatpak/generated-sources.json'), isFalse);
       expect(fileExists('flatpak/io.example.App.yml'), isFalse);
-      expect(fileExists('flatpak/io.example.App.metainfo.xml'), isFalse);
     });
 
     test('prints what would be created', () async {
@@ -205,7 +56,6 @@ manifest:
       expect(result.exitCode, 0, reason: result.stderr);
       expect(result.stderr, contains('would write'));
       expect(result.stderr, contains('io.example.App.yml'));
-      expect(result.stderr, contains('io.example.App.metainfo.xml'));
     });
 
     test('shows "would update" when manifest already exists', () async {
@@ -223,8 +73,7 @@ manifest:
 // (project root). Must be evaluated here, not inside the subprocess.
 final _flutpakScript = p.absolute('bin', 'flutpak.dart');
 
-Future<_Result> _runCli(List<String> args,
-    {String? workingDirectory}) async {
+Future<_Result> _runCli(List<String> args, {String? workingDirectory}) async {
   final result = await Process.run(
     Platform.executable,
     ['run', _flutpakScript, ...args],

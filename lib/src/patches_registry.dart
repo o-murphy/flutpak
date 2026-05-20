@@ -53,8 +53,7 @@ List<PatchEntry> resolvePatchEntries({
   List<PatchEntry> projectPatches = const [],
 }) {
   final lockedVersions = _readLockedVersions(lockPaths);
-  final overriddenPackages =
-      projectPatches.map((e) => e.package).toSet();
+  final overriddenPackages = projectPatches.map((e) => e.package).toSet();
 
   // Back-fill version from lock file for project patches that omit it.
   final entries = <PatchEntry>[

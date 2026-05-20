@@ -2,11 +2,9 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:args/command_runner.dart';
 import 'package:path/path.dart' as p;
-import 'package:yaml/yaml.dart';
 import '../config.dart';
 import '../generators/flutter_sdk.dart';
 import '../generators/manifest_generator.dart';
-import '../generators/metainfo_generator.dart';
 import '../generators/pub_sources.dart';
 import '../patches_registry.dart';
 import '../utils/download_cache.dart';
@@ -15,8 +13,6 @@ import '../utils/download_cache.dart';
 ///   1. Generates generated-sources.json (pub + Flutter SDK)
 ///   2. Resolves patch entries (registry + project config)
 ///   3. Generates the manifest if it doesn't exist, or updates placeholders
-///   4. Generates .desktop and metainfo on first run (with pubspec.yaml fallbacks)
-///   5. Pins metainfo screenshot URLs
 class PrepareCommand extends Command<void> {
   @override
   final name = 'prepare';
@@ -35,12 +31,9 @@ class PrepareCommand extends Command<void> {
           help: 'Full git commit SHA to embed in the manifest. '
               'Defaults to HEAD if inside a git repo.')
       ..addOption('sdk',
-          abbr: 's',
-          help: 'Flutter SDK path. Defaults to \$FLUTTER_ROOT.')
+          abbr: 's', help: 'Flutter SDK path. Defaults to \$FLUTTER_ROOT.')
       ..addOption('config',
-          abbr: 'c',
-          help: 'Config file path.',
-          defaultsTo: 'flutpak.yaml')
+          abbr: 'c', help: 'Config file path.', defaultsTo: 'flutpak.yaml')
       ..addFlag('no-sources',
           help: 'Skip source regeneration (manifest update only).')
       ..addFlag('pub-only', help: 'Skip Flutter SDK sources.')
@@ -78,9 +71,6 @@ class PrepareCommand extends Command<void> {
     final outputDir = p.absolute(cfg.output);
     final sourcesPath = p.join(outputDir, 'generated-sources.json');
 
-    // Read pubspec.yaml from CWD (project root), not from the config directory.
-    final pubspec = _readPubspecFallbacks(Directory.current.path);
-
     // Lock paths with $FLUTTER_ROOT substituted from the effective SDK path.
     final effectiveLocks = cfg.effectivePubLocks(sdkPath);
 
@@ -110,8 +100,7 @@ class PrepareCommand extends Command<void> {
 
     // ── 3. Write flutter version file ────────────────────────────────────
     if (sdkPath != null && cfg.flutterVersionFile != null) {
-      _writeFlutterVersionFile(
-          sdkPath, p.absolute(cfg.flutterVersionFile!));
+      _writeFlutterVersionFile(sdkPath, p.absolute(cfg.flutterVersionFile!));
     }
 
     // ── 4. Create or update manifest ───────────────────────────────────
@@ -149,57 +138,6 @@ class PrepareCommand extends Command<void> {
 
       stderr.writeln(
           '✓  manifest ${manifestCreated ? 'created' : 'updated'}: $manifestPath');
-
-      // ── 5. Generate .desktop file (first run only) ───────────────────
-      final desktopPath = p.join(outputDir, '${manifestCfg.appId}.desktop');
-      if (!File(desktopPath).existsSync()) {
-        _generateDesktopFile(
-          manifestCfg: manifestCfg,
-          desktopPath: desktopPath,
-          pubspec: pubspec,
-        );
-      }
-
-      // ── 6. Generate metainfo (first run only) ──────────────────────
-      if (manifestCfg.metainfo != null) {
-        final metainfoPath = manifestCfg.metainfo!.path != null
-            ? p.absolute(manifestCfg.metainfo!.path!)
-            : p.join(outputDir, '${manifestCfg.appId}.metainfo.xml');
-        final metainfoFile = File(metainfoPath);
-
-        final effectiveName =
-            manifestCfg.metainfo!.name ?? pubspec['name'];
-        final effectiveSummary =
-            manifestCfg.metainfo!.summary ?? pubspec['description'];
-
-        if (!metainfoFile.existsSync() && effectiveName != null) {
-          _generateMetainfo(
-            appId: manifestCfg.appId,
-            metainfoPath: metainfoPath,
-            cfg: manifestCfg.metainfo!,
-            overrideName: effectiveName,
-            overrideSummary: effectiveSummary,
-            tag: tag,
-            releaseDate: _tagDate(tag),
-            ref: tag ?? commit,
-          );
-        }
-
-        // ── 7. Replace metainfo screenshot URLs from config ───────────────
-        if (manifestCfg.metainfo!.screenshots.isNotEmpty) {
-          final ref = (tag != null && tag.isNotEmpty) ? tag : (commit ?? '');
-          _replaceMetainfoScreenshots(
-            metainfoPath,
-            metainfoCfg: manifestCfg.metainfo!,
-            ref: ref,
-          );
-        }
-
-        // ── 8. Update <releases> in metainfo ───────────────────────────
-        if (tag != null && tag.isNotEmpty) {
-          _patchMetainfoReleasesSection(metainfoPath, tag, _tagDate(tag));
-        }
-      }
     } else if (tag != null || commit != null) {
       // No manifest config but we have tag/commit — try to patch any existing
       // manifest that uses the placeholders.
@@ -312,53 +250,6 @@ class PrepareCommand extends Command<void> {
     }
   }
 
-  void _replaceMetainfoScreenshots(
-    String metainfoPath, {
-    required MetainfoConfig metainfoCfg,
-    required String ref,
-  }) {
-    final f = File(metainfoPath);
-    if (!f.existsSync()) return;
-    final original = f.readAsStringSync();
-    final patched = replaceMetainfoScreenshots(
-      original,
-      screenshots: metainfoCfg.screenshots,
-      repoSlug: metainfoCfg.repoSlug ?? '',
-      ref: ref,
-    );
-    if (patched != original) {
-      f.writeAsStringSync(patched);
-      stderr.writeln('  metainfo screenshots rebuilt → $ref');
-    }
-  }
-
-  void _patchMetainfoReleasesSection(
-      String metainfoPath, String tag, DateTime date) {
-    final f = File(metainfoPath);
-    if (!f.existsSync()) return;
-    final original = f.readAsStringSync();
-    final patched = patchMetainfoReleases(original, tag, date);
-    if (patched != original) {
-      f.writeAsStringSync(patched);
-      stderr.writeln('  metainfo releases → $tag');
-    }
-  }
-
-  /// Returns the date of [tag] from git log, falling back to today.
-  DateTime _tagDate(String? tag) {
-    if (tag != null && tag.isNotEmpty) {
-      try {
-        final result =
-            Process.runSync('git', ['log', '-1', '--format=%aI', tag]);
-        if (result.exitCode == 0) {
-          final s = (result.stdout as String).trim();
-          if (s.isNotEmpty) return DateTime.parse(s).toUtc();
-        }
-      } catch (_) {}
-    }
-    return DateTime.now().toUtc();
-  }
-
   void _writeFlutterVersionFile(String sdkPath, String outputPath) {
     final versionFile = File(p.join(sdkPath, 'version'));
     if (!versionFile.existsSync()) return;
@@ -369,89 +260,6 @@ class PrepareCommand extends Command<void> {
           '# Generated by flutpak — https://github.com/o-murphy/flutpak\n'
           '$version\n');
     stderr.writeln('✓  flutter.version → $outputPath ($version)');
-  }
-
-  void _generateMetainfo({
-    required String appId,
-    required String metainfoPath,
-    required MetainfoConfig cfg,
-    String? overrideName,
-    String? overrideSummary,
-    String? tag,
-    DateTime? releaseDate,
-    String? ref,
-  }) {
-    final content = MetainfoGenerator(
-      appId: appId,
-      cfg: cfg,
-      version: tag,
-      releaseDate: releaseDate ?? DateTime.now().toUtc(),
-      overrideName: overrideName,
-      overrideSummary: overrideSummary,
-    ).generate(ref: ref);
-    File(metainfoPath)
-      ..createSync(recursive: true)
-      ..writeAsStringSync(content);
-    stderr.writeln('✓  metainfo created: $metainfoPath');
-  }
-
-  void _generateDesktopFile({
-    required ManifestConfig manifestCfg,
-    required String desktopPath,
-    Map<String, String?> pubspec = const {},
-  }) {
-    final name = manifestCfg.desktop?.name ??
-        manifestCfg.metainfo?.name ??
-        pubspec['name'];
-    final comment = manifestCfg.desktop?.comment ??
-        manifestCfg.metainfo?.summary ??
-        pubspec['description'];
-    final categories = (manifestCfg.desktop?.categories.isNotEmpty == true)
-        ? manifestCfg.desktop!.categories
-        : (manifestCfg.metainfo?.categories ?? []);
-    final startupWmClass =
-        manifestCfg.desktop?.startupWmClass ?? manifestCfg.command;
-
-    if (name == null) {
-      stderr.writeln('⚠  desktop file skipped: no name available '
-          '(set manifest.desktop.name, manifest.metainfo.name, '
-          'or add name: to pubspec.yaml)');
-      return;
-    }
-
-    final buf = StringBuffer();
-    buf.writeln(
-        '# Generated by flutpak — https://github.com/o-murphy/flutpak');
-    buf.writeln('[Desktop Entry]');
-    buf.writeln('Type=Application');
-    buf.writeln('Name=$name');
-    if (comment != null && comment.isNotEmpty) buf.writeln('Comment=$comment');
-    buf.writeln('Exec=${manifestCfg.command}');
-    buf.writeln('Icon=${manifestCfg.appId}');
-    if (categories.isNotEmpty) {
-      buf.writeln('Categories=${categories.join(";")};');
-    }
-    buf.writeln('StartupWMClass=$startupWmClass');
-    File(desktopPath)
-      ..createSync(recursive: true)
-      ..writeAsStringSync(buf.toString());
-    stderr.writeln('✓  desktop file created: $desktopPath');
-  }
-
-  /// Reads `name` and `description` from the project pubspec.yaml.
-  Map<String, String?> _readPubspecFallbacks(String dir) {
-    final f = File(p.join(dir, 'pubspec.yaml'));
-    if (!f.existsSync()) return const {};
-    try {
-      final yaml = loadYaml(f.readAsStringSync());
-      if (yaml is! Map) return const {};
-      return {
-        'name': yaml['name']?.toString(),
-        'description': yaml['description']?.toString(),
-      };
-    } catch (_) {
-      return const {};
-    }
   }
 
   void _printDryRun(
@@ -489,24 +297,8 @@ class PrepareCommand extends Command<void> {
         stderr.writeln('  would create desktop file: $desktopPath');
       }
 
-      if (manifestCfg.metainfo != null) {
-        final metainfoPath = manifestCfg.metainfo!.path != null
-            ? p.absolute(manifestCfg.metainfo!.path!)
-            : p.join(outputDir, '${manifestCfg.appId}.metainfo.xml');
-        if (!File(metainfoPath).existsSync()) {
-          stderr.writeln('  would create metainfo: $metainfoPath');
-        }
-        if (manifestCfg.metainfo!.screenshots.isNotEmpty) {
-          stderr.writeln('  would rebuild metainfo screenshots → $ref');
-        }
-        if (tag != null && tag.isNotEmpty) {
-          stderr.writeln('  would update metainfo releases → $tag');
-        }
-      }
-
       if (cfg.flutterVersionFile != null) {
-        stderr.writeln(
-            '  would write: ${p.absolute(cfg.flutterVersionFile!)}');
+        stderr.writeln('  would write: ${p.absolute(cfg.flutterVersionFile!)}');
       }
     }
 
