@@ -8,6 +8,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 
+## [0.2.8] - 2026-05-20
+ 
+### Removed
+- `export` command — removed; files can be copied manually if needed
+- `manifest` command — removed
+- Metainfo XML generation — `manifest.metainfo:` config and `MetainfoGenerator` removed;
+  maintain your `<app_id>.metainfo.xml` manually in `app/share/metainfo/`
+- `.desktop` file generation — `manifest.desktop:` config and desktop generator removed;
+  maintain your `<app_id>.desktop` manually in `app/share/applications/`
+- `DesktopConfig`, `MetainfoConfig`, `DeveloperConfig`, `UrlConfig`, `ScreenshotConfig`
+  config classes removed
+- `replaceMetainfoScreenshots()` / `patchMetainfoReleases()` helpers removed
+### Added
+- `setup-flutpak` composite action — installs the `flutpak` binary (downloads
+  pre-built release or compiles from source); replaces the inline build steps
+  that were previously embedded in `prepare` and `verify` actions
+### Removed
+- `prepare` composite action — removed; use `setup-flutpak` + `flutpak prepare` directly
+- `verify` composite action — removed
+### Changed
+- Generated manifest now installs shared assets directly from the `app/` directory
+  tree that must be present in the repository:
+  - `app/share/metainfo/<app_id>.metainfo.xml` → `/app/share/metainfo/`
+  - `app/share/applications/<app_id>.desktop` → `/app/share/applications/`
+  - `app/share/icons/hicolor/512x512/apps/<app_id>.png` → `/app/share/icons/hicolor/512x512/apps/`
+- Config simplified: `manifest.metainfo:`, `manifest.desktop:`, `manifest.icons:`
+  sections no longer recognised
+- `prepare` no longer pins screenshot URLs or patches release dates in metainfo
+
+
 ## [0.2.7] - 2026-05-20
 
 ### Added
@@ -165,7 +195,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   output files
 - MIT License
 
-[Unreleased]: https://github.com/o-murphy/flutpak/compare/v0.2.7...HEAD
+[Unreleased]: https://github.com/o-murphy/flutpak/compare/v0.2.8...HEAD
+[0.2.8]: https://github.com/o-murphy/flutpak/compare/v0.2.7...v0.2.8
 [0.2.7]: https://github.com/o-murphy/flutpak/compare/v0.2.6...v0.2.7
 [0.2.6]: https://github.com/o-murphy/flutpak/compare/v0.2.5...v0.2.6
 [0.2.5]: https://github.com/o-murphy/flutpak/compare/v0.2.4...v0.2.5
