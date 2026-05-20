@@ -54,12 +54,6 @@ flutpak:
       - --share=ipc
       - --socket=wayland
       - --device=dri
-    icons:
-      - size: 512x512
-        path: assets/icon_512x512.png
-    metainfo:
-      path: flatpak/io.github.YourOrg.YourApp.metainfo.xml
-      repo_slug: YourOrg/YourApp
 ```
 
 ### 2. First run — generate everything
@@ -85,7 +79,7 @@ flutpak prepare \
   --sdk "$FLUTTER_ROOT"
 ```
 
-This replaces `__FLATPAK_TAG__` / `__FLATPAK_COMMIT__` in the manifest and regenerates `generated-sources.json`. Screenshot URLs in `metainfo.xml` are also pinned to the tag/commit.
+This replaces `__FLATPAK_TAG__` / `__FLATPAK_COMMIT__` in the manifest and regenerates `generated-sources.json`.
 
 ## Full config reference
 
@@ -155,6 +149,29 @@ flutpak:
         strip-components: 0
 ```
 
+## Required project structure
+
+The generated manifest expects the following files to be present in your repository.
+`flutpak prepare` installs them into `/app/share/` inside the Flatpak sandbox using
+`install -Dm644`, so a missing file will cause the build to fail with a clear error.
+
+```
+app/
+└── share/
+    ├── applications/
+    │   └── <app_id>.desktop          # XDG desktop entry
+    ├── icons/
+    │   └── hicolor/
+    │       └── 512x512/
+    │           └── apps/
+    │               └── <app_id>.png  # application icon (512×512 PNG)
+    └── metainfo/
+        └── <app_id>.metainfo.xml     # AppStream metainfo
+```
+
+These files must be committed to git — they are read directly from the source tree
+during the Flatpak build. `flutpak` does not generate them.
+
 ## Patches registry
 
 `flutpak` ships a built-in registry of patches for packages that need special
@@ -169,25 +186,11 @@ package is found in any of your lock files.
 Project-level `patches:` entries always take priority over registry entries for
 the same package.
 
-## Metainfo generation
-
-When `manifest.metainfo.name` and `manifest.metainfo.summary` are set,
-`flutpak prepare` generates a valid AppStream XML file on the first run
-(see all available fields in the [Full config reference](#full-config-reference) above).
-
-**On subsequent `flutpak prepare --tag v1.2.3 --commit <sha>` runs:**
-- Screenshot URLs are pinned from `/main/` to the tag (or commit when no tag)
-
-The file is never overwritten once it exists — edit it manually if needed.
-
-Validate the generated file with `appstreamcli` (see [Building and validating](#building-and-validating-with-official-flatpak-tools)).
-
 ## Commands
 
 ### `prepare` (recommended)
 
-One-shot command — generates sources, resolves patches, creates or updates the
-manifest, and pins metainfo screenshot URLs.
+One-shot command — generates sources, resolves patches, and creates or updates the manifest.
 
 ```bash
 # First run: generate everything from scratch
@@ -276,37 +279,6 @@ flutpak sdk-ext \
   --output org.freedesktop.Sdk.Extension.flutter3.json
 ```
 
-### `export`
-
-Copies all files needed for a Flathub submission into a single directory:
-`<app_id>.yml`, `generated-sources.json`, `<app_id>.metainfo.xml` (if present),
-and `patches/`.
-
-```bash
-# Default output dir: flatpak-export/
-flutpak export
-
-# Custom output dir
-flutpak export --out /tmp/my-submission
-```
-
-| Flag | Description |
-|---|---|
-| `-o, --out` | Output directory (default: `flatpak-export/`). |
-| `-m, --manifest` | Path to manifest YAML (auto-detected if omitted). |
-| `-c, --config` | Path to config file. |
-
-`generated-sources.json` is mandatory — export exits with an error if it does not
-exist. Run `flutpak prepare` first.
-
-### `manifest`
-
-Updates version-related fields in an existing manifest from `pubspec.yaml`.
-
-```bash
-flutpak manifest --manifest flatpak/io.github.YourOrg.YourApp.yml
-```
-
 ## CI/CD integration
 
 ### GitHub Actions — composite action (recommended)
@@ -378,11 +350,8 @@ flatpak install --user flathub org.flatpak.Builder
 ### 1. Validate metainfo (AppStream XML)
 
 ```bash
-appstreamcli validate --explain --no-net flatpak/<app_id>.metainfo.xml
+appstreamcli validate --explain --no-net app/share/metainfo/<app_id>.metainfo.xml
 ```
-
-- `--explain` — print a human-readable explanation for every issue
-- `--no-net` — skip network checks (URL reachability); omit to enable them
 
 ### 2. Lint the manifest
 
@@ -412,8 +381,6 @@ dbus-run-session flatpak run --command=flathub-build org.flatpak.Builder \
 
 > **Note:** do **not** set a top-level `branch:` in your manifest —
 > `flatpak-builder-lint` flags this as `toplevel-unnecessary-branch`.
-> The OSTree branch defaults to `master`; pass no branch argument to
-> `flatpak build-bundle` so it matches.
 
 ### 4. Lint the built repo
 
@@ -426,21 +393,10 @@ dbus-run-session flatpak run \
   repo repo
 ```
 
-Run this **after** the build to catch issues that only appear in the exported repo
-(icon sizes, desktop file, metainfo presence, etc.).
-
 ### 5. Export a single-file bundle (optional, for local testing)
 
 ```bash
-flatpak build-bundle \
-  repo \
-  myapp.flatpak \
-  <app_id>
-```
-
-Install and run the bundle:
-
-```bash
+flatpak build-bundle repo myapp.flatpak <app_id>
 flatpak install --user myapp.flatpak
 flatpak run <app_id>
 ```
@@ -454,7 +410,7 @@ flatpak run <app_id>
       - name: Validate metainfo
         run: |
           appstreamcli validate --explain --no-net \
-            flatpak/<app_id>.metainfo.xml
+            app/share/metainfo/<app_id>.metainfo.xml
 
       - name: Cache org.flatpak.Builder
         uses: actions/cache@v5
@@ -495,10 +451,7 @@ flatpak run <app_id>
 
       - name: Export bundle
         run: |
-          flatpak build-bundle \
-            repo \
-            myapp.flatpak \
-            <app_id>
+          flatpak build-bundle repo myapp.flatpak <app_id>
 ```
 
 ## Why include `flutter_tools/pubspec.lock`?
