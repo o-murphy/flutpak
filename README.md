@@ -315,33 +315,6 @@ flutpak sdk-ext \
   --output org.freedesktop.Sdk.Extension.flutter3.json
 ```
 
-### `validate`
-
-Validates the AppStream metainfo file using `appstream-util`.
-
-```bash
-# Auto-detect from config
-flutpak validate
-
-# Explicit path
-flutpak validate --metainfo flatpak/io.github.YourOrg.YourApp.metainfo.xml
-
-# Stricter checks
-flutpak validate --pedantic
-```
-
-| Flag | Description |
-|---|---|
-| `-m, --metainfo` | Path to metainfo XML (auto-detected from config if omitted). |
-| `--pedantic` | Pass `--pedantic` to `appstream-util` for stricter checks. |
-| `-c, --config` | Path to config file. |
-
-Install `appstream-util`:
-```bash
-sudo apt install appstream   # Debian/Ubuntu
-sudo dnf install appstream   # Fedora
-```
-
 ### `export`
 
 Copies all files needed for a Flathub submission into a single directory:

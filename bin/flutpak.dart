@@ -7,8 +7,6 @@ import 'package:flutpak/src/commands/prepare_command.dart';
 import 'package:flutpak/src/commands/pub_command.dart';
 import 'package:flutpak/src/commands/sdk_ext_command.dart';
 import 'package:flutpak/src/commands/sources_command.dart';
-import 'package:flutpak/src/commands/validate_command.dart';
-
 Future<void> main(List<String> args) async {
   final runner = CommandRunner<void>(
     'flutpak',
@@ -21,7 +19,6 @@ Future<void> main(List<String> args) async {
         '  flutpak flutter          # only Flutter SDK artifacts\n'
         '  flutpak sdk-ext          # Flutter SDK Extension manifest for Flathub\n'
         '  flutpak manifest -m app.yml  # sync version + regenerate sources\n'
-        '  flutpak validate         # validate metainfo with appstream-util\n'
         '  flutpak export           # export submission files to flatpak-export/\n'
         '  flutpak prepare --dry-run  # preview what prepare would do',
   )
@@ -31,7 +28,6 @@ Future<void> main(List<String> args) async {
     ..addCommand(FlutterCommand())
     ..addCommand(SdkExtCommand())
     ..addCommand(ManifestCommand())
-    ..addCommand(ValidateCommand())
     ..addCommand(ExportCommand());
 
   // Default to 'sources' when no subcommand given
