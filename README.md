@@ -216,10 +216,7 @@ When `manifest.metainfo.name` and `manifest.metainfo.summary` are set,
 
 The file is never overwritten once it exists — edit it manually if needed.
 
-Validate the generated file with:
-```bash
-flutpak validate
-```
+Validate the generated file with `appstreamcli` (see [Building and validating](#building-and-validating-with-official-flatpak-tools)).
 
 ## Commands
 
@@ -365,7 +362,6 @@ and `flutpak prepare` in one step. Add it to your release workflow:
           flutter_version_file: flatpak/flutter.version  # committed version file
           # flutter_version: stable               # or explicit version
           # config: flutpak.yaml                  # default: auto-detected
-          # validate: 'true'                      # run flutpak validate (default)
 ```
 
 | Input | Description |
@@ -375,7 +371,6 @@ and `flutpak prepare` in one step. Add it to your release workflow:
 | `flutter_version_file` | Path to committed version file (one of these two required) |
 | `commit` | Commit SHA (default: resolved from tag) |
 | `config` | Path to config file (default: auto-detected from CWD) |
-| `validate` | Run `flutpak validate` after prepare (default: `true`) |
 | `flutpak_version` | flutpak release tag to download (default: latest) |
 | `cache` | Cache Flutter SDK between runs (default: `true`) |
 
@@ -397,6 +392,149 @@ and `flutpak prepare` in one step. Add it to your release workflow:
             --tag "$TAG" \
             --commit "${{ github.sha }}" \
             --sdk "$FLUTTER_ROOT"
+```
+
+## Building and validating with official Flatpak tools
+
+`flutpak` generates sources and manifests. The actual build, lint, and validation
+steps use the official Flatpak toolchain — `org.flatpak.Builder` (installed as a
+Flatpak) and `appstreamcli` (system package).
+
+### Prerequisites
+
+```bash
+# Install appstreamcli (Debian/Ubuntu)
+sudo apt-get install appstream
+
+# Install org.flatpak.Builder (required for build + lint)
+flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+flatpak install --user flathub org.flatpak.Builder
+```
+
+### 1. Validate metainfo (AppStream XML)
+
+```bash
+appstreamcli validate --explain --no-net flatpak/<app_id>.metainfo.xml
+```
+
+- `--explain` — print a human-readable explanation for every issue
+- `--no-net` — skip network checks (URL reachability); omit to enable them
+
+### 2. Lint the manifest
+
+```bash
+dbus-run-session flatpak run \
+  --filesystem=host \
+  --command=flatpak-builder-lint \
+  org.flatpak.Builder \
+  --exceptions \
+  manifest flatpak/<app_id>.yml
+```
+
+- `--exceptions` — apply the built-in Flathub exception list
+- `--filesystem=host` — lets the sandboxed linter read files from the host
+- Run this **before** building to catch manifest errors early
+
+### 3. Build with flathub-build
+
+`flathub-build` is the same script Flathub CI uses. It runs `flatpak-builder`
+with `--sandbox`, `--install-deps-from=flathub`, `--repo=repo`, and other
+Flathub-specific flags. The built app is exported to `repo/` automatically.
+
+```bash
+dbus-run-session flatpak run --command=flathub-build org.flatpak.Builder \
+  flatpak/<app_id>.yml
+```
+
+> **Note:** do **not** set a top-level `branch:` in your manifest —
+> `flatpak-builder-lint` flags this as `toplevel-unnecessary-branch`.
+> The OSTree branch defaults to `master`; pass no branch argument to
+> `flatpak build-bundle` so it matches.
+
+### 4. Lint the built repo
+
+```bash
+dbus-run-session flatpak run \
+  --filesystem=host \
+  --command=flatpak-builder-lint \
+  org.flatpak.Builder \
+  --exceptions \
+  repo repo
+```
+
+Run this **after** the build to catch issues that only appear in the exported repo
+(icon sizes, desktop file, metainfo presence, etc.).
+
+### 5. Export a single-file bundle (optional, for local testing)
+
+```bash
+flatpak build-bundle \
+  repo \
+  myapp.flatpak \
+  <app_id>
+```
+
+Install and run the bundle:
+
+```bash
+flatpak install --user myapp.flatpak
+flatpak run <app_id>
+```
+
+### Full GitHub Actions example
+
+```yaml
+      - name: Install flatpak and appstream
+        run: sudo apt-get install -y flatpak appstream
+
+      - name: Validate metainfo
+        run: |
+          appstreamcli validate --explain --no-net \
+            flatpak/<app_id>.metainfo.xml
+
+      - name: Cache org.flatpak.Builder
+        uses: actions/cache@v5
+        with:
+          path: ~/.local/share/flatpak
+          key: flatpak-builder-25.08-${{ runner.arch }}-v1
+
+      - name: Install org.flatpak.Builder
+        run: |
+          flatpak remote-add --user --if-not-exists flathub \
+            https://dl.flathub.org/repo/flathub.flatpakrepo
+          dbus-run-session flatpak install --user -y --noninteractive flathub \
+            org.flatpak.Builder
+
+      - name: Lint manifest
+        run: |
+          dbus-run-session flatpak run \
+            --filesystem=host \
+            --command=flatpak-builder-lint \
+            org.flatpak.Builder \
+            --exceptions \
+            manifest flatpak/<app_id>.yml
+
+      - name: Build Flatpak
+        run: |
+          dbus-run-session flatpak run --command=flathub-build \
+            org.flatpak.Builder \
+            flatpak/<app_id>.yml
+
+      - name: Lint repo
+        run: |
+          dbus-run-session flatpak run \
+            --filesystem=host \
+            --command=flatpak-builder-lint \
+            org.flatpak.Builder \
+            --exceptions \
+            repo repo
+
+      - name: Export bundle
+        run: |
+          flatpak build-bundle \
+            repo \
+            myapp.flatpak \
+            <app_id>
 ```
 
 ## Why include `flutter_tools/pubspec.lock`?
