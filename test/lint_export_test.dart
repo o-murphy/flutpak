@@ -157,42 +157,6 @@ manifest:
     });
   });
 
-  // ── flutpak validate ───────────────────────────────────────────────────────
-
-  group('flutpak validate', () {
-    test('exits with error when appstream-util is not installed', () async {
-      final result = await _runCli(['validate']);
-      // Either appstream-util absent → non-zero with helpful message, or
-      // metainfo not found → non-zero. Either way must be non-zero.
-      if (result.exitCode != 0) {
-        expect(
-          result.stderr,
-          anyOf(
-            contains('appstream-util'),
-            contains('appstream'),
-            contains('error'),
-          ),
-        );
-      }
-    });
-
-    test('--metainfo flag points to missing file exits non-zero', () async {
-      final result = await _runCli([
-        'validate',
-        '--metainfo', p.join(tmp.path, 'nonexistent.metainfo.xml'),
-      ]);
-      expect(result.exitCode, isNot(0));
-    });
-
-    test('exits non-zero when no manifest config and no --metainfo', () async {
-      writeFile('flutpak.yaml', 'output: flatpak\n');
-      final result = await _runCli([
-        'validate',
-        '--config', p.join(tmp.path, 'flutpak.yaml'),
-      ]);
-      expect(result.exitCode, isNot(0));
-    });
-  });
 }
 
 // ── CLI runner helper ──────────────────────────────────────────────────────

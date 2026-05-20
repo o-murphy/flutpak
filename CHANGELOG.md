@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   directly; wrapping an official tool added complexity without value and
   made it hard to keep up with upstream CLI changes (`--exceptions`,
   `--user-exceptions`, etc.)
+- `validate` command — `appstreamcli` is only available on Ubuntu/Debian
+  and not universally present in CI environments; call it directly when needed
 
 
 ## [0.2.5] - 2026-05-20
