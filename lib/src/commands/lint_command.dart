@@ -78,6 +78,7 @@ class LintCommand extends Command<void> {
   bool _runLint(String subject, String path) {
     final result = Process.runSync('flatpak', [
       'run',
+      '--filesystem=host',
       '--command=flatpak-builder-lint',
       'org.flatpak.Builder',
       subject,

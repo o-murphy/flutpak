@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 
+## [0.2.3] - 2026-05-20
+
+### Fixed
+- `lint` command: pass `--filesystem=host` to `flatpak run` so the sandboxed
+  `flatpak-builder-lint` process can read `flathub.json` from the host filesystem
+  (without this the `exceptions` list in `flathub.json` was silently ignored)
+
+
 ## [0.2.2] - 2026-05-20
 
 ### Fixed
@@ -97,7 +105,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   output files
 - MIT License
 
-[Unreleased]: https://github.com/o-murphy/flutpak/compare/v0.2.2...HEAD
+[Unreleased]: https://github.com/o-murphy/flutpak/compare/v0.2.3...HEAD
+[0.2.3]: https://github.com/o-murphy/flutpak/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/o-murphy/flutpak/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/o-murphy/flutpak/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/o-murphy/flutpak/compare/v0.1.1...v0.2.0
