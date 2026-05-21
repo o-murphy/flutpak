@@ -1,7 +1,7 @@
 [
   {
     "type": "archive",
-    "url": "https://pub.dartlang.org/packages/yaml/versions/3.1.2.tar.gz",
+    "url": "https://pub.dev/packages/yaml/versions/3.1.2.tar.gz",
     "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     "dest": ".pub-cache/hosted/pub.dev/yaml-3.1.2",
     "strip-components": 0
@@ -14,7 +14,7 @@
   },
   {
     "type": "archive",
-    "url": "https://pub.dartlang.org/packages/collection/versions/1.18.0.tar.gz",
+    "url": "https://pub.dev/packages/collection/versions/1.18.0.tar.gz",
     "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     "dest": ".pub-cache/hosted/pub.dev/collection-1.18.0",
     "strip-components": 0
@@ -27,7 +27,7 @@
   },
   {
     "type": "archive",
-    "url": "https://pub.dartlang.org/packages/path/versions/1.9.0.tar.gz",
+    "url": "https://pub.dev/packages/path/versions/1.9.0.tar.gz",
     "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     "dest": ".pub-cache/hosted/pub.dev/path-1.9.0",
     "strip-components": 0

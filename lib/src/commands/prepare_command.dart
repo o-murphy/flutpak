@@ -99,8 +99,15 @@ class PrepareCommand extends Command<void> {
     }
 
     // ── 3. Write flutter version file ────────────────────────────────────
-    if (sdkPath != null && cfg.flutterVersionFile != null) {
-      _writeFlutterVersionFile(sdkPath, p.absolute(cfg.flutterVersionFile!));
+    if (cfg.flutterVersionFile != null) {
+      if (sdkPath == null) {
+        stderr.writeln(
+          '⚠  flutter_version_file is set but Flutter SDK path could not be '
+          'resolved (\$FLUTTER_ROOT not set); skipping',
+        );
+      } else {
+        _writeFlutterVersionFile(sdkPath, p.absolute(cfg.flutterVersionFile!));
+      }
     }
 
     // ── 4. Create or update manifest ───────────────────────────────────

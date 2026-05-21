@@ -7,6 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `-V` / `--version` global flag — prints `flutpak <version>` and exits;
+  `setup-flutpak` action now runs `flutpak --version` to verify the installation
+- `tool/update_version.dart` — generator script that reads `version:` from
+  `pubspec.yaml` and writes `lib/src/version.dart`; run after every version bump:
+  `dart run tool/update_version.dart`; the `setup-flutpak` action and `release.yml`
+  run it automatically so `pubspec.yaml` is the single source of truth
+- `Makefile` — `make build` (regenerate version + compile binary), `make version`
+  (regenerate only), `make test` (run test suite)
+- `test/version_test.dart` — enforces that `packageVersion` in `lib/src/version.dart`
+  matches `pubspec.yaml`; CI will fail if they diverge
+
+### Fixed
+- `setup-flutpak` action: when `version` input is empty, build from
+  `$GITHUB_ACTION_PATH` (the ref used in the `uses:` directive) instead of
+  cloning `main`; explicit tag/SHA/branch still supported via `version` input
+- `prepare`: warn when `flutter_version_file` is set but `$FLUTTER_ROOT` is
+  unresolvable instead of silently skipping; no warning emitted for pure-Dart
+  projects that do not set `flutter_version_file`
+- `release.yml`: regenerate `lib/src/version.dart` (via
+  `dart run tool/update_version.dart`) alongside the `pubspec.yaml` version
+  bump, so compiled binaries always report the correct release version
+
+### Fixed
+- `SdkExtensionGenerator` now uses `FlutterSdkGenerator.readFlutterVersion()`
+  instead of reading the `version` file directly; this prevents a
+  `PathNotFoundException` crash on Flutter ≥ 3.32 where the flat `version` file
+  was removed (falls back to `git describe` then `packages/flutter/pubspec.yaml`)
+- `RegistryEntry.versionConstraint` is now evaluated when resolving registry
+  patch entries; previously the field was declared but silently ignored, so
+  constrained entries were applied to every matched package version
+- Pub archive URLs switched from deprecated `pub.dartlang.org` to `pub.dev`
+- Fixed duplicate step-5 comment in `FlutterSdkGenerator.generate()`;
+  `engine_stamp.json` is now labelled step 6
+
+### Changed
+- `FlutterSdkGenerator._readFlutterVersion` renamed to
+  `FlutterSdkGenerator.readFlutterVersion` (public static) so that
+  `SdkExtensionGenerator` (and external tooling) can reuse the multi-fallback
+  version-resolution logic
+- `resolvePatchEntries` accepts an optional `registryEntries` parameter to
+  allow injecting a custom registry in tests
+
 
 ## [0.2.8] - 2026-05-20
  

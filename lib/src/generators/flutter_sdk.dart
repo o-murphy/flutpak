@@ -83,7 +83,7 @@ class FlutterSdkGenerator {
     final gradleHash = File(p.join(internalDir, 'gradle_wrapper.version'))
         .readAsStringSync()
         .trim();
-    final flutterTag = _readFlutterVersion(sdkPath);
+    final flutterTag = readFlutterVersion(sdkPath);
     final flutterCommit = _gitRevParse(sdkPath);
 
     stderr.writeln('flutter: version=$flutterTag engine=$engineHash');
@@ -144,7 +144,7 @@ class FlutterSdkGenerator {
       destFilename: 'setup-flutter.sh',
     ));
 
-    // 5. engine_stamp.json (type: file)
+    // 6. engine_stamp.json (type: file)
     final stampUrl = '$_infraBase/flutter/$engineHash/engine_stamp.json';
     final stampSha256 = await _cache.sha256For(stampUrl);
     sources.add(FileSource(
@@ -261,7 +261,7 @@ class FlutterSdkGenerator {
   ///   1. `flutter/version` — legacy flat file (Flutter < ~3.32)
   ///   2. `git describe --tags --abbrev=0` — works for any tagged git clone
   ///   3. `flutter/packages/flutter/pubspec.yaml` — inner package version
-  static String _readFlutterVersion(String sdkPath) {
+  static String readFlutterVersion(String sdkPath) {
     final versionFile = File(p.join(sdkPath, 'version'));
     if (versionFile.existsSync()) return versionFile.readAsStringSync().trim();
 

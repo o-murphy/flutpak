@@ -7,8 +7,9 @@ description: >
 inputs:
   version:
     description: >
-      Version to install (tag, commit SHA, or branch).
-      If empty, uses the latest stable release.
+      Tag, commit SHA, or branch name to build from.
+      If empty, builds from the same ref the action was checked out at
+      (i.e. the ref specified in the 'uses:' directive).
     required: false
     default: ""
   install_dir:
@@ -19,16 +20,6 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Resolve flutpak version
-      id: flutpak-version
-      shell: bash
-      run: |
-        VERSION="${{ inputs.version }}"
-        if [ -z "$VERSION" ]; then
-          VERSION=$(curl -fsSL https://api.github.com/repos/o-murphy/flutpak/releases/latest | jq -r .tag_name)
-        fi
-        echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-
     - name: Set up Dart SDK
       uses: dart-lang/setup-dart@v1
       with:
@@ -37,11 +28,21 @@ runs:
     - name: Build and install flutpak
       shell: bash
       run: |
-        git clone https://github.com/o-murphy/flutpak.git "$RUNNER_TEMP/flutpak-src"
-        git -C "$RUNNER_TEMP/flutpak-src" fetch --tags
-        git -C "$RUNNER_TEMP/flutpak-src" checkout "${{ steps.flutpak-version.outputs.version }}"
+        VERSION="${{ inputs.version }}"
+        if [ -z "$VERSION" ]; then
+          # No explicit version — build from the action's own checkout.
+          # $GITHUB_ACTION_PATH is the directory where this action lives,
+          # already at the ref given in the 'uses:' directive.
+          SRC_DIR="$GITHUB_ACTION_PATH/../../.."
+        else
+          git clone https://github.com/o-murphy/flutpak.git "$RUNNER_TEMP/flutpak-src"
+          git -C "$RUNNER_TEMP/flutpak-src" fetch --tags
+          git -C "$RUNNER_TEMP/flutpak-src" checkout "$VERSION"
+          SRC_DIR="$RUNNER_TEMP/flutpak-src"
+        fi
 
-        cd "$RUNNER_TEMP/flutpak-src"
+        cd "$SRC_DIR"
+        dart run tool/update_version.dart
         dart pub get
         dart compile exe bin/flutpak.dart -o "$RUNNER_TEMP/flutpak"
 
@@ -51,5 +52,4 @@ runs:
 
     - name: Verify installation
       shell: bash
-      run: |
-        flutpak --help || echo "flutpak installed but --help not supported"
+      run: flutpak --version

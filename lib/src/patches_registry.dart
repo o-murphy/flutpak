@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:pub_semver/pub_semver.dart';
 import 'package:yaml/yaml.dart';
 import 'config.dart';
 
@@ -42,16 +43,22 @@ const List<RegistryEntry> _registry = [
 /// Resolves patch entries from the registry for packages found in [lockPath].
 ///
 /// For each registry entry whose package appears in the lock file:
-///   1. Looks for a patch file under `{patchesDir}/{entry.patchFilename}`.
-///   2. If found, emits a [PatchEntry] with the resolved version and dest.
+///   1. Checks [RegistryEntry.versionConstraint] if set; skips if not satisfied.
+///   2. Looks for a patch file under `{patchesDir}/{entry.patchFilename}`.
+///   3. If found, emits a [PatchEntry] with the resolved version and dest.
 ///
 /// Explicit [projectPatches] from the project config override registry entries
 /// for the same package (project wins).
+///
+/// [registryEntries] can be supplied to override the built-in registry; used
+/// only in tests.
 List<PatchEntry> resolvePatchEntries({
   required List<String> lockPaths,
   String patchesDir = 'flatpak/patches',
   List<PatchEntry> projectPatches = const [],
+  List<RegistryEntry>? registryEntries,
 }) {
+  final registry = registryEntries ?? _registry;
   final lockedVersions = _readLockedVersions(lockPaths);
   final overriddenPackages = projectPatches.map((e) => e.package).toSet();
 
@@ -68,10 +75,14 @@ List<PatchEntry> resolvePatchEntries({
             ),
   ];
 
-  for (final entry in _registry) {
+  for (final entry in registry) {
     if (overriddenPackages.contains(entry.package)) continue;
     final version = lockedVersions[entry.package];
     if (version == null) continue;
+
+    if (entry.versionConstraint != null) {
+      if (!_satisfiesConstraint(version, entry.versionConstraint!)) continue;
+    }
 
     final patchFile = File('$patchesDir/${entry.patchFilename}');
     if (!patchFile.existsSync()) continue;
@@ -85,6 +96,18 @@ List<PatchEntry> resolvePatchEntries({
   }
 
   return entries;
+}
+
+/// Returns true when [versionStr] satisfies [constraintStr].
+/// Malformed inputs are treated as non-matching (returns false).
+bool _satisfiesConstraint(String versionStr, String constraintStr) {
+  try {
+    final version = Version.parse(versionStr);
+    final constraint = VersionConstraint.parse(constraintStr);
+    return constraint.allows(version);
+  } catch (_) {
+    return false;
+  }
 }
 
 Map<String, String> _readLockedVersions(List<String> lockPaths) {
