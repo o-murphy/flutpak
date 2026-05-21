@@ -96,12 +96,32 @@ class ScreenshotConfig {
   }
 }
 
+/// An icon entry specifying the size and source path of an icon asset.
+class IconEntry {
+  /// Icon size string, e.g. '256x256', '512x512', 'scalable'.
+  final String size;
+
+  /// Source path in the repo (relative to project root).
+  final String path;
+
+  const IconEntry({required this.size, required this.path});
+
+  factory IconEntry.fromYaml(Map yaml) => IconEntry(
+        size: yaml['size'] as String,
+        path: yaml['path'] as String,
+      );
+}
+
 /// Config for manifest generation (`flutpak.manifest:` section).
 class ManifestConfig {
   final String appId;
   final String runtimeVersion;
   final List<String> sdkExtensions;
   final String command;
+
+  /// True when [command] was derived from [appId] rather than set explicitly.
+  final bool commandInferred;
+
   final List<String> finishArgs;
 
   /// Paths to extra module YAML files (e.g. bclibc module).
@@ -124,11 +144,24 @@ class ManifestConfig {
   /// pub package equivalent.
   final List<Map<String, dynamic>> extraSources;
 
+  /// Override for the metainfo XML path. When null, [effectiveMetainfoPath()]
+  /// computes the default.
+  final String? metainfoPath;
+
+  /// Override for the desktop entry path. When null,
+  /// [effectiveDesktopEntryPath()] computes the default.
+  final String? desktopEntryPath;
+
+  /// Icon entries. When empty, [effectiveIcons()] returns the default 256x256
+  /// icon derived from [appId].
+  final List<IconEntry> icons;
+
   const ManifestConfig({
     required this.appId,
     required this.runtimeVersion,
     this.sdkExtensions = const [],
     required this.command,
+    this.commandInferred = false,
     this.finishArgs = const [],
     this.extraModules = const [],
     this.appendPath,
@@ -136,17 +169,39 @@ class ManifestConfig {
     this.env = const {},
     this.repoUrl,
     this.extraSources = const [],
+    this.metainfoPath,
+    this.desktopEntryPath,
+    this.icons = const [],
   });
+
+  /// Effective metainfo XML path (config override or default).
+  String effectiveMetainfoPath() =>
+      metainfoPath ?? 'app/share/metainfo/$appId.metainfo.xml';
+
+  /// Effective .desktop entry path (config override or default).
+  String effectiveDesktopEntryPath() =>
+      desktopEntryPath ?? 'app/share/applications/$appId.desktop';
+
+  /// Effective icon list. Returns the default 256x256 icon when [icons] is
+  /// empty.
+  List<IconEntry> effectiveIcons() => icons.isEmpty
+      ? [
+          IconEntry(
+            size: '256x256',
+            path: 'app/share/icons/hicolor/256x256/apps/$appId.png',
+          )
+        ]
+      : icons;
 
   factory ManifestConfig.fromYaml(Map yaml) {
     final appId = yaml['app_id'];
-    final command = yaml['command'];
     if (appId == null) {
       throw ArgumentError('manifest.app_id is required in flutpak config');
     }
-    if (command == null) {
-      throw ArgumentError('manifest.command is required in flutpak config');
-    }
+
+    final commandRaw = yaml['command'] as String?;
+    final commandInferred = commandRaw == null;
+    final command = commandRaw ?? (appId as String).split('.').last;
 
     final exts = (yaml['sdk_extensions'] as List?)?.cast<String>() ?? [];
     final finArgs = (yaml['finish_args'] as List?)?.cast<String>() ?? [];
@@ -163,11 +218,28 @@ class ManifestConfig {
 
     final extraSourcesRaw = yaml['extra_sources'] as List? ?? [];
 
+    // Parse icons list.
+    final iconsRaw = yaml['icons'] as List?;
+    final List<IconEntry> iconsList;
+    if (iconsRaw != null) {
+      iconsList = iconsRaw.map((e) => IconEntry.fromYaml(e as Map)).toList();
+      // Validate: if icons key is present, there must be a 256x256 entry.
+      final has256 = iconsList.any((e) => e.size == '256x256');
+      if (!has256) {
+        throw ArgumentError(
+          'manifest.icons must contain a 256x256 entry when icons: is specified',
+        );
+      }
+    } else {
+      iconsList = const [];
+    }
+
     return ManifestConfig(
       appId: appId as String,
       runtimeVersion: (yaml['runtime_version'] ?? '25.08').toString(),
       sdkExtensions: exts,
-      command: command as String,
+      command: command,
+      commandInferred: commandInferred,
       finishArgs: finArgs,
       extraModules: extraMods,
       appendPath: buildOpts['append_path'] as String?,
@@ -177,6 +249,9 @@ class ManifestConfig {
       extraSources: extraSourcesRaw
           .map((e) => Map<String, dynamic>.from(e as Map))
           .toList(),
+      metainfoPath: yaml['metainfo_path'] as String?,
+      desktopEntryPath: yaml['desktop_entry_path'] as String?,
+      icons: iconsList,
     );
   }
 }
@@ -247,8 +322,15 @@ class FlatpakGenConfig {
     final patchEntries =
         patchesRaw.map((e) => PatchEntry.fromYaml(e as Map)).toList();
 
+    final output = yaml['output'] as String? ?? 'flatpak';
+
+    // Determine if a Flutter SDK is configured (either via flutter.sdk or
+    // FLUTTER_ROOT env var) to decide the default flutter_version_file path.
+    final flutterSdkPresent =
+        flutter['sdk'] != null || Platform.environment['FLUTTER_ROOT'] != null;
+
     return FlatpakGenConfig(
-      output: yaml['output'] as String? ?? 'flatpak',
+      output: output,
       // Substitute env vars that ARE set; keep \$FLUTTER_ROOT literally when
       // not set — effectivePubLocks() resolves it with the CLI --sdk value.
       pubLocks: rawLocks.map(resolve).toList(),
@@ -258,7 +340,8 @@ class FlatpakGenConfig {
           ? tryResolve(flutter['sdk'] as String)
           : Platform.environment['FLUTTER_ROOT'],
       patchPath: (flutter['patch'] ?? yaml['patch_path']) as String?,
-      flutterVersionFile: yaml['flutter_version_file'] as String?,
+      flutterVersionFile: yaml['flutter_version_file'] as String? ??
+          (flutterSdkPresent ? p.join(output, 'flutter.version') : null),
       patches: patchEntries,
       manifest: yaml['manifest'] != null
           ? ManifestConfig.fromYaml(yaml['manifest'] as Map)

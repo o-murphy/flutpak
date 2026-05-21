@@ -7,6 +7,8 @@
 /// - Flathub SDK Extension manifest for distributing Flutter SDK
 library flutpak;
 
+export 'src/commands/generate_command.dart';
+export 'src/commands/init_command.dart';
 export 'src/config.dart';
 export 'src/generators/flutter_sdk.dart';
 export 'src/generators/manifest_generator.dart';

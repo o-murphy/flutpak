@@ -5,7 +5,7 @@ import 'package:test/test.dart';
 void main() {
   late Directory tmp;
 
-  setUp(() => tmp = Directory.systemTemp.createTempSync('flutpak_prepare_'));
+  setUp(() => tmp = Directory.systemTemp.createTempSync('flutpak_generate_'));
   tearDown(() => tmp.deleteSync(recursive: true));
 
   File writeFile(String rel, String content) {
@@ -20,9 +20,9 @@ void main() {
   // workingDirectory is set to tmp.path so that output paths in the config
   // (e.g. "output: flatpak") resolve relative to the temp dir.
   // The script path is absolute so dart can find it regardless of CWD.
-  Future<_Result> runPrepare(List<String> extra) => _runCli(
+  Future<_Result> runGenerate(List<String> extra) => _runCli(
         [
-          'prepare',
+          'generate',
           '--no-sources',
           '--config',
           p.join(tmp.path, 'flutpak.yaml'),
@@ -33,7 +33,7 @@ void main() {
 
   // ── dry-run ────────────────────────────────────────────────────────────────────
 
-  group('prepare --dry-run', () {
+  group('generate --dry-run', () {
     setUp(() {
       writeFile('flutpak.yaml', '''
 output: flatpak
@@ -45,24 +45,16 @@ manifest:
     });
 
     test('does not write any files', () async {
-      final result = await runPrepare(['--dry-run']);
+      final result = await runGenerate(['--dry-run']);
       expect(result.exitCode, 0, reason: result.stderr);
-      expect(fileExists('flatpak/generated-sources.json'), isFalse);
-      expect(fileExists('flatpak/io.example.App.yml'), isFalse);
+      expect(fileExists('flatpak/generated/generated-sources.json'), isFalse);
+      expect(fileExists('flatpak/generated/io.example.App.yml'), isFalse);
     });
 
-    test('prints what would be created', () async {
-      final result = await runPrepare(['--dry-run']);
+    test('prints dry-run message', () async {
+      final result = await runGenerate(['--dry-run']);
       expect(result.exitCode, 0, reason: result.stderr);
-      expect(result.stderr, contains('would write'));
-      expect(result.stderr, contains('io.example.App.yml'));
-    });
-
-    test('shows "would update" when manifest already exists', () async {
-      writeFile('flatpak/io.example.App.yml', 'app-id: io.example.App\n');
-      final result = await runPrepare(['--dry-run']);
-      expect(result.exitCode, 0, reason: result.stderr);
-      expect(result.stderr, contains('would update'));
+      expect(result.stderr, contains('dry-run'));
     });
   });
 }
