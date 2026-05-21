@@ -86,6 +86,9 @@ jobs:
       - name: Compile
         run: dart compile exe bin/flutpak.dart -o /tmp/flutpak
 
+      - name: Smoke test — version
+        run: /tmp/flutpak --version
+
       - name: Smoke test — help
         run: /tmp/flutpak --help
 
@@ -94,6 +97,12 @@ jobs:
 
       - name: Smoke test — sdk-ext --help
         run: /tmp/flutpak sdk-ext --help
+
+      - name: Smoke test — init --help
+        run: /tmp/flutpak init --help
+
+      - name: Smoke test — generate --help
+        run: /tmp/flutpak generate --help
 
       - name: Smoke test — pub sources (real pub.dev)
         run: |

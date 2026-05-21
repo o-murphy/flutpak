@@ -20,11 +20,21 @@ class ManifestGenerator {
   /// commands (e.g. `flatpak`). Defaults to `flatpak`.
   final String outputRelDir;
 
+  /// Resolved git remote URL — overrides [ManifestConfig.repoUrl] when set.
+  final String? resolvedRepoUrl;
+
+  /// Whether this project uses Flutter. When false, Flutter-specific build
+  /// commands (cache stamps, setup-flutter.sh, flutter build) are omitted and
+  /// replaced with a TODO comment. Defaults to true for backward compatibility.
+  final bool hasFlutter;
+
   ManifestGenerator({
     required this.cfg,
     required this.generatedSourcesPath,
     this.patchEntries = const [],
     this.outputRelDir = 'flatpak',
+    this.resolvedRepoUrl,
+    this.hasFlutter = true,
   });
 
   /// Returns the manifest as a YAML string ready to write to disk.
@@ -84,13 +94,16 @@ class ManifestGenerator {
 
   void _buildOptions(StringBuffer buf, String appName) {
     buf.writeln('    build-options:');
-    buf.writeln('      arch:');
-    buf.writeln('        x86_64:');
-    buf.writeln('          env:');
-    buf.writeln('            BUNDLE_PATH: build/linux/x64/release/bundle');
-    buf.writeln('        aarch64:');
-    buf.writeln('          env:');
-    buf.writeln('            BUNDLE_PATH: build/linux/arm64/release/bundle');
+
+    if (hasFlutter) {
+      buf.writeln('      arch:');
+      buf.writeln('        x86_64:');
+      buf.writeln('          env:');
+      buf.writeln('            BUNDLE_PATH: build/linux/x64/release/bundle');
+      buf.writeln('        aarch64:');
+      buf.writeln('          env:');
+      buf.writeln('            BUNDLE_PATH: build/linux/arm64/release/bundle');
+    }
 
     final appendParts = <String>[];
     String? prependLdLib = cfg.prependLdLibraryPath;
@@ -104,8 +117,10 @@ class ManifestGenerator {
         prependLdLib ??= '/usr/lib/sdk/llvm$ver/lib';
       }
     }
-    // Flutter SDK is bundled into the build dir — always add its bin to PATH.
-    appendParts.add('/run/build/$appName/flutter/bin');
+    if (hasFlutter) {
+      // Flutter SDK is bundled into the build dir — add its bin to PATH.
+      appendParts.add('/run/build/$appName/flutter/bin');
+    }
     if (cfg.appendPath != null) appendParts.add(cfg.appendPath!);
 
     if (appendParts.isNotEmpty) {
@@ -116,7 +131,9 @@ class ManifestGenerator {
     }
 
     buf.writeln('      env:');
-    buf.writeln('        PUB_CACHE: /run/build/$appName/.pub-cache');
+    if (hasFlutter) {
+      buf.writeln('        PUB_CACHE: /run/build/$appName/.pub-cache');
+    }
     for (final entry in cfg.env.entries) {
       buf.writeln('        ${entry.key}: ${entry.value}');
     }
@@ -125,43 +142,58 @@ class ManifestGenerator {
   void _buildCommands(StringBuffer buf, String appName) {
     buf.writeln('    build-commands:');
 
-    // Flutter cache stamp copies.
-    final stamps = [
-      'engine-dart-sdk.stamp',
-      'material_fonts.stamp',
-      'gradle_wrapper.stamp',
-      'engine_stamp.stamp',
-      'flutter_sdk.stamp',
-      'font-subset.stamp',
-      'linux-sdk.stamp',
-    ];
-    final versionFiles = {
-      'engine-dart-sdk.stamp': 'engine.version',
-      'material_fonts.stamp': 'material_fonts.version',
-      'gradle_wrapper.stamp': 'gradle_wrapper.version',
-      'engine_stamp.stamp': 'engine.version',
-      'flutter_sdk.stamp': 'engine.version',
-      'font-subset.stamp': 'engine.version',
-      'linux-sdk.stamp': 'engine.version',
-    };
-    for (final stamp in stamps) {
-      final src = versionFiles[stamp]!;
-      buf.writeln(
-          '      - cp flutter/bin/internal/$src flutter/bin/cache/$stamp');
+    if (hasFlutter) {
+      // Flutter cache stamp copies.
+      final stamps = [
+        'engine-dart-sdk.stamp',
+        'material_fonts.stamp',
+        'gradle_wrapper.stamp',
+        'engine_stamp.stamp',
+        'flutter_sdk.stamp',
+        'font-subset.stamp',
+        'linux-sdk.stamp',
+      ];
+      final versionFiles = {
+        'engine-dart-sdk.stamp': 'engine.version',
+        'material_fonts.stamp': 'material_fonts.version',
+        'gradle_wrapper.stamp': 'gradle_wrapper.version',
+        'engine_stamp.stamp': 'engine.version',
+        'flutter_sdk.stamp': 'engine.version',
+        'font-subset.stamp': 'engine.version',
+        'linux-sdk.stamp': 'engine.version',
+      };
+      for (final stamp in stamps) {
+        final src = versionFiles[stamp]!;
+        buf.writeln(
+            '      - cp flutter/bin/internal/$src flutter/bin/cache/$stamp');
+      }
+
+      buf
+        ..writeln('      - setup-flutter.sh')
+        ..writeln('      - flutter build linux --release --no-pub')
+        ..writeln('      - mkdir -p /app/$appName')
+        ..writeln('      - cp -r "\$BUNDLE_PATH"/. /app/$appName/')
+        ..writeln(
+            '      - install -Dm755 $outputRelDir/$appName-wrapper.sh /app/bin/$appName');
+    } else {
+      buf.writeln('      # TODO: add your build commands here');
     }
 
-    buf
-      ..writeln('      - setup-flutter.sh')
-      ..writeln('      - flutter build linux --release --no-pub')
-      ..writeln('      - mkdir -p /app/$appName')
-      ..writeln('      - cp -r "\$BUNDLE_PATH"/. /app/$appName/')
-      ..writeln(
-          '      - install -Dm644 app/share/metainfo/${cfg.appId}.metainfo.xml /app/share/metainfo/${cfg.appId}.metainfo.xml')
-      ..writeln(
-          '      - install -Dm644 app/share/applications/${cfg.appId}.desktop /app/share/applications/${cfg.appId}.desktop')
-      ..writeln(
-          '      - install -Dm644 app/share/icons/hicolor/512x512/apps/${cfg.appId}.png /app/share/icons/hicolor/512x512/apps/${cfg.appId}.png');
-    // ..writeln('      - cp -r app/* /app/');
+    // Asset installs using effective paths from config.
+    final metainfoSrc = cfg.effectiveMetainfoPath();
+    final metainfoDest = '/app/share/metainfo/${cfg.appId}.metainfo.xml';
+    buf.writeln('      - install -Dm644 $metainfoSrc $metainfoDest');
+
+    final desktopSrc = cfg.effectiveDesktopEntryPath();
+    final desktopDest = '/app/share/applications/${cfg.appId}.desktop';
+    buf.writeln('      - install -Dm644 $desktopSrc $desktopDest');
+
+    for (final icon in cfg.effectiveIcons()) {
+      final ext = icon.size == 'scalable' ? 'svg' : 'png';
+      final iconDest =
+          '/app/share/icons/hicolor/${icon.size}/apps/${cfg.appId}.$ext';
+      buf.writeln('      - install -Dm644 ${icon.path} $iconDest');
+    }
   }
 
   void _sources(StringBuffer buf) {
@@ -169,8 +201,9 @@ class ManifestGenerator {
 
     // App git source with placeholders.
     buf.writeln('      - type: git');
-    if (cfg.repoUrl != null) {
-      buf.writeln('        url: ${cfg.repoUrl}');
+    final url = resolvedRepoUrl ?? cfg.repoUrl;
+    if (url != null) {
+      buf.writeln('        url: $url');
     }
     buf.writeln('        tag: $tagPlaceholder');
     buf.writeln('        commit: $commitPlaceholder');
@@ -187,10 +220,9 @@ class ManifestGenerator {
     // Patch sources from registry / project config.
     // Paths are made relative to the manifest directory so flatpak-builder
     // can resolve them correctly (manifest lives in outputRelDir/).
-    final manifestDir = p.dirname(p.absolute(generatedSourcesPath));
     for (final patch in patchEntries) {
       final dest = patch.version != null ? patch.dest(patch.version!) : null;
-      final relPath = p.relative(patch.path, from: manifestDir);
+      final relPath = p.relative(patch.path, from: outputRelDir);
       buf.writeln('      - type: patch');
       if (dest != null) {
         buf.writeln('        dest: $dest');
