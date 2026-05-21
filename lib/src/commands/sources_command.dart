@@ -1,11 +1,8 @@
-import 'dart:convert';
 import 'dart:io';
 import 'package:args/command_runner.dart';
 import 'package:path/path.dart' as p;
 import '../config.dart';
-import '../generators/flutter_sdk.dart';
-import '../generators/pub_sources.dart';
-import '../utils/download_cache.dart';
+import '../utils/sources_util.dart';
 
 /// Combines pub + Flutter SDK sources into a single generated-sources.json.
 class SourcesCommand extends Command<void> {
@@ -35,7 +32,6 @@ class SourcesCommand extends Command<void> {
   Future<void> run() async {
     final cfg = FlatpakGenConfig.load(argResults!['config'] as String);
 
-    // Resolve SDK path first; it is needed for effectivePubLocks.
     final sdkPath = argResults!['sdk'] as String? ??
         cfg.flutterSdk ??
         Platform.environment['FLUTTER_ROOT'];
@@ -45,47 +41,17 @@ class SourcesCommand extends Command<void> {
         lockArg.isNotEmpty ? lockArg : cfg.effectivePubLocks(sdkPath);
 
     final outputDir = argResults!['output'] as String? ?? cfg.output;
-    final outputFile = p.join(outputDir, 'generated-sources.json');
+    final outputPath = p.join(outputDir, 'generated-sources.json');
     final patchPath = argResults!['patch'] as String? ?? cfg.patchPath;
-    final pubOnly = argResults!['pub-only'] as bool;
-    final flutterOnly = argResults!['flutter-only'] as bool;
 
-    final allSources = <Map<String, dynamic>>[];
-    final cache = LocalDownloadCache();
-
-    try {
-      if (!flutterOnly) {
-        final pubGen = PubSourcesGenerator(lockFilePaths: lockPaths);
-        final pubSources = await pubGen.generate();
-        allSources.addAll(pubSources.map((s) => s.toJson()));
-        stderr.writeln('pub: ${pubSources.length} entries');
-      }
-
-      if (!pubOnly) {
-        if (sdkPath == null) {
-          stderr.writeln(
-              '⚠  Flutter SDK not found — skipping (set --sdk or \$FLUTTER_ROOT)');
-        } else {
-          final flutterGen = FlutterSdkGenerator(
-            sdkPath: sdkPath,
-            patchPath: patchPath,
-            outputDir: outputDir,
-            cache: cache,
-          );
-          final flutterSources = await flutterGen.generate();
-          allSources.addAll(flutterSources.map((s) => s.toJson()));
-          stderr.writeln('flutter: ${flutterSources.length} entries');
-        }
-      }
-    } finally {
-      cache.dispose();
-    }
-
-    final json = const JsonEncoder.withIndent('    ').convert(allSources);
-    File(outputFile)
-      ..createSync(recursive: true)
-      ..writeAsStringSync('$json\n');
-
-    stderr.writeln('✓  ${allSources.length} total sources → $outputFile');
+    await generateSourcesJson(
+      lockPaths: lockPaths,
+      sdkPath: sdkPath,
+      patchPath: patchPath,
+      outputDir: outputDir,
+      outputPath: outputPath,
+      pubOnly: argResults!['pub-only'] as bool,
+      flutterOnly: argResults!['flutter-only'] as bool,
+    );
   }
 }

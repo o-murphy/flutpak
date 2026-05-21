@@ -25,24 +25,19 @@ sources:
       expect(result, isNot(contains('__FLATPAK_COMMIT__')));
     });
 
-    test('removes tag: line when tag is null', () {
+    test('test build: SHA used as both tag and commit', () {
+      // When --commit is passed without --tag, prepare uses the SHA for both
+      // fields so flatpak-builder can fetch and build without a release tag.
+      const sha = 'abc1234567890abcdef';
       final result = patchManifestPlaceholders(
         base,
-        tag: null,
-        commit: 'abc1234567890',
+        tag: sha,
+        commit: sha,
       );
-      expect(result, isNot(contains('tag:')));
-      expect(result, contains('commit: abc1234567890'));
-    });
-
-    test('removes tag: line when tag is empty string', () {
-      final result = patchManifestPlaceholders(
-        base,
-        tag: '',
-        commit: 'abc1234567890',
-      );
-      expect(result, isNot(contains('tag:')));
-      expect(result, contains('commit: abc1234567890'));
+      expect(result, contains('tag: $sha'));
+      expect(result, contains('commit: $sha'));
+      expect(result, isNot(contains('__FLATPAK_TAG__')));
+      expect(result, isNot(contains('__FLATPAK_COMMIT__')));
     });
 
     test('re-pins tag and commit when placeholders already replaced', () {
@@ -65,7 +60,7 @@ sources:
       expect(result, isNot(contains('abc1234567890')));
     });
 
-    test('re-pins commit only (no tag) when placeholders already replaced', () {
+    test('re-pins with SHA as both tag and commit when previously pinned', () {
       const pinned = '''
 sources:
   - type: git
@@ -74,13 +69,14 @@ sources:
     commit: abc1234567890
     disable-submodules: true
 ''';
+      const sha = 'deadbeefdeadbeef';
       final result = patchManifestPlaceholders(
         pinned,
-        tag: null,
-        commit: 'deadbeef',
+        tag: sha,
+        commit: sha,
       );
-      expect(result, isNot(contains('tag:')));
-      expect(result, contains('commit: deadbeef'));
+      expect(result, contains('tag: $sha'));
+      expect(result, contains('commit: $sha'));
     });
 
     test('does not touch other modules without disable-submodules when re-pinning', () {

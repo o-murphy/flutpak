@@ -8,7 +8,86 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 
-## [0.3.0] - 2026-05-26
+## [0.4.0-beta.1] - 2026-05-21
+
+### Notes
+- This is a beta release. The stable 0.4.0 will follow after testing.
+- Patches injection: Currently patches are injected into the template
+  manifest during init, but this may cause issues when package versions change.
+  The dest path includes the package version
+  (e.g., .pub-cache/hosted/pub.dev/objectbox_flutter_libs-5.3.1).
+  If the version updates in pubspec.lock, the patch would be applied
+  to the wrong directory.
+  TODO: Move patch injection to generate phase where we have access
+  to current locked versions.
+
+### Added
+- `flutpak init` command — one-time setup: generates the template manifest
+  (`<output>/<app_id>.yml`), `<name>-wrapper.sh`, `flathub.json`, and
+  `.gitignore`; immediately runs `generate` to populate `generated/`
+- `flutpak generate [--tag] [--commit]` command — replaces `prepare`; reads the
+  template, validates it against config, substitutes placeholders, copies
+  everything to `<output>/generated/`
+- `manifest.icons:` config list — each entry has `size:` and `path:`; default
+  is a single `256x256` entry (fixes previously hardcoded `512x512`); when
+  `icons:` key is present a `256x256` entry is required
+- `manifest.metainfo_path:` — override for the metainfo XML source path
+  (default: `app/share/metainfo/<app_id>.metainfo.xml`)
+- `manifest.desktop_entry_path:` — override for the `.desktop` source path
+  (default: `app/share/applications/<app_id>.desktop`)
+- Auto-generated `<name>-wrapper.sh` in `<output>/` for Flutter projects
+  (sets `LD_LIBRARY_PATH` and execs the bundle binary)
+
+### Removed
+- `prepare` command — replaced by `init` + `generate`
+
+### Changed
+- Generated output now lives in `<output>/generated/` (gitignored via
+  auto-generated `.gitignore`); the template manifest in `<output>/` is
+  committed and edited by hand
+- `generate` validates template fields (`app-id`, `command`, `runtime-version`)
+  against config and errors if they diverge
+- `generate` errors if `__FLATPAK_TAG__` or `__FLATPAK_COMMIT__` placeholders
+  are missing from the template
+- Asset files (metainfo, desktop, icons) are validated for existence on both
+  `init` and `generate` — missing files are errors, not warnings
+- `--tag` and `--commit` flags now work exclusively; passing only `--tag v1.2.3`
+  auto-resolves the commit SHA via `git rev-parse v1.2.3^{}`; passing only
+  `--commit <sha>` (or nothing) writes the SHA into both `tag:` and `commit:`
+  in the manifest so `flatpak-builder` can fetch and build without a release tag;
+  previously omitting `--tag` would remove the `tag:` line which broke builds
+- `manifest.command` is now optional; defaults to the last reverse-DNS segment of
+  `manifest.app_id` (e.g. `io.github.example.myapp` → `myapp`); explicit
+  `command:` still accepted and takes precedence; an info message is printed on
+  first run when the value is inferred so the user can verify or override it
+- `flutter_version_file` now defaults to `<output>/flutter.version` when a Flutter
+  SDK is configured (via `flutter.sdk:` or `$FLUTTER_ROOT`); pure-Dart projects
+  with no Flutter SDK configured are unaffected (field stays `null`, no warning)
+- `manifest.repo_url` is now auto-detected from `git remote get-url origin` on
+  the first `flutpak init` run when not set in config; the resolved URL is
+  written into the manifest; explicit `repo_url:` still accepted and takes
+  precedence; an info message is printed when the URL is inferred; if the project
+  has no git remote the field is simply omitted
+
+### Minimum config
+The minimum viable config is now just `app_id` + `finish_args`:
+
+```yaml
+flutpak:
+  manifest:
+    app_id: io.github.YourOrg.YourApp
+    finish_args:
+      - --share=ipc
+      - --socket=wayland
+      - --device=dri
+```
+
+All other fields (`command`, `repo_url`, `flutter_version_file`, `pub.locks`,
+`flutter.sdk`, `output`) are resolved automatically from the environment and
+git remote.
+
+
+## [0.3.0] - 2026-05-21
 
 ### Added
 - `-V` / `--version` global flag — prints `flutpak <version>` and exits;
@@ -241,7 +320,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   output files
 - MIT License
 
-[Unreleased]: https://github.com/o-murphy/flutpak/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/o-murphy/flutpak/compare/v0.4.0-beta.1...HEAD
+[0.4.0-beta.1]: https://github.com/o-murphy/flutpak/compare/v0.3.0...v0.4.0-beta.1
 [0.3.0]: https://github.com/o-murphy/flutpak/compare/v0.2.8...v0.3.0
 [0.2.8]: https://github.com/o-murphy/flutpak/compare/v0.2.7...v0.2.8
 [0.2.7]: https://github.com/o-murphy/flutpak/compare/v0.2.6...v0.2.7
