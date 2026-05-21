@@ -18,3 +18,5 @@ jobs:
 
             - name: Install flutpak
               uses: ./.github/actions/setup-flutpak
+              # No version input — action builds from $GITHUB_ACTION_PATH,
+              # which is this checkout, so it always reflects the branch under review.

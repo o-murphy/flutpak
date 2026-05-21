@@ -1,5 +1,3 @@
-import 'dart:io';
-import 'package:path/path.dart' as p;
 import '../utils/download_cache.dart';
 import 'flutter_sdk.dart';
 
@@ -29,8 +27,7 @@ class SdkExtensionGenerator {
   }) : _cache = cache ?? LocalDownloadCache();
 
   Future<Map<String, dynamic>> generate() async {
-    final flutterTag =
-        File(p.join(sdkPath, 'version')).readAsStringSync().trim();
+    final flutterTag = FlutterSdkGenerator.readFlutterVersion(sdkPath);
     final majorMinor = _majorMinor(flutterTag); // e.g. '3.41' → '3'
 
     final sdkGen = FlutterSdkGenerator(

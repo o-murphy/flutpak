@@ -42,7 +42,7 @@ void main() {
         expect(j['type'], 'archive');
         expect(j['strip-components'], 0);
         expect(j['dest'], startsWith('.pub-cache/hosted/pub.dev/'));
-        expect(j['url'], contains('pub.dartlang.org'));
+        expect(j['url'], contains('pub.dev'));
       }
     });
 

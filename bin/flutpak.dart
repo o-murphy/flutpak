@@ -5,8 +5,14 @@ import 'package:flutpak/src/commands/prepare_command.dart';
 import 'package:flutpak/src/commands/pub_command.dart';
 import 'package:flutpak/src/commands/sdk_ext_command.dart';
 import 'package:flutpak/src/commands/sources_command.dart';
+import 'package:flutpak/src/version.dart';
 
 Future<void> main(List<String> args) async {
+  if (args.contains('-V') || args.contains('--version')) {
+    stdout.writeln('flutpak $packageVersion');
+    return;
+  }
+
   final runner = CommandRunner<void>(
     'flutpak',
     'Generate Flatpak manifests and offline source bundles for Flutter apps.\n\n'

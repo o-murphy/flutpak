@@ -459,5 +459,113 @@ packages:
       );
       expect(entries, isEmpty);
     });
+
+    group('versionConstraint', () {
+      const lockWithMypkg = '''
+packages:
+  mypkg:
+    source: hosted
+    version: "5.3.1"
+''';
+
+      const lockWithMypkgOld = '''
+packages:
+  mypkg:
+    source: hosted
+    version: "4.9.0"
+''';
+
+      final constrainedEntry = RegistryEntry(
+        package: 'mypkg',
+        versionConstraint: '>=5.0.0 <6.0.0',
+        patchFilename: 'mypkg.patch',
+      );
+
+      test('includes entry when locked version satisfies constraint', () {
+        final lockPath = writeLock(lockWithMypkg);
+        writePatch('mypkg.patch');
+
+        final entries = resolvePatchEntries(
+          lockPaths: [lockPath],
+          patchesDir: '${tmpDir.path}/flatpak/patches',
+          registryEntries: [constrainedEntry],
+        );
+
+        expect(entries, hasLength(1));
+        expect(entries.first.package, 'mypkg');
+        expect(entries.first.version, '5.3.1');
+      });
+
+      test('skips entry when locked version does not satisfy constraint', () {
+        final lockPath = writeLock(lockWithMypkgOld);
+        writePatch('mypkg.patch');
+
+        final entries = resolvePatchEntries(
+          lockPaths: [lockPath],
+          patchesDir: '${tmpDir.path}/flatpak/patches',
+          registryEntries: [constrainedEntry],
+        );
+
+        expect(entries, isEmpty);
+      });
+
+      test('includes entry when constraint is null (any version)', () {
+        final lockPath = writeLock(lockWithMypkgOld);
+        writePatch('mypkg.patch');
+
+        final entries = resolvePatchEntries(
+          lockPaths: [lockPath],
+          patchesDir: '${tmpDir.path}/flatpak/patches',
+          registryEntries: [
+            const RegistryEntry(
+              package: 'mypkg',
+              patchFilename: 'mypkg.patch',
+            ),
+          ],
+        );
+
+        expect(entries, hasLength(1));
+        expect(entries.first.version, '4.9.0');
+      });
+
+      test('skips entry when constraint is malformed', () {
+        final lockPath = writeLock(lockWithMypkg);
+        writePatch('mypkg.patch');
+
+        final entries = resolvePatchEntries(
+          lockPaths: [lockPath],
+          patchesDir: '${tmpDir.path}/flatpak/patches',
+          registryEntries: [
+            const RegistryEntry(
+              package: 'mypkg',
+              versionConstraint: 'not-a-valid-constraint',
+              patchFilename: 'mypkg.patch',
+            ),
+          ],
+        );
+
+        expect(entries, isEmpty);
+      });
+
+      test('exact version constraint matches only that version', () {
+        final lockPath = writeLock(lockWithMypkg);
+        writePatch('mypkg.patch');
+
+        final entries = resolvePatchEntries(
+          lockPaths: [lockPath],
+          patchesDir: '${tmpDir.path}/flatpak/patches',
+          registryEntries: [
+            const RegistryEntry(
+              package: 'mypkg',
+              versionConstraint: '5.3.1',
+              patchFilename: 'mypkg.patch',
+            ),
+          ],
+        );
+
+        expect(entries, hasLength(1));
+        expect(entries.first.version, '5.3.1');
+      });
+    });
   });
 }
