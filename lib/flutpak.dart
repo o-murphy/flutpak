@@ -1,12 +1,3 @@
-/// Flatpak source manifest generator for Flutter/Dart applications.
-///
-/// Provides generators for:
-/// - Dart pub package sources (from pubspec.lock, using pub.dev API)
-/// - Flutter SDK sources (from a local Flutter install, cached SHA-256)
-/// - Combined generated-sources.json for offline Flatpak builds
-/// - Flathub SDK Extension manifest for distributing Flutter SDK
-library flutpak;
-
 export 'src/commands/generate_command.dart';
 export 'src/commands/init_command.dart';
 export 'src/config.dart';
