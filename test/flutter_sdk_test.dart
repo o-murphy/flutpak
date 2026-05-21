@@ -1,10 +1,10 @@
+import 'dart:io';
 import 'package:flutpak/flutpak.dart';
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 
 void main() {
-  final sdkFixture =
-      p.join('test', 'fixtures', 'flutter_sdk');
+  final sdkFixture = p.join('test', 'fixtures', 'flutter_sdk');
 
   // We test URL construction only — actual SHA-256 download is skipped by
   // injecting a fake DownloadCache that returns deterministic hashes.
@@ -82,14 +82,14 @@ void main() {
           .map((s) => s.url)
           .firstWhere((u) => u.contains('gradle-wrapper'));
 
-      expect(
-          gradleUrl, contains('fd5c1f2c013565a3bea56ada6df9d2b8e96d56aa'));
+      expect(gradleUrl, contains('fd5c1f2c013565a3bea56ada6df9d2b8e96d56aa'));
     });
 
     test('engine_stamp.json is a FileSource in flutter/bin/cache', () async {
       final sources = await gen.generate();
-      final stamp = sources.whereType<FileSource>().firstWhere(
-          (s) => s.url.contains('engine_stamp.json'));
+      final stamp = sources
+          .whereType<FileSource>()
+          .firstWhere((s) => s.url.contains('engine_stamp.json'));
 
       expect(stamp.dest, 'flutter/bin/cache');
     });
@@ -97,7 +97,9 @@ void main() {
     test('sky_engine/pubspec.yaml is an InlineSource', () async {
       final sources = await gen.generate();
       final inline = sources.whereType<InlineSource>().firstWhere(
-          (s) => s.destFilename == 'pubspec.yaml' && s.dest.contains('sky_engine'));
+          (s) =>
+              s.destFilename == 'pubspec.yaml' &&
+              s.dest.contains('sky_engine'));
       expect(inline.contents, contains('name: sky_engine'));
       expect(inline.contents, contains('version: 0.0.99'));
       expect(inline.contents, contains('sdk:'));
@@ -109,6 +111,50 @@ void main() {
 
       expect(script.destFilename, 'setup-flutter.sh');
       expect(script.commands.any((c) => c.contains('--offline')), isTrue);
+    });
+
+    test('pub archive URLs use pub.dev (not pub.dartlang.org)', () async {
+      // This test ensures the deprecated pub.dartlang.org domain is not used.
+      // FlutterSdkGenerator itself doesn't generate pub URLs, but verify the
+      // ArchiveSource URLs it produces don't accidentally reference dartlang.org.
+      final sources = await gen.generate();
+      for (final s in sources.whereType<ArchiveSource>()) {
+        expect(s.url, isNot(contains('pub.dartlang.org')));
+      }
+    });
+  });
+
+  group('FlutterSdkGenerator.readFlutterVersion', () {
+    late Directory tmpDir;
+
+    setUp(() {
+      tmpDir = Directory.systemTemp.createTempSync('flutpak_ver_test_');
+    });
+
+    tearDown(() => tmpDir.deleteSync(recursive: true));
+
+    test('reads version from version file when present', () {
+      File(p.join(tmpDir.path, 'version')).writeAsStringSync('3.41.9\n');
+      expect(FlutterSdkGenerator.readFlutterVersion(tmpDir.path), '3.41.9');
+    });
+
+    test('falls back to packages/flutter/pubspec.yaml when version file absent',
+        () {
+      final pubspecDir =
+          Directory(p.join(tmpDir.path, 'packages', 'flutter'))
+            ..createSync(recursive: true);
+      File(p.join(pubspecDir.path, 'pubspec.yaml')).writeAsStringSync(
+        'name: flutter\nversion: 3.27.1\nenvironment:\n  sdk: ">=3.3.0"\n',
+      );
+      expect(FlutterSdkGenerator.readFlutterVersion(tmpDir.path), '3.27.1');
+    });
+
+    test('throws when no version source is available', () {
+      // Empty directory — no version file, no git, no pubspec.
+      expect(
+        () => FlutterSdkGenerator.readFlutterVersion(tmpDir.path),
+        throwsException,
+      );
     });
   });
 }

@@ -51,7 +51,7 @@ void main() {
       expect(yaml.toJson(), {
         'type': 'archive',
         'url':
-            'https://pub.dartlang.org/packages/yaml/versions/3.1.2.tar.gz',
+            'https://pub.dev/packages/yaml/versions/3.1.2.tar.gz',
         'sha256': _fakeSha256,
         'dest': '.pub-cache/hosted/pub.dev/yaml-3.1.2',
         'strip-components': 0,

@@ -53,8 +53,7 @@ class PubSourcesGenerator {
         final sha256 = await _fetchSha256(name, version);
         return [
           ArchiveSource(
-            url:
-                'https://pub.dartlang.org/packages/$name/versions/$version.tar.gz',
+            url: 'https://pub.dev/packages/$name/versions/$version.tar.gz',
             sha256: sha256,
             dest: '.pub-cache/hosted/pub.dev/$name-$version',
             stripComponents: 0,
@@ -113,7 +112,7 @@ class PubSourcesGenerator {
 
     // Fallback: download archive and hash it (pre-2023 packages).
     return _downloadAndHash(
-        'https://pub.dartlang.org/packages/$name/versions/$version.tar.gz');
+        'https://pub.dev/packages/$name/versions/$version.tar.gz');
   }
 
   Future<String> _downloadAndHash(String url) async {
