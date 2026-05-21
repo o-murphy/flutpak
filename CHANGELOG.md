@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+
+## [0.3.0] - 2026-05-26
+
 ### Added
 - `-V` / `--version` global flag — prints `flutpak <version>` and exits;
   `setup-flutpak` action now runs `flutpak --version` to verify the installation
@@ -51,7 +54,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   allow injecting a custom registry in tests
 
 
-## [0.2.8] - 2026-05-20
+## [0.2.8] - 2026-05-25
  
 ### Removed
 - `export` command — removed; files can be copied manually if needed
@@ -238,7 +241,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   output files
 - MIT License
 
-[Unreleased]: https://github.com/o-murphy/flutpak/compare/v0.2.8...HEAD
+[Unreleased]: https://github.com/o-murphy/flutpak/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/o-murphy/flutpak/compare/v0.2.8...v0.3.0
 [0.2.8]: https://github.com/o-murphy/flutpak/compare/v0.2.7...v0.2.8
 [0.2.7]: https://github.com/o-murphy/flutpak/compare/v0.2.6...v0.2.7
 [0.2.6]: https://github.com/o-murphy/flutpak/compare/v0.2.5...v0.2.6
