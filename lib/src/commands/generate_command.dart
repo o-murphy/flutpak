@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:args/command_runner.dart';
 import 'package:path/path.dart' as p;
 import '../config.dart';
+import '../generators/flutter_sdk.dart';
 import '../generators/manifest_generator.dart';
 import '../patches_registry.dart';
 import '../utils/sources_util.dart';
@@ -102,8 +103,7 @@ class GenerateCommand extends Command<void> {
     final templatePath = p.join(outputDir, '${manifestCfg.appId}.yml');
     final templateFile = File(templatePath);
     if (!templateFile.existsSync()) {
-      stderr.writeln(
-          'error: template not found: $templatePath\n'
+      stderr.writeln('error: template not found: $templatePath\n'
           '  Run `flutpak init` first to create the template.');
       exit(1);
     }
@@ -139,13 +139,31 @@ class GenerateCommand extends Command<void> {
     final effectiveLocks = cfg.effectivePubLocks(sdkPath);
 
     // ── Resolve patch entries ─────────────────────────────────────────────
-    final patchEntries = resolvePatchEntries(
-      lockPaths: effectiveLocks,
-      patchesDir: patchesDir,
-      projectPatches: cfg.patches,
-    );
+    final List<PatchEntry> patchEntries;
+    try {
+      patchEntries = resolvePatchEntries(
+        lockPaths: effectiveLocks,
+        patchesDir: patchesDir,
+        projectPatches: cfg.patches,
+      );
+    } on Exception catch (e) {
+      stderr.writeln('error: $e');
+      exit(1);
+    }
     if (patchEntries.isNotEmpty) {
       stderr.writeln('patches: ${patchEntries.length} entries resolved');
+    }
+
+    // ── Resolve Flutter patch (write built-in if needed) ─────────────────
+    // The Flutter patch is injected into the generated manifest (not the JSON)
+    // so it is visible alongside package patches and is not lost when the JSON
+    // is regenerated independently.
+    String? flutterPatchAbsPath;
+    if (!pubOnly && sdkPath != null) {
+      flutterPatchAbsPath = FlutterSdkGenerator.resolveAndWritePatch(
+        configPatchPath: cfg.patchPath,
+        outputDir: outputDir,
+      );
     }
 
     // ── Generate sources ──────────────────────────────────────────────────
@@ -158,6 +176,7 @@ class GenerateCommand extends Command<void> {
         outputPath: sourcesPath,
         pubOnly: pubOnly,
         flutterOnly: flutterOnly,
+        emitFlutterPatch: false,
       );
     }
 
@@ -183,11 +202,19 @@ class GenerateCommand extends Command<void> {
     }
 
     final effectiveCommit = commit ?? commitPlaceholder;
-    final generatedContent = patchManifestPlaceholders(
-      templateContent,
+    var generatedContent = stripTemplateGuidance(templateContent);
+    generatedContent = patchManifestPlaceholders(
+      generatedContent,
       tag: tag,
       commit: effectiveCommit,
     );
+    final allPatches = [
+      if (flutterPatchAbsPath != null)
+        PatchEntry(package: 'flutter', path: flutterPatchAbsPath),
+      ...patchEntries,
+    ];
+    generatedContent =
+        injectPatchSources(generatedContent, allPatches, patchesDir);
     File(generatedManifestPath)
       ..createSync(recursive: true)
       ..writeAsStringSync(generatedContent);
@@ -195,8 +222,7 @@ class GenerateCommand extends Command<void> {
 
     // ── Copy patches ──────────────────────────────────────────────────────
     if (Directory(patchesDir).existsSync()) {
-      _copyDirectory(
-          Directory(patchesDir), Directory(generatedPatchesDir));
+      _copyDirectory(Directory(patchesDir), Directory(generatedPatchesDir));
     }
 
     // ── Copy flathub.json ─────────────────────────────────────────────────

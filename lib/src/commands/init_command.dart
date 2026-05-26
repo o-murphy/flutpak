@@ -3,7 +3,6 @@ import 'package:args/command_runner.dart';
 import 'package:path/path.dart' as p;
 import '../config.dart';
 import '../generators/manifest_generator.dart';
-import '../patches_registry.dart';
 import 'command_utils.dart';
 import 'generate_command.dart';
 
@@ -24,8 +23,7 @@ class InitCommand extends Command<void> {
           abbr: 'c', help: 'Config file path.', defaultsTo: 'flutpak.yaml')
       ..addOption('sdk',
           abbr: 's', help: 'Flutter SDK path. Defaults to \$FLUTTER_ROOT.')
-      ..addFlag('force',
-          abbr: 'f', help: 'Overwrite existing template files.');
+      ..addFlag('force', abbr: 'f', help: 'Overwrite existing template files.');
   }
 
   @override
@@ -64,7 +62,8 @@ class InitCommand extends Command<void> {
       final result = Process.runSync('git', ['remote', 'get-url', 'origin']);
       if (result.exitCode == 0) {
         resolvedRepoUrl = (result.stdout as String).trim();
-        stderr.writeln('ℹ  manifest.repo_url not set — using "$resolvedRepoUrl" '
+        stderr.writeln(
+            'ℹ  manifest.repo_url not set — using "$resolvedRepoUrl" '
             '(from git remote origin); set manifest.repo_url explicitly to override');
       }
     }
@@ -75,32 +74,14 @@ class InitCommand extends Command<void> {
           '(last segment of app_id); set manifest.command explicitly to override');
     }
 
-    // ─────────────────────────────────────────────────────────────
-    // RESOLVE PATCHES FOR TEMPLATE
-    // ─────────────────────────────────────────────────────────────
-    final patchesDir = p.join(outputDir, 'patches');
-    final effectiveLocks = cfg.effectivePubLocks(sdkPath);
-    final patchEntries = resolvePatchEntries(
-      lockPaths: effectiveLocks,
-      patchesDir: patchesDir,
-      projectPatches: cfg.patches,
-    );
-    
-    if (patchEntries.isNotEmpty) {
-      stderr.writeln('patches: ${patchEntries.length} entries will be added to template');
-      for (final p in patchEntries) {
-        stderr.writeln('  - ${p.package} -> ${p.path}');
-      }
-    }
-
-    // Generate template manifest (with patches included!)
+    // Generate template manifest (patches are injected at generate time,
+    // not baked into the template, so versions stay in sync with pubspec.lock).
     final hasFlutter = sdkPath != null;
     final sourcesPath =
         p.join(outputDir, 'generated', 'generated-sources.json');
     final generator = ManifestGenerator(
       cfg: manifestCfg,
       generatedSourcesPath: sourcesPath,
-      patchEntries: patchEntries,  // <-- КЛЮЧОВО: передаємо патчі в темплейт
       outputRelDir: cfg.output,
       resolvedRepoUrl: resolvedRepoUrl,
       hasFlutter: hasFlutter,

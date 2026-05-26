@@ -124,6 +124,63 @@ void main() {
     });
   });
 
+  group('FlutterSdkGenerator — patchPath normalisation', () {
+    late Directory tmpDir;
+
+    setUp(() {
+      tmpDir = Directory.systemTemp.createTempSync('flutpak_patch_norm_');
+    });
+    tearDown(() => tmpDir.deleteSync(recursive: true));
+
+    test('explicit patchPath is made relative to outputDir', () async {
+      // outputDir = tmpDir/flatpak
+      // patchPath = tmpDir/flatpak/patches/flutter/shared.sh.patch
+      // Expected path in sources: patches/flutter/shared.sh.patch
+      final outputDir = p.join(tmpDir.path, 'flatpak');
+      final patchFile = File(
+          p.join(outputDir, 'patches', 'flutter', 'shared.sh.patch'))
+        ..createSync(recursive: true)
+        ..writeAsStringSync('# dummy patch');
+
+      final gen = FlutterSdkGenerator(
+        sdkPath: sdkFixture,
+        patchPath: patchFile.path,  // absolute path as given by cfg.patchPath after resolution
+        outputDir: outputDir,
+        cache: _FakeCache(),
+      );
+
+      final sources = await gen.generate();
+      final patch = sources.whereType<PatchSource>().first;
+
+      expect(patch.path, 'patches/flutter/shared.sh.patch');
+      expect(patch.path, isNot(contains(outputDir)));
+    });
+
+    test('patchPath given as project-relative path is normalised', () async {
+      // Simulate cfg.patchPath = 'flatpak/patches/flutter/shared.sh.patch'
+      // relative to project CWD, with outputDir = absolute path to flatpak/.
+      final outputDir = p.join(tmpDir.path, 'flatpak');
+      File(p.join(outputDir, 'patches', 'flutter', 'shared.sh.patch'))
+        ..createSync(recursive: true)
+        ..writeAsStringSync('# dummy patch');
+
+      final projectRelativePath =
+          p.relative(p.join(outputDir, 'patches', 'flutter', 'shared.sh.patch'));
+
+      final gen = FlutterSdkGenerator(
+        sdkPath: sdkFixture,
+        patchPath: projectRelativePath,
+        outputDir: outputDir,
+        cache: _FakeCache(),
+      );
+
+      final sources = await gen.generate();
+      final patch = sources.whereType<PatchSource>().first;
+
+      expect(patch.path, 'patches/flutter/shared.sh.patch');
+    });
+  });
+
   group('FlutterSdkGenerator.readFlutterVersion', () {
     late Directory tmpDir;
 
