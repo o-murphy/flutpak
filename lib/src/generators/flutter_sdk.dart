@@ -61,10 +61,16 @@ class FlutterSdkGenerator {
   final String? outputDir;
   final DownloadCache _cache;
 
+  /// When false, the patch source is not added to the returned list even if a
+  /// patch file exists. The caller is responsible for injecting it elsewhere
+  /// (e.g. directly into the manifest). Defaults to true for standalone use.
+  final bool includePatchInSources;
+
   FlutterSdkGenerator({
     required this.sdkPath,
     this.patchPath,
     this.outputDir,
+    this.includePatchInSources = true,
     DownloadCache? cache,
   }) : _cache = cache ?? LocalDownloadCache();
 
@@ -114,9 +120,11 @@ class FlutterSdkGenerator {
     }
 
     // 3. patch for shared.sh (replaces pub upgrade with pub get --offline)
-    final effectivePatchPath = _resolveOrWritePatch();
-    if (effectivePatchPath != null) {
-      sources.add(PatchSource(path: effectivePatchPath));
+    if (includePatchInSources) {
+      final effectivePatchPath = _resolveOrWritePatch();
+      if (effectivePatchPath != null) {
+        sources.add(PatchSource(path: effectivePatchPath));
+      }
     }
 
     // 4. sky_engine/pubspec.yaml — not in the Flutter git tree (removed in
@@ -158,12 +166,22 @@ class FlutterSdkGenerator {
 
   /// Returns the patch path to embed in the source list.
   ///
-  /// - If [patchPath] was provided explicitly: returns it as-is.
+  /// - If [patchPath] was provided explicitly: normalises it to be relative to
+  ///   [outputDir] so flatpak-builder can resolve it from `generated-sources.json`
+  ///   (which lives inside `outputDir/generated/`, the same directory as the manifest).
   /// - If [outputDir] is set: writes [builtinSharedShPatch] to
   ///   `outputDir/defaultSharedShPatchPath` and returns the relative path.
   /// - Otherwise: returns null (no patch included).
   String? _resolveOrWritePatch() {
-    if (patchPath != null) return patchPath;
+    if (patchPath != null) {
+      // Explicit path from config is relative to the project root (e.g.
+      // 'flatpak/patches/flutter/shared.sh.patch'). Convert it to be relative
+      // to outputDir so flatpak-builder finds it inside generated/patches/.
+      if (outputDir != null) {
+        return p.relative(p.absolute(patchPath!), from: p.absolute(outputDir!));
+      }
+      return patchPath;
+    }
     if (outputDir == null) return null;
 
     final target = File(p.join(outputDir!, defaultSharedShPatchPath));
@@ -253,6 +271,29 @@ class FlutterSdkGenerator {
       return '$_infraBase/gradle-wrapper/$gradleHash/gradle-wrapper.tgz';
     }
     return '$_infraBase/flutter/$engineHash/${art.path}';
+  }
+
+  /// Resolves the Flutter patch path and writes the built-in patch if needed.
+  ///
+  /// If [configPatchPath] is provided, returns its absolute path without
+  /// writing any file. Otherwise writes [builtinSharedShPatch] to
+  /// `outputDir/defaultSharedShPatchPath` and returns the absolute path.
+  ///
+  /// Used by `generate` command to obtain the path for manifest injection
+  /// independently of [FlutterSdkGenerator.generate].
+  static String resolveAndWritePatch({
+    String? configPatchPath,
+    required String outputDir,
+  }) {
+    if (configPatchPath != null) {
+      return p.absolute(configPatchPath);
+    }
+    final target =
+        File(p.join(p.absolute(outputDir), defaultSharedShPatchPath));
+    target.createSync(recursive: true);
+    target.writeAsStringSync(builtinSharedShPatch);
+    stderr.writeln('flutter: wrote built-in shared.sh patch → ${target.path}');
+    return target.path;
   }
 
   /// Reads the Flutter SDK version tag.

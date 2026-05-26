@@ -26,19 +26,12 @@ class RegistryEntry {
 
 /// Community-maintained registry of packages that commonly need Flatpak patches.
 ///
-/// When [resolvePatchEntries] finds a matching package in pubspec.lock and a
-/// patch file on disk, it emits a [PatchEntry] with the correct `dest` path.
-const List<RegistryEntry> _registry = [
-  RegistryEntry(
-    package: 'objectbox_flutter_libs',
-    patchFilename: 'objectbox_flutter_libs.patch',
-  ),
-  RegistryEntry(
-    package: 'sqflite_common_ffi',
-    destSubpath: 'linux',
-    patchFilename: 'sqflite_common_ffi.patch',
-  ),
-];
+/// Currently empty — known patches are maintained as reference files in the
+/// `known-patches/` directory of the flutpak repository. Copy the relevant
+/// `.patch` file to your project and reference it via the `patches:` config key.
+///
+/// See: https://github.com/o-murphy/flutpak/tree/main/known-patches
+const List<RegistryEntry> _registry = [];
 
 /// Resolves patch entries from the registry for packages found in [lockPath].
 ///
@@ -62,18 +55,29 @@ List<PatchEntry> resolvePatchEntries({
   final lockedVersions = _readLockedVersions(lockPaths);
   final overriddenPackages = projectPatches.map((e) => e.package).toSet();
 
-  // Back-fill version from lock file for project patches that omit it.
-  final entries = <PatchEntry>[
-    for (final p in projectPatches)
-      p.version != null
-          ? p
-          : PatchEntry(
-              package: p.package,
-              version: lockedVersions[p.package],
-              path: p.path,
-              destSubpath: p.destSubpath,
-            ),
-  ];
+  // Build entries from project patches, back-filling version from lock file.
+  final entries = <PatchEntry>[];
+  for (final p in projectPatches) {
+    if (p.version != null) {
+      final lockedVersion = lockedVersions[p.package];
+      if (lockedVersion != null && lockedVersion != p.version) {
+        throw Exception(
+          'patch version mismatch for "${p.package}": '
+          'config pins ${p.version} but pubspec.lock has $lockedVersion.\n'
+          'Update the version in your flutpak config, fix the patch for the '
+          'new version, or remove the patch entry if it is no longer needed.',
+        );
+      }
+      entries.add(p);
+    } else {
+      entries.add(PatchEntry(
+        package: p.package,
+        version: lockedVersions[p.package],
+        path: p.path,
+        destSubpath: p.destSubpath,
+      ));
+    }
+  }
 
   for (final entry in registry) {
     if (overriddenPackages.contains(entry.package)) continue;

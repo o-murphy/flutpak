@@ -8,6 +8,64 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 
+## [0.4.0-beta.2] - 2026-05-26
+
+### Fixed
+- Patch sources are now injected into the **generated** manifest at `generate`
+  time instead of being baked into the template at `init` time. Previously, the
+  `dest:` path (e.g. `.pub-cache/hosted/pub.dev/objectbox_flutter_libs-5.3.1`)
+  was written into the template once and became stale whenever the package
+  version changed in `pubspec.lock`. Now the version is resolved from the
+  current lock file on every `generate` run.
+- Patch subdirectory structure is preserved in the generated manifest. A patch
+  at `flatpak/patches/objectbox_flutter_libs/CMakeLists.txt.patch` is now
+  correctly referenced as `patches/objectbox_flutter_libs/CMakeLists.txt.patch`
+  instead of the bare filename `patches/CMakeLists.txt.patch`.
+
+### Added
+- `known-patches/` directory with reference `.patch` files for packages that
+  commonly need Flatpak modifications: `flutter/shared.sh.patch` and
+  `objectbox_flutter_libs/5.3.1/CMakeLists.txt.patch`. Usage instructions are
+  in `known-patches/PATCHES.md`.
+- Version mismatch check for project `patches:` entries: `generate` now exits
+  with an error when a `version:` pinned in config differs from the version
+  resolved from `pubspec.lock`, instead of silently producing a broken manifest.
+
+### Changed
+- `ManifestGenerator` no longer accepts or emits `patchEntries`; the template
+  manifest intentionally contains no `type: patch` sources.
+- The template manifest now includes inline guidance comments explaining which
+  sections are safe to edit, which placeholders must not be removed, and that
+  patch sources are auto-injected by `generate`.
+- The Flutter `shared.sh.patch` is now injected directly into the generated
+  manifest's `sources:` section alongside package patches, instead of being
+  embedded in `generated-sources.json`. This makes it visible and prevents a
+  broken source list when the JSON is regenerated without the patch being
+  copied. For pure Dart projects (`--pub-only`) the Flutter patch is skipped
+  entirely.
+- The built-in Dart patch registry (`_registry`) has been emptied. Known patches
+  are now maintained as reference files in `known-patches/` rather than as
+  half-working auto-detection logic without shipped patch content. The
+  `patches:` config key and all project-level patch support remain unchanged.
+
+### Breaking Changes
+- **CI workflows must now run `flutpak generate` before `flatpak-builder`.**
+  Previously, patch sources were baked into `generated-sources.json` at `init`
+  time, so a committed JSON file was sufficient for CI. Now all patch sources
+  (`type: patch`) are injected into the manifest by `flutpak generate` at build
+  time. Update your CI pipeline:
+  ```yaml
+  # before
+  - run: flutpak prepare
+  - run: flatpak-builder ... flatpak/<app-id>.yaml
+
+  # after
+  - run: flutpak prepare
+  - run: flutpak generate
+  - run: flatpak-builder ... flatpak/generated/<app-id>.yaml
+  ```
+
+
 ## [0.4.0-beta.1] - 2026-05-21
 
 ### Notes
@@ -320,7 +378,8 @@ git remote.
   output files
 - MIT License
 
-[Unreleased]: https://github.com/o-murphy/flutpak/compare/v0.4.0-beta.1...HEAD
+[Unreleased]: https://github.com/o-murphy/flutpak/compare/v0.4.0-beta.2...HEAD
+[0.4.0-beta.2]: https://github.com/o-murphy/flutpak/compare/v0.4.0-beta.1...v0.4.0-beta.2
 [0.4.0-beta.1]: https://github.com/o-murphy/flutpak/compare/v0.3.0...v0.4.0-beta.1
 [0.3.0]: https://github.com/o-murphy/flutpak/compare/v0.2.8...v0.3.0
 [0.2.8]: https://github.com/o-murphy/flutpak/compare/v0.2.7...v0.2.8
