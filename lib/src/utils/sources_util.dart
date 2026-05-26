@@ -17,6 +17,7 @@ Future<void> generateSourcesJson({
   required String outputPath,
   required bool pubOnly,
   required bool flutterOnly,
+  bool emitFlutterPatch = true,
 }) async {
   final allSources = <Map<String, dynamic>>[];
   final cache = LocalDownloadCache();
@@ -38,6 +39,7 @@ Future<void> generateSourcesJson({
         sdkPath: sdkPath,
         patchPath: patchPath,
         outputDir: outputDir,
+        includePatchInSources: emitFlutterPatch,
         cache: cache,
       ).generate();
     }

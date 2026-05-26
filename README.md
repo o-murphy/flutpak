@@ -13,7 +13,7 @@ build to produce a fully-substituted, `flatpak-builder`-ready output.
 - **No Python** — pure Dart, compiles to a single native binary for CI
 - **Config in `pubspec.yaml`** — same pattern as `msix_config`, `flutter_native_splash`
 - **Placeholder substitution** — `__FLATPAK_TAG__` and `__FLATPAK_COMMIT__` are resolved by `generate` at build time, never baked into the template
-- **Patches registry** — known packages (e.g. `objectbox_flutter_libs`) get their patches resolved automatically
+- **Patches registry** — known packages (e.g. `objectbox_flutter_libs`) get their patches resolved and injected into the generated manifest automatically at `generate` time
 - **Validation on every run** — `generate` errors early if the template is missing placeholders or its fields diverge from config
 - **Retry on transient errors** — pub.dev and Flutter artifact downloads retry on 429/5xx
 
@@ -254,19 +254,19 @@ Open `flatpak/<app_id>.yml` and adjust `build-commands`, `sdk-extensions`,
 `finish-args`, and any other fields for your project. The template is yours —
 `flutpak` never overwrites it on subsequent runs.
 
-**Important:** keep `__FLATPAK_TAG__` and `__FLATPAK_COMMIT__` in the sources
-section. `generate` requires both placeholders and will error if either is
-missing.
+The generated template already contains inline guidance comments that explain
+which sections are safe to edit. Key rules:
 
-| Section | Safe to edit? |
+| Section | Guidance |
 |---|---|
-| `finish-args:` | Yes |
-| `build-commands:` | Yes |
-| `build-options:` | Yes |
-| `sdk-extensions:` | Yes |
-| `modules:` | Yes |
-| `sources:` (extra archives, patches) | Yes |
-| `__FLATPAK_TAG__` / `__FLATPAK_COMMIT__` in sources | **Do not remove** — required by `generate` |
+| `finish-args:` | Safe to edit — add/remove sandbox permissions |
+| `build-commands:` | Safe to edit — add steps, adjust install paths |
+| `build-options:` | Safe to edit — add env vars, path overrides |
+| `sdk-extensions:` | Safe to edit |
+| `modules:` | Safe to edit — add extra modules |
+| `sources:` — extra archives | Safe to add/remove |
+| `__FLATPAK_TAG__` / `__FLATPAK_COMMIT__` | **Do not remove** — required by `generate` |
+| Patch sources (`type: patch`) | **Do not add manually** — injected automatically by `generate` from your `patches:` config; adding them to the template causes duplicates |
 
 ---
 
@@ -494,6 +494,14 @@ flutpak sources [--lock <path>] [--sdk <path>] [--output <dir>]
 
 Generate all sources (pub + Flutter SDK) combined into a single
 `generated-sources.json`.
+
+> [!NOTE]
+> **`pub`, `flutter`, and `sources` are for advanced / standalone use.**
+> They are intended for users who write their Flatpak manifest by hand and need
+> only the source list as a JSON file to embed themselves. In the standard
+> `init` + `generate` workflow you never need to call them directly — `generate`
+> handles source generation internally and injects patch sources into the
+> generated manifest automatically.
 
 ### `sdk-ext`
 
@@ -783,6 +791,11 @@ download URLs for each artifact — Dart SDK, engine binaries, fonts, and the
 Gradle wrapper — for both `x86_64` and `aarch64`. SHA-256 checksums are cached
 in `~/.cache/flutpak/` by URL hash to avoid redundant downloads across runs.
 
+All sources (pub + Flutter SDK) are combined into a single
+`generated-sources.json`. This matches the convention expected by Flathub
+reviewers — splitting into multiple files offers no practical benefit and
+typically prompts questions during review.
+
 Two extra entries are always added:
 
 - **`sky_engine/pubspec.yaml` (inline)** — `packages/sky_engine/` was removed
@@ -800,22 +813,27 @@ fallback chain:
 
 ### Patches registry
 
-`flutpak` ships a built-in registry of patches for packages that need special
-handling inside the Flatpak sandbox. Patches are applied automatically when the
-package is found in any of your lock files.
-
-| Package | What the patch does |
-|---|---|
-| `objectbox_flutter_libs` | Replaces prebuilt binary download with a local objectbox-c archive |
-| `sqflite_common_ffi` | Adjusts CMake for sandbox builds |
-
-Registry entries may specify a version constraint (semver range) to limit which
-package versions the patch applies to. Project-level `patches:` entries always
-take priority over registry entries for the same package.
+**Patch injection happens at `generate` time, not `init` time.** The template
+manifest contains no `type: patch` entries — this is by design. On every
+`generate` run, `flutpak` resolves the current package versions from
+`pubspec.lock` and injects the correct `type: patch` entries (with accurate
+`dest: .pub-cache/hosted/pub.dev/<package>-<version>` paths) into the generated
+manifest after the `generated-sources.json` line. Patch files themselves are
+committed to `flatpak/patches/` and copied to `generated/patches/` during
+generation.
 
 The built-in Flutter bootstrap patch (`shared.sh.patch`) replaces
 `pub upgrade` (requires network) with `pub get --offline` inside the Flutter
-SDK's `shared.sh` bootstrap script.
+SDK's `shared.sh` bootstrap script. It is injected directly into the generated
+manifest's `sources:` section and applied automatically — no configuration
+needed. For pure Dart projects (`--pub-only`) it is skipped entirely.
+
+**Known patches for common packages** are maintained as reference files in the
+[`known-patches/`](known-patches/) directory of this repository, with usage
+instructions in [`known-patches/PATCHES.md`](known-patches/PATCHES.md).
+Copy the relevant `.patch` file to your project's `flatpak/patches/` directory
+and reference it via the `patches:` config key — `flutpak generate` will then
+copy it to `generated/patches/` and inject it into the manifest automatically.
 
 ### Wrapper script
 
@@ -841,9 +859,12 @@ placeholder strings:
 - `__FLATPAK_TAG__` — replaced by the git tag (e.g. `v1.2.3`) or HEAD SHA
 - `__FLATPAK_COMMIT__` — replaced by the full commit SHA
 
-`generate` copies the template to `flatpak/generated/<app_id>.yml` and
-substitutes the placeholders. The template is never modified; the generated
-file is gitignored and rebuilt on every CI run.
+`generate` copies the template to `flatpak/generated/<app_id>.yml`,
+substitutes the placeholders, and **injects patch sources** immediately after
+the `generated-sources.json` reference. Patches are never baked into the
+template — they are resolved from `pubspec.lock` at generate time so the
+`dest:` path always contains the correct package version. The template is
+never modified; the generated file is gitignored and rebuilt on every CI run.
 
 `generate` also validates consistency between the template and config before
 writing anything:

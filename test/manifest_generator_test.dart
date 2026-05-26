@@ -144,25 +144,26 @@ void main() {
       expect(yaml, contains('- generated-sources.json'));
     });
 
-    test('includes patch sources with correct dest', () {
-      final patches = [
-        PatchEntry(
-          package: 'objectbox_flutter_libs',
-          version: '5.3.1',
-          path: 'flatpak/patches/objectbox.patch',
-        ),
-      ];
+    test('does not include patch sources (injected at generate time)', () {
       final yaml = ManifestGenerator(
         cfg: _baseConfig(command: 'myapp'),
         generatedSourcesPath: 'flatpak/generated-sources.json',
-        patchEntries: patches,
       ).generate();
 
-      expect(yaml, contains('type: patch'));
-      // Path is made relative to manifest dir (flatpak/), so flatpak/ prefix is stripped.
-      expect(yaml, contains('path: patches/objectbox.patch'));
-      expect(yaml,
-          contains('.pub-cache/hosted/pub.dev/objectbox_flutter_libs-5.3.1'));
+      expect(yaml, isNot(contains('type: patch')));
+      expect(yaml, contains('"flutpak generate" injects patch sources'));
+    });
+
+    test('header contains template guidance comments', () {
+      final yaml = ManifestGenerator(
+        cfg: _baseConfig(command: 'myapp'),
+        generatedSourcesPath: 'flatpak/generated-sources.json',
+      ).generate();
+
+      expect(yaml, contains('editable TEMPLATE manifest'));
+      expect(yaml, contains('SAFE TO EDIT'));
+      expect(yaml, contains('DO NOT REMOVE'));
+      expect(yaml, contains('AUTO-INJECTED'));
     });
 
     test('includes Flutter cache stamp copy commands when hasFlutter is true',
