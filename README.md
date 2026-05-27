@@ -49,6 +49,8 @@ build to produce a fully-substituted, `flatpak-builder`-ready output.
   - [Manifest lifecycle](#manifest-lifecycle)
   - [CI/CD integration](#cicd-integration)
     - [`setup-flutpak` action](#setup-flutpak-action)
+    - [`generate` action](#generate-action)
+    - [`build-flatpak` action](#build-flatpak-action)
     - [Release workflow example](#release-workflow-example)
   - [Validating and building locally](#validating-and-building-locally)
     - [Install toolchain](#install-toolchain)
@@ -608,10 +610,132 @@ The action also exports `FLUTTER_ROOT` and `FLUTTER_HOME` env vars and adds
 `flutter/bin` to `$PATH`, so `flutpak generate` picks up the SDK automatically
 without an explicit `--sdk` flag.
 
+### `generate` action
+
+Runs `flutpak generate`, validates metainfo, and uploads the generated manifest
+and sources as a workflow artifact. Requires Flutter to be installed beforehand
+(e.g. via the `flutter` action above).
+
+```yaml
+- uses: o-murphy/flutpak/.github/actions/generate@main
+  with:
+    tag: ${{ inputs.tag }}      # or pass 'commit:' for non-tag builds
+    # commit: ${{ github.sha }} # used when 'tag' is empty
+    metainfo-path: app/share/metainfo/<app_id>.metainfo.xml
+    artifact-name: flatpak-generated
+```
+
+| Input | Description | Default |
+|---|---|---|
+| `tag` | Git tag to embed in the manifest (mutually exclusive with `commit`) | — |
+| `commit` | Commit SHA; defaults to `github.sha` when empty | — |
+| `sdk` | Flutter SDK path; auto-detected from `FLUTTER_ROOT` or `flutter` in `PATH` | — |
+| `metainfo-path` | Path to `.metainfo.xml`; `appstream` is installed automatically if needed | — |
+| `artifact-name` | Upload generated files under this artifact name | `flutpak-artifacts` |
+| `retention-days` | Artifact retention in days | `2` |
+| `flutpak-version` | flutpak version to install; defaults to the same ref as the `uses:` directive | — |
+
+### `build-flatpak` action
+
+Installs `org.flatpak.Builder`, lints the manifest, builds via `flathub-build`,
+lints the repo, exports a `.flatpak` bundle, and optionally uploads it.
+
+```yaml
+- uses: o-murphy/flutpak/.github/actions/build-flatpak@main
+  id: build
+  with:
+    manifest: flatpak/generated/<app_id>.yml
+    app-id: io.github.YourOrg.YourApp
+    artifact-name: myapp-flatpak
+    github-token: ${{ secrets.GITHUB_TOKEN }}   # for private source downloads
+
+# Downstream steps can reference:
+# ${{ steps.build.outputs.bundle }}       — path to the .flatpak file
+# ${{ steps.build.outputs.arch }}         — x86_64 or aarch64
+# ${{ steps.build.outputs.artifact-url }} — download URL of the uploaded artifact
+```
+
+| Input | Description | Default |
+|---|---|---|
+| `manifest` | Path to the generated Flatpak manifest | **required** |
+| `app-id` | Flatpak application ID | **required** |
+| `arch` | Target architecture (`x86_64` or `aarch64`); auto-detected from `flatpak --default-arch` | — |
+| `bundle` | Output `.flatpak` filename | `<app-id>_<arch>.flatpak` |
+| `artifact-name` | Upload bundle under this artifact name; skip upload if empty | — |
+| `retention-days` | Artifact retention in days | `2` |
+| `github-token` | GitHub token written to `~/.netrc` for private source downloads | — |
+
+| Output | Description |
+|---|---|
+| `bundle` | Path to the exported `.flatpak` bundle |
+| `arch` | Architecture used for the build |
+| `artifact-url` | Download URL of the uploaded artifact (empty if `artifact-name` is unset) |
+
 ### Release workflow example
+
+The `generate` and `build-flatpak` actions let you split generation (runs once)
+from building (can fan out across multiple architectures):
 
 ```yaml
 name: Flatpak release
+
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # required for --tag to resolve the commit
+
+      - uses: o-murphy/flutpak/.github/actions/flutter@main
+        id: flutter
+        with:
+          flutter-version: stable
+          cache: true
+
+      - run: flutter pub get
+
+      - uses: o-murphy/flutpak/.github/actions/generate@main
+        with:
+          tag: ${{ github.ref_name }}
+          metainfo-path: app/share/metainfo/<app_id>.metainfo.xml
+          artifact-name: flatpak-generated
+
+  build:
+    needs: generate
+    strategy:
+      matrix:
+        arch: [amd64, arm64]
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: flatpak-generated
+          path: flatpak/generated
+
+      - uses: o-murphy/flutpak/.github/actions/build-flatpak@main
+        id: build
+        with:
+          manifest: flatpak/generated/<app_id>.yml
+          app-id: io.github.YourOrg.YourApp
+          artifact-name: myapp-${{ matrix.arch }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+```
+
+For a minimal single-job workflow that uses `setup-flutpak` + manual steps, see
+the legacy example below.
+
+<details>
+<summary>Legacy single-job example (manual steps)</summary>
+
+```yaml
+name: Flatpak release (manual)
 
 on:
   push:
@@ -623,7 +747,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0          # required for --tag to resolve the commit
+          fetch-depth: 0
 
       - uses: o-murphy/flutpak/.github/actions/setup-flutpak@main
 
@@ -634,23 +758,10 @@ jobs:
 
       - run: flutter pub get
 
-      - name: Generate Flatpak manifest
-        run: flutpak generate --tag ${{ github.ref_name }}
-
-      - name: Upload generated artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: flatpak-generated
-          path: flatpak/generated/
-          retention-days: 90
-          if-no-files-found: error
+      - run: flutpak generate --tag ${{ github.ref_name }}
 ```
 
-`flatpak-builder` is then pointed at `flatpak/generated/<app_id>.yml`.
-
-For a full workflow that includes linting, building, exporting a `.flatpak`
-bundle, and uploading a Flathub submission artifact, add the steps described
-in [Validating and building locally](#validating-and-building-locally).
+</details>
 
 ---
 

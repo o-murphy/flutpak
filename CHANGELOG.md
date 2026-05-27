@@ -8,6 +8,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 
+## [0.4.0-beta.3] - 2026-05-27
+
+### Added
+- `scripts/flatpak-build.sh` — shared shell library with reusable Flatpak build
+  functions (`_dbus_run`, `install_flatpak_builder`, `lint_flatpak_manifest`,
+  `build_flatpak`, `lint_flatpak_repo`, `export_flatpak_bundle`); sourced by both
+  composite actions and local scripts.
+- `actions/generate` composite action — installs flutpak, optionally fetches the
+  target tag so `--tag` SHA resolution works with `--depth=1` checkouts, auto-detects
+  the Flutter SDK path from `FLUTTER_ROOT` or `PATH`, runs `flutpak generate`,
+  auto-installs `appstream` and validates metainfo when `metainfo-path` is set,
+  and uploads the generated manifest + sources as a workflow artifact.
+- `actions/build-flatpak` composite action — installs `org.flatpak.Builder`,
+  lints the manifest, builds the Flatpak via `flathub-build`, lints the resulting
+  repo, exports a `.flatpak` bundle, and optionally uploads it as a workflow
+  artifact. Outputs `bundle`, `arch`, and `artifact-url`.
+
+### Changed
+- All `${{ inputs.* }}` expansions inside shell steps in composite actions replaced
+  with `env:` variable declarations to prevent shell injection.
+
+
 ## [0.4.0-beta.2] - 2026-05-26
 
 ### Fixed
@@ -378,7 +400,8 @@ git remote.
   output files
 - MIT License
 
-[Unreleased]: https://github.com/o-murphy/flutpak/compare/v0.4.0-beta.2...HEAD
+[Unreleased]: https://github.com/o-murphy/flutpak/compare/v0.4.0-beta.3...HEAD
+[0.4.0-beta.3]: https://github.com/o-murphy/flutpak/compare/v0.4.0-beta.2...v0.4.0-beta.3
 [0.4.0-beta.2]: https://github.com/o-murphy/flutpak/compare/v0.4.0-beta.1...v0.4.0-beta.2
 [0.4.0-beta.1]: https://github.com/o-murphy/flutpak/compare/v0.3.0...v0.4.0-beta.1
 [0.3.0]: https://github.com/o-murphy/flutpak/compare/v0.2.8...v0.3.0
