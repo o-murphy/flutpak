@@ -42,10 +42,37 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Install flutpak
-      uses: o-murphy/flutpak/.github/actions/setup-flutpak@claude/keen-bell-8zyAK
+    - name: Set up Dart SDK
+      uses: dart-lang/setup-dart@v1
       with:
-        version: ${{ inputs.flutpak-version }}
+        sdk: stable
+
+    - name: Build and install flutpak
+      shell: bash
+      env:
+        INPUT_VERSION: ${{ inputs.flutpak-version }}
+      run: |
+        if [ -n "$INPUT_VERSION" ]; then
+          git clone https://github.com/o-murphy/flutpak.git "$RUNNER_TEMP/flutpak-src"
+          git -C "$RUNNER_TEMP/flutpak-src" fetch --tags
+          git -C "$RUNNER_TEMP/flutpak-src" checkout "$INPUT_VERSION"
+          SRC_DIR="$RUNNER_TEMP/flutpak-src"
+        else
+          # Build from the same ref this action was checked out at.
+          # GITHUB_ACTION_PATH points to .github/actions/generate/ inside
+          # the flutpak repo; three levels up is the repo root.
+          SRC_DIR="$GITHUB_ACTION_PATH/../../.."
+        fi
+        cd "$SRC_DIR"
+        dart run tool/update_version.dart
+        dart pub get
+        dart compile exe bin/flutpak.dart -o "$RUNNER_TEMP/flutpak"
+        sudo mv "$RUNNER_TEMP/flutpak" /usr/local/bin/flutpak
+        sudo chmod +x /usr/local/bin/flutpak
+
+    - name: Verify flutpak installation
+      shell: bash
+      run: flutpak --version
 
     - name: Fetch tag
       if: inputs.tag != ''
