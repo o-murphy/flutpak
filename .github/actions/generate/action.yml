@@ -1,0 +1,123 @@
+name: Flutpak generate
+description: >
+  Runs flutpak generate, optionally validates metainfo,
+  and uploads the generated manifest + sources as an artifact.
+  If metainfo-path is set, appstream is installed automatically.
+
+inputs:
+  tag:
+    description: "Git tag to pin in the manifest (mutually exclusive with commit)"
+    required: false
+    default: ""
+  commit:
+    description: "Commit SHA to pin in the manifest (defaults to github.sha)"
+    required: false
+    default: ""
+  sdk:
+    description: >
+      Path to Flutter SDK root. Auto-detected from FLUTTER_ROOT env var
+      or 'flutter' in PATH if not set.
+    required: false
+    default: ""
+  metainfo-path:
+    description: "Path to .metainfo.xml for appstreamcli validation. Skip if empty."
+    required: false
+    default: ""
+  artifact-name:
+    description: "Name for the uploaded submission artifact"
+    required: false
+    default: "flutpak-artifacts"
+  retention-days:
+    description: "Artifact retention in days"
+    required: false
+    default: "2"
+  flutpak-version:
+    description: >
+      flutpak version to install (tag, branch, or commit SHA).
+      If empty, uses the ref from the 'uses:' directive — same behaviour
+      as setup-flutpak's version input.
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - name: Install flutpak
+      uses: o-murphy/flutpak/.github/actions/setup-flutpak@claude/keen-bell-8zyAK
+      with:
+        version: ${{ inputs.flutpak-version }}
+
+    - name: Fetch tag
+      if: inputs.tag != ''
+      shell: bash
+      env:
+        INPUT_TAG: ${{ inputs.tag }}
+      run: |
+        git fetch origin "refs/tags/${INPUT_TAG}:refs/tags/${INPUT_TAG}" --depth=1 \
+          || git fetch --tags --depth=1
+
+    - name: Resolve SDK path
+      id: sdk
+      shell: bash
+      env:
+        INPUT_SDK: ${{ inputs.sdk }}
+      run: |
+        SDK="$INPUT_SDK"
+        if [ -z "$SDK" ]; then
+          if [ -n "${FLUTTER_ROOT:-}" ]; then
+            SDK="$FLUTTER_ROOT"
+          elif command -v flutter &>/dev/null; then
+            SDK="$(dirname "$(dirname "$(command -v flutter)")")"
+          else
+            echo "ERROR: Flutter SDK not found. Set FLUTTER_ROOT, add flutter to PATH, or pass sdk input." >&2
+            exit 1
+          fi
+        fi
+        echo "path=$SDK" >> "$GITHUB_OUTPUT"
+
+    - name: Set ref flag
+      id: ref
+      shell: bash
+      env:
+        INPUT_TAG: ${{ inputs.tag }}
+        INPUT_COMMIT: ${{ inputs.commit }}
+        GITHUB_SHA: ${{ github.sha }}
+      run: |
+        if [ -n "$INPUT_TAG" ]; then
+          echo "flag=--tag"    >> "$GITHUB_OUTPUT"
+          echo "value=$INPUT_TAG" >> "$GITHUB_OUTPUT"
+        else
+          echo "flag=--commit" >> "$GITHUB_OUTPUT"
+          echo "value=${INPUT_COMMIT:-$GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Flutpak generate
+      shell: bash
+      env:
+        REF_FLAG: ${{ steps.ref.outputs.flag }}
+        REF_VALUE: ${{ steps.ref.outputs.value }}
+        SDK_PATH: ${{ steps.sdk.outputs.path }}
+      run: flutpak generate "$REF_FLAG" "$REF_VALUE" --sdk "$SDK_PATH"
+
+    - name: Install appstream
+      if: inputs.metainfo-path != ''
+      shell: bash
+      run: |
+        if ! command -v appstreamcli &>/dev/null; then
+          sudo apt-get update -qq
+          sudo apt-get install -y appstream
+        fi
+
+    - name: Validate metainfo
+      if: inputs.metainfo-path != ''
+      shell: bash
+      env:
+        INPUT_METAINFO_PATH: ${{ inputs.metainfo-path }}
+      run: appstreamcli validate --explain --no-net "$INPUT_METAINFO_PATH"
+
+    - name: Upload submission artifacts
+      uses: actions/upload-artifact@v7
+      with:
+        name: ${{ inputs.artifact-name }}
+        path: flatpak/generated/
+        retention-days: ${{ inputs.retention-days }}
