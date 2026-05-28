@@ -9,11 +9,22 @@ class PatchEntry {
   final String path;
   final String? destSubpath;
 
+  /// Extra flags forwarded to the `patch` command via the flatpak-builder
+  /// patch source `options` field (e.g. `["--ignore-whitespace"]`).
+  final List<String> options;
+
+  /// When true, a `type: shell` source is injected before this patch to strip
+  /// trailing `\r` from the target file. Use this when the pub.dev archive for
+  /// the package has CRLF line endings but the patch file uses LF.
+  final bool stripTrailingCr;
+
   const PatchEntry({
     required this.package,
     this.version,
     required this.path,
     this.destSubpath,
+    this.options = const [],
+    this.stripTrailingCr = false,
   });
 
   /// Resolves the dest path for this patch given the package version.
@@ -23,11 +34,14 @@ class PatchEntry {
   }
 
   factory PatchEntry.fromYaml(Map yaml) {
+    final options = (yaml['options'] as List?)?.cast<String>() ?? [];
     return PatchEntry(
       package: yaml['package'] as String,
       version: yaml['version'] as String?,
       path: yaml['path'] as String,
       destSubpath: yaml['dest_subpath'] as String?,
+      options: options,
+      stripTrailingCr: yaml['strip_trailing_cr'] as bool? ?? false,
     );
   }
 }
