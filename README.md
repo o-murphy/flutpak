@@ -349,7 +349,10 @@ flutpak:
   patches:                           # optional project-level patches
     - package: objectbox_flutter_libs
       path: flatpak/patches/objectbox.patch
-      dest_subpath: linux
+      dest_subpath: linux            # optional: subdirectory inside package root
+      strip_trailing_cr: true        # optional: strip \r before patching (CRLF sources)
+      options:                       # optional: extra flags passed to patch(1)
+        - --some-flag
 
   manifest:
     app_id: io.github.YourOrg.YourApp  # required
@@ -401,6 +404,8 @@ flutpak:
 | `flutter.patch` | string | — | Custom patch for `setup-flutter.sh` |
 | `flutter_version_file` | string | `<output>/flutter.version` | Written when Flutter is configured |
 | `patches` | list | `[]` | Project-level package patches |
+| `patches[].options` | list | `[]` | Extra flags forwarded to `patch(1)` |
+| `patches[].strip_trailing_cr` | bool | `false` | Inject a `sed -i 's/\r//'` shell step before patching; use when the upstream pub.dev archive has CRLF line endings |
 | `manifest.app_id` | string | **required** | Reverse-DNS app ID |
 | `manifest.runtime_version` | string | `25.08` | Freedesktop runtime version |
 | `manifest.command` | string | last segment of `app_id` | Executable name inside `/app/bin/` |
@@ -945,6 +950,19 @@ instructions in [`known-patches/PATCHES.md`](known-patches/PATCHES.md).
 Copy the relevant `.patch` file to your project's `flatpak/patches/` directory
 and reference it via the `patches:` config key — `flutpak generate` will then
 copy it to `generated/patches/` and inject it into the manifest automatically.
+
+Some upstream packages ship sources with CRLF line endings (e.g.
+`objectbox_flutter_libs` ≥ 5.3.2). GNU `patch(1)` fails with "different line
+endings" in this case even with `--ignore-whitespace`. Use `strip_trailing_cr:
+true` instead — flutpak injects a `type: shell` source that runs
+`sed -i 's/\r//'` on the target file before the patch is applied:
+
+```yaml
+patches:
+  - package: objectbox_flutter_libs
+    path: flatpak/patches/objectbox_flutter_libs/CMakeLists.txt.patch
+    strip_trailing_cr: true
+```
 
 ### Wrapper script
 

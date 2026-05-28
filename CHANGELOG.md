@@ -8,6 +8,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 
+## [0.4.0-beta.4] - 2026-05-27
+
+### Added
+- `patches[].options` config key — extra flags forwarded to the `patch(1)`
+  command via the flatpak-builder patch source `options` field.
+- `patches[].strip_trailing_cr` config key — when `true`, flutpak injects a
+  `type: shell` source before the patch that runs `sed -i 's/\r//'` on the
+  target file. Use this when the upstream pub.dev archive ships sources with
+  CRLF line endings (e.g. `objectbox_flutter_libs` ≥ 5.3.2); GNU `patch(1)`
+  does not reliably handle CRLF/LF mismatches even with `--ignore-whitespace`.
+- `known-patches/objectbox_flutter_libs/5.3.2/CMakeLists.txt.patch` — known
+  patch for `objectbox_flutter_libs` 5.3.2 (same `OBJECTBOX_PREBUILT_DIR`
+  logic as 5.3.1; use with `strip_trailing_cr: true` due to CRLF sources).
+
+### Fixed
+- `patches[].options` and `patches[].strip_trailing_cr` were silently dropped
+  when `version` was omitted from the patch entry and back-filled from the lock
+  file; `resolvePatchEntries` now preserves all fields during version resolution.
+
+
 ## [0.4.0-beta.3] - 2026-05-27
 
 ### Added

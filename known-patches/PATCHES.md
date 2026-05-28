@@ -74,3 +74,55 @@ flutpak:
     - package: objectbox_flutter_libs
       path: flatpak/patches/objectbox_flutter_libs/CMakeLists.txt.patch
 ```
+
+---
+
+## `objectbox_flutter_libs/5.3.2/CMakeLists.txt.patch`
+
+**Package:** `objectbox_flutter_libs`  
+**Version:** `5.3.2`  
+**What it does:** Same as the 5.3.1 patch — adds `OBJECTBOX_PREBUILT_DIR` support
+for offline/sandboxed Flatpak builds.
+
+> **Note on line endings:** `objectbox_flutter_libs` 5.3.2 ships
+> `linux/CMakeLists.txt` with CRLF line endings in the pub.dev archive, while
+> this patch is stored with LF. Use `strip_trailing_cr: true` so flutpak injects
+> a `type: shell` source that runs `sed -i 's/\r//'` on the file before the patch
+> is applied. GNU `patch(1)` does not reliably handle CRLF/LF mismatches even
+> with `--ignore-whitespace`.
+
+**Usage:**
+
+1. Add the objectbox-c prebuilt archive to `extra_sources` in your config:
+
+```yaml
+flutpak:
+  manifest:
+    env:
+      OBJECTBOX_PREBUILT_DIR: /run/build/<appname>/objectbox-c
+    extra_sources:
+      - type: archive
+        only-arches: [x86_64]
+        url: https://github.com/objectbox/objectbox-c/releases/download/v5.3.2/objectbox-linux-x64.tar.gz
+        sha256: 6dbb5450c36dd11ee9074f16ecc61e79b45ff43c2082934601f3166b39c8a613
+        dest: objectbox-c
+        strip-components: 0
+      - type: archive
+        only-arches: [aarch64]
+        url: https://github.com/objectbox/objectbox-c/releases/download/v5.3.2/objectbox-linux-aarch64.tar.gz
+        sha256: bdfbfbf4971057e11018ca6645697d8a40ebc7df56ccde63397cbb0e0609c0e8
+        dest: objectbox-c
+        strip-components: 0
+```
+
+2. Copy this patch to `flatpak/patches/objectbox_flutter_libs/CMakeLists.txt.patch`
+
+3. Add to your `flutpak.yaml`:
+
+```yaml
+flutpak:
+  patches:
+    - package: objectbox_flutter_libs
+      path: flatpak/patches/objectbox_flutter_libs/CMakeLists.txt.patch
+      strip_trailing_cr: true
+```

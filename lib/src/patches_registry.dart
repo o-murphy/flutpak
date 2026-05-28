@@ -75,6 +75,8 @@ List<PatchEntry> resolvePatchEntries({
         version: lockedVersions[p.package],
         path: p.path,
         destSubpath: p.destSubpath,
+        options: p.options,
+        stripTrailingCr: p.stripTrailingCr,
       ));
     }
   }
