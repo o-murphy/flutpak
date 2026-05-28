@@ -8,6 +8,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 
+## [0.4.0-beta.4] - 2026-05-27
+
+### Added
+- `patches[].options` config key — extra flags forwarded to the `patch(1)`
+  command via the flatpak-builder patch source `options` field.
+- `patches[].strip_trailing_cr` config key — when `true`, flutpak injects a
+  `type: shell` source before the patch that runs `sed -i 's/\r//'` on the
+  target file. Use this when the upstream pub.dev archive ships sources with
+  CRLF line endings (e.g. `objectbox_flutter_libs` ≥ 5.3.2); GNU `patch(1)`
+  does not reliably handle CRLF/LF mismatches even with `--ignore-whitespace`.
+- `known-patches/objectbox_flutter_libs/5.3.2/CMakeLists.txt.patch` — known
+  patch for `objectbox_flutter_libs` 5.3.2 (same `OBJECTBOX_PREBUILT_DIR`
+  logic as 5.3.1; use with `strip_trailing_cr: true` due to CRLF sources).
+
+### Fixed
+- `patches[].options` and `patches[].strip_trailing_cr` were silently dropped
+  when `version` was omitted from the patch entry and back-filled from the lock
+  file; `resolvePatchEntries` now preserves all fields during version resolution.
+
+
 ## [0.4.0-beta.3] - 2026-05-27
 
 ### Added
@@ -400,19 +420,20 @@ git remote.
   output files
 - MIT License
 
-[Unreleased]: https://github.com/o-murphy/flutpak/compare/v0.4.0-beta.3...HEAD
-[0.4.0-beta.3]: https://github.com/o-murphy/flutpak/compare/v0.4.0-beta.2...v0.4.0-beta.3
-[0.4.0-beta.2]: https://github.com/o-murphy/flutpak/compare/v0.4.0-beta.1...v0.4.0-beta.2
-[0.4.0-beta.1]: https://github.com/o-murphy/flutpak/compare/v0.3.0...v0.4.0-beta.1
-[0.3.0]: https://github.com/o-murphy/flutpak/compare/v0.2.8...v0.3.0
-[0.2.8]: https://github.com/o-murphy/flutpak/compare/v0.2.7...v0.2.8
-[0.2.7]: https://github.com/o-murphy/flutpak/compare/v0.2.6...v0.2.7
-[0.2.6]: https://github.com/o-murphy/flutpak/compare/v0.2.5...v0.2.6
-[0.2.5]: https://github.com/o-murphy/flutpak/compare/v0.2.4...v0.2.5
-[0.2.4]: https://github.com/o-murphy/flutpak/compare/v0.2.3...v0.2.4
-[0.2.3]: https://github.com/o-murphy/flutpak/compare/v0.2.2...v0.2.3
-[0.2.2]: https://github.com/o-murphy/flutpak/compare/v0.2.1...v0.2.2
-[0.2.1]: https://github.com/o-murphy/flutpak/compare/v0.2.0...v0.2.1
-[0.2.0]: https://github.com/o-murphy/flutpak/compare/v0.1.1...v0.2.0
+[Unreleased]: https://github.com/o-murphy/flutpak/compare/v0.4.0-beta.4...HEAD
+[0.4.0-beta.4]: https://github.com/o-murphy/flutpak/releases/tag/v0.4.0-beta.4
+[0.4.0-beta.3]: https://github.com/o-murphy/flutpak/releases/tag/v0.4.0-beta.3
+[0.4.0-beta.2]: https://github.com/o-murphy/flutpak/releases/tag/v0.4.0-beta.2
+[0.4.0-beta.1]: https://github.com/o-murphy/flutpak/releases/tag/v0.4.0-beta.1
+[0.3.0]: https://github.com/o-murphy/flutpak/releases/tag/v0.3.0
+[0.2.8]: https://github.com/o-murphy/flutpak/releases/tag/v0.2.8
+[0.2.7]: https://github.com/o-murphy/flutpak/releases/tag/v0.2.7
+[0.2.6]: https://github.com/o-murphy/flutpak/releases/tag/v0.2.6
+[0.2.5]: https://github.com/o-murphy/flutpak/releases/tag/v0.2.5
+[0.2.4]: https://github.com/o-murphy/flutpak/releases/tag/v0.2.4
+[0.2.3]: https://github.com/o-murphy/flutpak/releases/tag/v0.2.3
+[0.2.2]: https://github.com/o-murphy/flutpak/releases/tag/v0.2.2
+[0.2.1]: https://github.com/o-murphy/flutpak/releases/tag/v0.2.1
+[0.2.0]: https://github.com/o-murphy/flutpak/releases/tag/v0.2.0
 [0.1.1]: https://github.com/o-murphy/flutpak/releases/tag/v0.1.1
 [0.1.0]: https://github.com/o-murphy/flutpak/releases/tag/v0.1.0

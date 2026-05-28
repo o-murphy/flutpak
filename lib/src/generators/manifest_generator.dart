@@ -367,17 +367,49 @@ String injectPatchSources(
     final relFromPatchesDir =
         p.relative(p.absolute(patch.path), from: absPatchesDir);
     final patchPath = 'patches/$relFromPatchesDir';
+
+    if (patch.stripTrailingCr && dest != null) {
+      final targetFile = _parsePatchTarget(patch.path);
+      if (targetFile != null) {
+        buf.writeln('      - type: shell');
+        buf.writeln('        commands:');
+        buf.writeln("          - sed -i 's/\\r//' $dest/$targetFile");
+      }
+    }
+
     buf.writeln('      - type: patch');
     if (dest != null) {
       buf.writeln('        dest: $dest');
     }
     buf.writeln('        path: $patchPath');
+    if (patch.options.isNotEmpty) {
+      buf.writeln('        options:');
+      for (final opt in patch.options) {
+        buf.writeln('          - $opt');
+      }
+    }
   }
 
   return content.replaceFirstMapped(
     RegExp(r'([ \t]*-[ \t]+generated-sources\.json\n)', multiLine: true),
     (m) => '${m.group(0)}${buf.toString()}',
   );
+}
+
+/// Reads the first `--- a/<path>` line of a unified diff and returns the
+/// target file path with the leading `a/` stripped (i.e. the path after `-p1`
+/// stripping). Returns null if the header is not found or the file cannot be read.
+String? _parsePatchTarget(String patchPath) {
+  try {
+    for (final line in File(patchPath).readAsLinesSync()) {
+      if (line.startsWith('--- ')) {
+        final path = line.substring(4).trim();
+        if (path == '/dev/null') return null;
+        return path.startsWith('a/') ? path.substring(2) : path;
+      }
+    }
+  } catch (_) {}
+  return null;
 }
 
 /// Pins screenshot URLs in a metainfo XML file from `/main/` to [ref].
