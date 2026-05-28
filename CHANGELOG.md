@@ -420,19 +420,20 @@ git remote.
   output files
 - MIT License
 
-[Unreleased]: https://github.com/o-murphy/flutpak/compare/v0.4.0-beta.3...HEAD
-[0.4.0-beta.3]: https://github.com/o-murphy/flutpak/compare/v0.4.0-beta.2...v0.4.0-beta.3
-[0.4.0-beta.2]: https://github.com/o-murphy/flutpak/compare/v0.4.0-beta.1...v0.4.0-beta.2
-[0.4.0-beta.1]: https://github.com/o-murphy/flutpak/compare/v0.3.0...v0.4.0-beta.1
-[0.3.0]: https://github.com/o-murphy/flutpak/compare/v0.2.8...v0.3.0
-[0.2.8]: https://github.com/o-murphy/flutpak/compare/v0.2.7...v0.2.8
-[0.2.7]: https://github.com/o-murphy/flutpak/compare/v0.2.6...v0.2.7
-[0.2.6]: https://github.com/o-murphy/flutpak/compare/v0.2.5...v0.2.6
-[0.2.5]: https://github.com/o-murphy/flutpak/compare/v0.2.4...v0.2.5
-[0.2.4]: https://github.com/o-murphy/flutpak/compare/v0.2.3...v0.2.4
-[0.2.3]: https://github.com/o-murphy/flutpak/compare/v0.2.2...v0.2.3
-[0.2.2]: https://github.com/o-murphy/flutpak/compare/v0.2.1...v0.2.2
-[0.2.1]: https://github.com/o-murphy/flutpak/compare/v0.2.0...v0.2.1
-[0.2.0]: https://github.com/o-murphy/flutpak/compare/v0.1.1...v0.2.0
+[Unreleased]: https://github.com/o-murphy/flutpak/compare/v0.4.0-beta.4...HEAD
+[0.4.0-beta.4]: https://github.com/o-murphy/flutpak/releases/tag/v0.4.0-beta.4
+[0.4.0-beta.3]: https://github.com/o-murphy/flutpak/releases/tag/v0.4.0-beta.3
+[0.4.0-beta.2]: https://github.com/o-murphy/flutpak/releases/tag/v0.4.0-beta.2
+[0.4.0-beta.1]: https://github.com/o-murphy/flutpak/releases/tag/v0.4.0-beta.1
+[0.3.0]: https://github.com/o-murphy/flutpak/releases/tag/v0.3.0
+[0.2.8]: https://github.com/o-murphy/flutpak/releases/tag/v0.2.8
+[0.2.7]: https://github.com/o-murphy/flutpak/releases/tag/v0.2.7
+[0.2.6]: https://github.com/o-murphy/flutpak/releases/tag/v0.2.6
+[0.2.5]: https://github.com/o-murphy/flutpak/releases/tag/v0.2.5
+[0.2.4]: https://github.com/o-murphy/flutpak/releases/tag/v0.2.4
+[0.2.3]: https://github.com/o-murphy/flutpak/releases/tag/v0.2.3
+[0.2.2]: https://github.com/o-murphy/flutpak/releases/tag/v0.2.2
+[0.2.1]: https://github.com/o-murphy/flutpak/releases/tag/v0.2.1
+[0.2.0]: https://github.com/o-murphy/flutpak/releases/tag/v0.2.0
 [0.1.1]: https://github.com/o-murphy/flutpak/releases/tag/v0.1.1
 [0.1.0]: https://github.com/o-murphy/flutpak/releases/tag/v0.1.0
