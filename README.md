@@ -1,8 +1,15 @@
 # flutpak
 
-[![Pub Version](https://img.shields.io/pub/v/flutpak?logo=dart&link=https%3A%2F%2Fpub.dev%2Fpackages%2Fflutpak)](https://pub.dev/packages/flutpak)
+[![Pub Version]][Pub]
+[![Development Status]][Repo]
+[![Platform]][Repo]
+[![Flatpak Runtime]][Flatpak Org]
+[![GitHub License]](LICENSE)
+[![GitHub last commit]][Github commits]
+[![Made in Ukraine]][SWUBadge]
 
-A Dart CLI tool that automates Flatpak packaging for Flutter applications.
+
+Dart CLI tool that automates Flatpak packaging for Flutter applications.
 Describe your config once in `flutpak.yaml`, run `flutpak init` once to
 scaffold your template manifest, then run `flutpak generate` on every CI
 build to produce a fully-substituted, `flatpak-builder`-ready output.
@@ -1033,3 +1040,19 @@ tag is pushed, so the compiled binaries always report the correct version.
 ## License
 
 MIT
+
+
+<!-- LINKS -->
+
+[Pub]: https://pub.dev/packages/flutpak
+[Repo]: https://github.com/o-murphy/flutpak
+[Pub Version]: https://img.shields.io/pub/v/flutpak?logo=dart
+[Development Status]: https://img.shields.io/badge/status-alpha-orange
+[Platform]: https://img.shields.io/badge/platform-linux-9c59b6?logo=linux&logoColor=white
+[Flatpak Runtime]: https://img.shields.io/badge/Flatpak--Runtime-25.08-blue?logo=flatpak&logoColor=white
+[Flatpak Org]: https://flatpak.org/
+[GitHub License]: https://img.shields.io/github/license/o-murphy/flutpak
+[GitHub last commit]: https://img.shields.io/github/last-commit/o-murphy/flutpak?logo=git
+[Github commits]: https://github.com/o-murphy/flutpak/commits/main
+[Made in Ukraine]:https://img.shields.io/badge/made_in-Ukraine-ffd700.svg?labelColor=0057b7&style=flat-square
+[SWUBadge]: https://stand-with-ukraine.pp.ua
