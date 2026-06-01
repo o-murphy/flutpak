@@ -3,7 +3,7 @@ name: Release
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
 
 jobs:
   test:
@@ -29,8 +29,8 @@ jobs:
     needs: test
     runs-on: ubuntu-latest
     permissions:
-      contents: write   # push version bump commit
-      id-token: write   # pub.dev OIDC trusted publisher
+      contents: write # push version bump commit
+      id-token: write # pub.dev OIDC trusted publisher
     outputs:
       tag: ${{ steps.meta.outputs.tag }}
       version: ${{ steps.meta.outputs.version }}

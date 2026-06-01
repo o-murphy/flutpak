@@ -8,6 +8,101 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 
+## [0.4.0] — 2026-06-02
+
+### Breaking Changes
+
+- **`prepare` command removed** — replaced by `init` + `generate`.
+- **CI pipelines must be updated:** `flutpak generate` must now run before `flatpak-builder`. Patch sources are no longer baked into the template at `init` time; they are injected into the manifest dynamically at `generate` time.
+
+  ```yaml
+  # before
+  - run: flutpak prepare
+  - run: flatpak-builder ... flatpak/<app-id>.yaml
+
+  # after
+  - run: flutpak prepare
+  - run: flutpak generate
+  - run: flatpak-builder ... flatpak/generated/<app-id>.yaml
+  ```
+
+- **Config keys converted to kebab-case** (to match the Flatpak manifest format):
+  - `app_id` → `app-id`, `runtime_version` → `runtime-version`, `sdk_extensions` → `sdk-extensions`, `build_options` → `build-options`, `append_path` → `append-path`, `prepend_ld_library_path` → `prepend-ld-library-path`
+  - `flutter_version_file` → `flutter-version-file`
+  - `patches[].dest_subpath` → `dest-subpath`, `patches[].strip_trailing_cr` → `strip-trailing-cr`
+- **Fields moved from `manifest` section to root config level:**
+  - `repo_url` → `repo-url`, `metainfo_path` → `metainfo-path`, `desktop_entry_path` → `desktop-entry-path`, `icons` → `icons:`
+- **`manifest.extra_modules` removed** — use the root `modules:` key instead.
+- **`manifest.extra_sources` renamed** to `manifest.sources`.
+- **`pub_patches` removed** — use `patches:` only.
+- **`patch_path` root key removed** — use `flutter.patch` instead.
+- **`finish_args` removed from config.** `ManifestGenerator` now writes sensible Flutter desktop defaults (`--share=ipc`, `--socket=wayland`, `--socket=fallback-x11`, `--device=dri`) into the template at `init`. Edit the template manifest to adjust sandbox permissions.
+- **`__FLATPAK_TAG__` and `__FLATPAK_COMMIT__` placeholders removed.** `generate` now sets `tag:` and `commit:` directly on the git source block in the template via `yaml_edit`.
+
+### Added
+
+- **`flutpak init`** — one-time setup: generates the template manifest (`<output>/<app_id>.yml`), `<name>-wrapper.sh`, `flathub.json`, and `.gitignore`; immediately runs `generate`.
+- **`flutpak generate [--tag] [--commit]`** — replaces `prepare`; reads the template, validates it against config, substitutes placeholders, copies everything to `<output>/generated/`.
+- **`actions/generate`** composite action — installs flutpak, auto-detects Flutter SDK from `FLUTTER_ROOT` or `PATH`, runs `flutpak generate`, validates metainfo, and uploads generated artifacts.
+- **`actions/build-flatpak`** composite action — installs `org.flatpak.Builder`, lints the manifest, builds the Flatpak, lints the repo, exports a `.flatpak` bundle. Outputs `bundle`, `arch`, `artifact-url`.
+- **`scripts/flatpak-build.sh`** — shared shell library with reusable Flatpak build functions.
+- **`patches[].options`** — extra flags forwarded to the `patch(1)` command via the flatpak-builder patch source `options` field.
+- **`patches[].strip_trailing_cr`** — when `true`, injects a `type: shell` source that runs `sed -i 's/\r//'` on the target file. Useful for packages with CRLF line endings (e.g. `objectbox_flutter_libs` ≥ 5.3.2).
+- **`known-patches/`** — directory with ready-to-use reference patches:
+  - `flutter/shared.sh.patch`
+  - `objectbox_flutter_libs/5.3.1/CMakeLists.txt.patch`
+  - `objectbox_flutter_libs/5.3.2/CMakeLists.txt.patch`
+  - `objectbox_flutter_libs/5.3.1/objectbox-c.yml` and `5.3.2/objectbox-c.yml` — ready-to-use Flatpak module files that install `libobjectbox.so` to `/app/lib/`.
+- **`manifest.icons:`** — list of entries with `size:` and `path:`; default is a single `256x256` entry (fixes previously hardcoded `512x512`).
+- **`manifest.metainfo_path:` / `manifest.desktop_entry_path:`** — overrides for the metainfo XML and `.desktop` source paths.
+- Auto-generated `<name>-wrapper.sh` for Flutter projects (sets `LD_LIBRARY_PATH`).
+- **Version is now derived at compile time** from the git tag via `--define=version=$(git describe --tags --always)`; `lib/src/version.dart` and `tool/update_version.dart` removed.
+
+### Changed
+
+- Generated output now lives in `<output>/generated/` (gitignored); the template manifest in `<output>/` is committed and edited by hand.
+- `generate` validates template fields (`app-id`, `command`, `runtime-version`) against config and errors if they diverge.
+- `--tag` only: commit SHA is auto-resolved via `git rev-parse v1.2.3^{}`; `--commit` only or no flags: SHA is written to both `tag:` and `commit:` fields.
+- `manifest.command` is now optional — defaults to the last reverse-DNS segment of `app-id`.
+- `manifest.repo_url` is auto-detected from `git remote get-url origin` on the first `flutpak init` run.
+- `flutter_version_file` defaults to `<output>/flutter.version` for Flutter projects.
+- All `${{ inputs.* }}` expansions inside composite action shell steps replaced with `env:` variable declarations to prevent shell injection.
+- Built-in patch registry (`_registry`) cleared — known patches are now maintained as reference files in `known-patches/`.
+- Template manifest now includes inline guidance comments explaining which sections are safe to edit.
+
+---
+
+### Fixed
+
+- Patch version in `pubspec.lock` is now checked against `version:` in config — `generate` exits with an error on mismatch instead of silently producing a broken manifest.
+- Patch subdirectory structure is now preserved in the generated manifest (e.g. `patches/objectbox_flutter_libs/CMakeLists.txt.patch` instead of `patches/CMakeLists.txt.patch`).
+- All fields (`options`, `strip_trailing_cr`) are now preserved when resolving patch entries without an explicit `version:`.
+- `PubSourcesGenerator` now explicitly closes `http.Client` in a `finally` block — eliminates a multi-second hang after `generate` completes.
+- Patch sources are injected into the **generated** manifest at `generate` time, not into the template at `init` time — `dest:` path always matches the current `pubspec.lock`.
+- `SdkExtensionGenerator` now uses `FlutterSdkGenerator.readFlutterVersion()` — fixes `PathNotFoundException` crash on Flutter ≥ 3.32 where the flat `version` file was removed.
+
+### Removed
+
+- `prepare` command — replaced by `init` + `generate`.
+- `tagPlaceholder` / `commitPlaceholder` constants and `patchManifestPlaceholders` / `injectPatchSources` functions from the public API.
+- `tool/update_version.dart` — no longer needed with compile-time `--define=version=`.
+- `prepare` and `verify` composite actions — replaced by `setup-flutpak` + `flutpak prepare`.
+- `export`, `manifest`, `lint`, `validate` commands — removed; use the official tools directly.
+- Metainfo XML generation and `.desktop` generation — removed; maintain files manually in `app/share/`.
+
+### Minimum config
+
+The minimum viable config is now just `app-id`:
+
+```yaml
+flutpak:
+  manifest:
+    app-id: io.github.YourOrg.YourApp
+```
+
+All other fields (`command`, `repo-url`, `flutter-version-file`, `pub.locks`, `flutter.sdk`, `output`) are resolved automatically from the environment and git remote.
+
+
 ## [0.4.0-rc.2] - 2026-06-01
 
 ### Fixed
@@ -486,7 +581,8 @@ git remote.
   output files
 - MIT License
 
-[Unreleased]: https://github.com/o-murphy/flutpak/compare/v0.4.0-rc.2...HEAD
+[Unreleased]: https://github.com/o-murphy/flutpak/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/o-murphy/flutpak/compare/v0.4.0
 [0.4.0-rc.2]: https://github.com/o-murphy/flutpak/compare/v0.4.0-rc.2
 [0.4.0-rc.1]: https://github.com/o-murphy/flutpak/releases/tag/v0.4.0-rc.1
 [0.4.0-beta.4]: https://github.com/o-murphy/flutpak/releases/tag/v0.4.0-beta.4

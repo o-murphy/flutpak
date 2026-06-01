@@ -104,7 +104,7 @@ The repository ships a composite action that compiles and installs `flutpak`
 automatically. See [CI/CD integration](#cicd-integration) for full usage.
 
 ```yaml
-- uses: o-murphy/flutpak/.github/actions/setup-flutpak@main
+- uses: o-murphy/flutpak/.github/actions/setup-flutpak@v0.4.0
 ```
 
 ### From source
@@ -587,11 +587,11 @@ template is never modified. `flatpak-builder` consumes
 ### `setup-flutpak` action
 
 ```yaml
-- uses: o-murphy/flutpak/.github/actions/setup-flutpak@main
+- uses: o-murphy/flutpak/.github/actions/setup-flutpak@v0.4.0
   # Builds from the same ref as the 'uses:' directive by default.
   # Pin to a specific release:
   # with:
-  #   version: v0.4.0-beta.1
+  #   version: v0.4.0
 ```
 
 | Input | Description | Default |
@@ -604,7 +604,7 @@ The repository also ships a `flutter` composite action with
 (x86_64) and `ubuntu-24.04-arm` (aarch64) runners:
 
 ```yaml
-- uses: o-murphy/flutpak/.github/actions/flutter@main
+- uses: o-murphy/flutpak/.github/actions/flutter@v0.4.0
   with:
     flutter-version: stable   # or read from flatpak/flutter.version
     cache: true
@@ -630,7 +630,7 @@ and sources as a workflow artifact. Requires Flutter to be installed beforehand
 (e.g. via the `flutter` action above).
 
 ```yaml
-- uses: o-murphy/flutpak/.github/actions/generate@main
+- uses: o-murphy/flutpak/.github/actions/generate@v0.4.0
   with:
     tag: ${{ inputs.tag }}      # or pass 'commit:' for non-tag builds
     # commit: ${{ github.sha }} # used when 'tag' is empty
@@ -654,7 +654,7 @@ Installs `org.flatpak.Builder`, lints the manifest, builds via `flathub-build`,
 lints the repo, exports a `.flatpak` bundle, and optionally uploads it.
 
 ```yaml
-- uses: o-murphy/flutpak/.github/actions/build-flatpak@main
+- uses: o-murphy/flutpak/.github/actions/build-flatpak@v0.4.0
   id: build
   with:
     manifest: flatpak/generated/<app-id>.yml
@@ -700,11 +700,11 @@ jobs:
   generate:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0          # required for --tag to resolve the commit
 
-      - uses: o-murphy/flutpak/.github/actions/flutter@main
+      - uses: o-murphy/flutpak/.github/actions/flutter@v0.4.0
         id: flutter
         with:
           flutter-version: stable
@@ -712,7 +712,7 @@ jobs:
 
       - run: flutter pub get
 
-      - uses: o-murphy/flutpak/.github/actions/generate@main
+      - uses: o-murphy/flutpak/.github/actions/generate@v0.4.0
         with:
           tag: ${{ github.ref_name }}
           metainfo-path: app/share/metainfo/<app-id>.metainfo.xml
@@ -725,14 +725,14 @@ jobs:
         arch: [amd64, arm64]
     runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: flatpak-generated
           path: flatpak/generated
 
-      - uses: o-murphy/flutpak/.github/actions/build-flatpak@main
+      - uses: o-murphy/flutpak/.github/actions/build-flatpak@v0.4.0
         id: build
         with:
           manifest: flatpak/generated/<app-id>.yml
@@ -758,13 +758,13 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
-      - uses: o-murphy/flutpak/.github/actions/setup-flutpak@main
+      - uses: o-murphy/flutpak/.github/actions/setup-flutpak@v0.4.0
 
-      - uses: o-murphy/flutpak/.github/actions/flutter@main
+      - uses: o-murphy/flutpak/.github/actions/flutter@v0.4.0
         with:
           flutter-version: stable
           cache: true
