@@ -8,6 +8,64 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 
+## [0.4.0-rc.1] - 2026-06-01
+
+### Changed
+- `finish_args` removed from config. `ManifestGenerator` now writes a
+  sensible Flutter desktop default (`--share=ipc`, `--socket=wayland`,
+  `--socket=fallback-x11`, `--device=dri`) directly into the template on
+  `init`. Edit the template manifest to add, remove, or adjust sandbox
+  permissions — no config change needed.
+- `__FLATPAK_TAG__` and `__FLATPAK_COMMIT__` string placeholders removed.
+  `generate` now sets `tag:` and `commit:` directly on the git source block in
+  the template via `yaml_edit`, so the template no longer needs to carry
+  placeholder strings. When `--tag` is omitted, the HEAD SHA is written to both
+  fields so `flatpak-builder` can fetch the revision without a release tag.
+- `manifest` config section keys converted to kebab-case to match the Flatpak
+  manifest format: `app_id` → `app-id`, `runtime_version` → `runtime-version`,
+  `sdk_extensions` → `sdk-extensions`, `build_options` → `build-options`,
+  `append_path` → `append-path`, `prepend_ld_library_path` →
+  `prepend-ld-library-path`.
+- `repo_url`, `metainfo_path`, `desktop_entry_path` moved from the `manifest`
+  section to the root config level as `repo-url`, `metainfo-path`,
+  `desktop-entry-path`. These are flutpak-specific settings, not part of the
+  Flatpak manifest schema.
+- `manifest.icons` moved to the root config level as `icons:`. Icons are a
+  flutpak-specific concept (file path validation, default 256x256 fallback) and
+  do not belong in the Flatpak manifest schema.
+- `manifest.extra_modules` removed; use the root `modules:` key instead.
+- `manifest.extra_sources` renamed to `manifest.sources`.
+- Root config keys converted to kebab-case: `flutter_version_file` →
+  `flutter-version-file`.
+- `patches[].dest_subpath` → `dest-subpath`,
+  `patches[].strip_trailing_cr` → `strip-trailing-cr`.
+- `pub_patches` key removed; use `patches` only.
+- `patch_path` root key removed; use `flutter.patch` instead.
+- Version is now derived at compile time from the git tag via
+  `--define=version=$(git describe --tags --always)`. The generated
+  `lib/src/version.dart` file and `tool/update_version.dart` script are
+  removed; `pubspec.yaml` remains the single source of truth for the published
+  package version.
+
+### Fixed
+- Process hung for a few seconds after `generate complete` due to
+  `PubSourcesGenerator`'s `http.Client` never being closed; the client is now
+  explicitly closed in a `finally` block after sources are generated.
+
+### Removed
+- `tagPlaceholder` / `commitPlaceholder` constants and `patchManifestPlaceholders`
+  / `injectPatchSources` functions removed from the public API.
+- `tool/update_version.dart` removed; no longer needed with compile-time
+  `--define=version=` injection.
+
+### Added
+- `known-patches/objectbox_flutter_libs/5.3.1/objectbox-c.yml` and
+  `known-patches/objectbox_flutter_libs/5.3.2/objectbox-c.yml` — ready-to-use
+  Flatpak module files that install the prebuilt `libobjectbox.so` to `/app/lib/`.
+  Copy to `flatpak/modules/objectbox-c.yml` and reference via the `modules:`
+  config key. See `known-patches/PATCHES.md` for full instructions.
+
+
 ## [0.4.0-beta.4] - 2026-05-27
 
 ### Added
@@ -420,7 +478,8 @@ git remote.
   output files
 - MIT License
 
-[Unreleased]: https://github.com/o-murphy/flutpak/compare/v0.4.0-beta.4...HEAD
+[Unreleased]: https://github.com/o-murphy/flutpak/compare/v0.4.0-rc.1...HEAD
+[0.4.0-rc.1]: https://github.com/o-murphy/flutpak/releases/tag/v0.4.0-rc.1
 [0.4.0-beta.4]: https://github.com/o-murphy/flutpak/releases/tag/v0.4.0-beta.4
 [0.4.0-beta.3]: https://github.com/o-murphy/flutpak/releases/tag/v0.4.0-beta.3
 [0.4.0-beta.2]: https://github.com/o-murphy/flutpak/releases/tag/v0.4.0-beta.2

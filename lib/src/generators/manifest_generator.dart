@@ -2,9 +2,6 @@ import 'dart:io';
 import 'package:path/path.dart' as p;
 import '../config.dart';
 
-const String tagPlaceholder = '__FLATPAK_TAG__';
-const String commitPlaceholder = '__FLATPAK_COMMIT__';
-
 /// Generates a Flatpak application manifest YAML from [ManifestConfig].
 ///
 /// Writes a human-readable manifest file using a structured template.
@@ -19,7 +16,7 @@ class ManifestGenerator {
   /// commands (e.g. `flatpak`). Defaults to `flatpak`.
   final String outputRelDir;
 
-  /// Resolved git remote URL — overrides [ManifestConfig.repoUrl] when set.
+  /// Resolved git remote URL for the app source entry.
   final String? resolvedRepoUrl;
 
   /// Whether this project uses Flutter. When false, Flutter-specific build
@@ -27,12 +24,24 @@ class ManifestGenerator {
   /// replaced with a TODO comment. Defaults to true for backward compatibility.
   final bool hasFlutter;
 
+  /// Effective metainfo XML path passed from [FlatpakGenConfig].
+  final String metainfoPath;
+
+  /// Effective desktop entry path passed from [FlatpakGenConfig].
+  final String desktopEntryPath;
+
+  /// Effective icon list passed from [FlatpakGenConfig].
+  final List<IconEntry> icons;
+
   ManifestGenerator({
     required this.cfg,
     required this.generatedSourcesPath,
     this.outputRelDir = 'flatpak',
     this.resolvedRepoUrl,
     this.hasFlutter = true,
+    required this.metainfoPath,
+    required this.desktopEntryPath,
+    required this.icons,
   });
 
   /// Returns the manifest as a YAML string ready to write to disk.
@@ -49,9 +58,7 @@ class ManifestGenerator {
     _line(buf,
         '# SAFE TO EDIT   finish-args, build-commands, build-options, sdk-extensions, modules');
     _line(buf,
-        '# DO NOT REMOVE  __FLATPAK_TAG__ and __FLATPAK_COMMIT__ placeholders — required by generate');
-    _line(buf,
-        '# AUTO-INJECTED  patch sources are appended after generated-sources.json by generate');
+        '# AUTO-INJECTED  tag, commit, modules, manifest.sources, generated-sources.json, and patches are set/appended by generate');
     _line(buf, 'app-id: ${cfg.appId}');
     _line(buf, 'runtime: org.freedesktop.Platform');
     _line(buf, "runtime-version: '${cfg.runtimeVersion}'");
@@ -66,33 +73,16 @@ class ManifestGenerator {
 
     _line(buf, 'command: ${cfg.command}');
 
-    if (cfg.finishArgs.isNotEmpty) {
-      _line(buf, '# Sandbox permissions — add or remove as your app requires.');
-      _line(buf, 'finish-args:');
-      for (final arg in cfg.finishArgs) {
-        _line(buf, '  - $arg');
-      }
-    }
+    _line(buf, '# Sandbox permissions — review and adjust for your app.');
+    _line(buf, 'finish-args:');
+    _line(buf, '  - --share=ipc');
+    _line(buf, '  - --socket=fallback-x11');
+    _line(buf, '  - --socket=wayland');
+    _line(buf, '  - --device=dri');
 
     _line(buf, 'modules:');
 
-    // Extra modules (inline YAML or file paths).
-    // Files are included verbatim with a 2-space indent so they can be
-    // written as normal YAML lists rooted at the modules level.
-    for (final modPath in cfg.extraModules) {
-      final f = File(modPath);
-      if (f.existsSync()) {
-        final content = f.readAsStringSync().trimRight();
-        for (final rawLine in content.split('\n')) {
-          _line(buf, '  $rawLine');
-        }
-      } else {
-        stderr.writeln('⚠  extra_modules: file not found: $modPath');
-        _line(buf, '  - $modPath');
-      }
-    }
-
-    // App module.
+    // App module. modules are injected by `flutpak generate`.
     _line(buf, '  - name: $appName');
     _line(buf, '    buildsystem: simple');
     _buildOptions(buf, appName);
@@ -191,15 +181,13 @@ class ManifestGenerator {
     }
 
     // Asset installs using effective paths from config.
-    final metainfoSrc = cfg.effectiveMetainfoPath();
     final metainfoDest = '/app/share/metainfo/${cfg.appId}.metainfo.xml';
-    buf.writeln('      - install -Dm644 $metainfoSrc $metainfoDest');
+    buf.writeln('      - install -Dm644 $metainfoPath $metainfoDest');
 
-    final desktopSrc = cfg.effectiveDesktopEntryPath();
     final desktopDest = '/app/share/applications/${cfg.appId}.desktop';
-    buf.writeln('      - install -Dm644 $desktopSrc $desktopDest');
+    buf.writeln('      - install -Dm644 $desktopEntryPath $desktopDest');
 
-    for (final icon in cfg.effectiveIcons()) {
+    for (final icon in icons) {
       final ext = icon.size == 'scalable' ? 'svg' : 'png';
       final iconDest =
           '/app/share/icons/hicolor/${icon.size}/apps/${cfg.appId}.$ext';
@@ -208,97 +196,19 @@ class ManifestGenerator {
   }
 
   void _sources(StringBuffer buf) {
-    buf.writeln(
-        '    # Sources — do not remove __FLATPAK_TAG__ / __FLATPAK_COMMIT__.');
     buf.writeln('    sources:');
 
-    // App git source with placeholders.
     buf.writeln('      - type: git');
-    final url = resolvedRepoUrl ?? cfg.repoUrl;
+    final url = resolvedRepoUrl;
     if (url != null) {
       buf.writeln('        url: $url');
     }
-    buf.writeln('        tag: $tagPlaceholder');
-    buf.writeln('        commit: $commitPlaceholder');
     buf.writeln('        disable-submodules: true');
-
-    // Extra verbatim sources (e.g. arch-specific prebuilt archives).
-    for (final src in cfg.extraSources) {
-      _writeYamlMap(buf, src, indent: '      ');
-    }
-
-    // generated-sources.json reference (relative to manifest dir).
-    buf.writeln(
-        '      # "flutpak generate" injects patch sources after this line.');
-    buf.writeln('      - ${p.basename(generatedSourcesPath)}');
-  }
-
-  /// Writes a Map as indented YAML key-value pairs with a leading `- ` on the
-  /// first key (list item syntax).
-  static void _writeYamlMap(StringBuffer buf, Map<String, dynamic> map,
-      {required String indent}) {
-    var first = true;
-    for (final entry in map.entries) {
-      final value = entry.value;
-      final prefix = first ? '- ' : '  ';
-      if (value is List) {
-        buf.writeln('$indent$prefix${entry.key}:');
-        for (final item in value) {
-          buf.writeln('$indent    - $item');
-        }
-      } else {
-        buf.writeln('$indent$prefix${entry.key}: $value');
-      }
-      first = false;
-    }
+    // tag, commit, manifest.sources, generated-sources.json, and patches are
+    // set/appended by `flutpak generate` via yaml_edit.
   }
 
   static void _line(StringBuffer buf, String s) => buf.writeln(s);
-}
-
-/// Updates [tagPlaceholder] / [commitPlaceholder] in a manifest's raw YAML text.
-///
-/// If [tag] is null or empty, the `tag:` placeholder line is removed.
-String patchManifestPlaceholders(
-  String content, {
-  required String commit,
-  String? tag,
-}) {
-  var result = content;
-
-  final hasTagPlaceholder = result.contains(tagPlaceholder);
-  final hasCommitPlaceholder = result.contains(commitPlaceholder);
-
-  if (hasTagPlaceholder || hasCommitPlaceholder) {
-    // Fast path: manifest still has template placeholders.
-    if (tag != null && tag.isNotEmpty) {
-      result = result.replaceAll(tagPlaceholder, tag);
-    } else {
-      result = result.replaceAll(
-        RegExp(r'[ \t]*tag:\s*' + RegExp.escape(tagPlaceholder) + r'\n?'),
-        '',
-      );
-    }
-    result = result.replaceAll(commitPlaceholder, commit);
-  } else {
-    // Manifest was previously pinned — placeholders are gone.
-    // Locate the app source block by its unique `disable-submodules: true`
-    // marker and re-pin tag/commit in-place.
-    result = result.replaceFirstMapped(
-      RegExp(
-        r'(?:[ \t]*tag:\s+\S+\n)?([ \t]*)commit:\s+\S+(?=\n[ \t]*disable-submodules:)',
-        multiLine: true,
-      ),
-      (m) {
-        final indent = m.group(1)!;
-        final tagLine =
-            (tag != null && tag.isNotEmpty) ? '${indent}tag: $tag\n' : '';
-        return '$tagLine${indent}commit: $commit';
-      },
-    );
-  }
-
-  return result;
 }
 
 /// Strips template-only guidance comments from [content] before writing the
@@ -306,9 +216,7 @@ String patchManifestPlaceholders(
 ///
 /// The template manifest contains human-readable hints (header block and
 /// inline section labels) that are useful in the committed template but add
-/// noise to the final flatpak-builder manifest in `generated/`. This function
-/// must be called before [patchManifestPlaceholders] to prevent placeholder
-/// strings inside comments from being replaced with commit SHAs.
+/// noise to the final flatpak-builder manifest in `generated/`.
 String stripTemplateGuidance(String content) {
   var result = content;
 
@@ -320,7 +228,6 @@ String stripTemplateGuidance(String content) {
       '# Run "flutpak generate"[^\n]*\n'
       '#\n'
       '# SAFE TO EDIT[^\n]*\n'
-      '# DO NOT REMOVE[^\n]*\n'
       '# AUTO-INJECTED[^\n]*\n',
     ),
     '',
@@ -330,70 +237,11 @@ String stripTemplateGuidance(String content) {
   for (final re in [
     RegExp(r'[ \t]*# Sandbox permissions[^\n]*\n'),
     RegExp(r'[ \t]*# Build steps — review[^\n]*\n'),
-    RegExp(r'[ \t]*# Sources — do not remove[^\n]*\n'),
-    RegExp(r'[ \t]*# "flutpak generate" injects patch sources[^\n]*\n'),
   ]) {
     result = result.replaceAll(re, '');
   }
 
   return result;
-}
-
-/// Injects [patches] as `type: patch` sources into [content] immediately after
-/// the `generated-sources.json` reference line.
-///
-/// Patch files are expected to be copied to `generated/patches/` by the caller,
-/// so paths are written as `patches/<basename>`. The `dest:` field is derived
-/// from the resolved package version via [PatchEntry.dest].
-///
-/// Returns [content] unchanged when [patches] is empty or when the
-/// `generated-sources.json` anchor line is not found.
-///
-/// [patchesDir] is the directory that will be copied to `generated/patches/`.
-/// Patch paths in the manifest are written relative to that directory so the
-/// subdirectory structure is preserved (e.g. `patches/subdir/foo.patch`).
-String injectPatchSources(
-  String content,
-  List<PatchEntry> patches,
-  String patchesDir,
-) {
-  if (patches.isEmpty) return content;
-
-  final absPatchesDir = p.absolute(patchesDir);
-
-  final buf = StringBuffer();
-  for (final patch in patches) {
-    final dest = patch.version != null ? patch.dest(patch.version!) : null;
-    final relFromPatchesDir =
-        p.relative(p.absolute(patch.path), from: absPatchesDir);
-    final patchPath = 'patches/$relFromPatchesDir';
-
-    if (patch.stripTrailingCr && dest != null) {
-      final targetFile = _parsePatchTarget(patch.path);
-      if (targetFile != null) {
-        buf.writeln('      - type: shell');
-        buf.writeln('        commands:');
-        buf.writeln("          - sed -i 's/\\r//' $dest/$targetFile");
-      }
-    }
-
-    buf.writeln('      - type: patch');
-    if (dest != null) {
-      buf.writeln('        dest: $dest');
-    }
-    buf.writeln('        path: $patchPath');
-    if (patch.options.isNotEmpty) {
-      buf.writeln('        options:');
-      for (final opt in patch.options) {
-        buf.writeln('          - $opt');
-      }
-    }
-  }
-
-  return content.replaceFirstMapped(
-    RegExp(r'([ \t]*-[ \t]+generated-sources\.json\n)', multiLine: true),
-    (m) => '${m.group(0)}${buf.toString()}',
-  );
 }
 
 /// Reads the first `--- a/<path>` line of a unified diff and returns the
@@ -410,6 +258,48 @@ String? _parsePatchTarget(String patchPath) {
     }
   } catch (_) {}
   return null;
+}
+
+/// Builds a list of flatpak source maps for [patches] suitable for passing to
+/// yaml_edit. Each [PatchEntry] may produce one or two maps: an optional
+/// `type: shell` map (when [PatchEntry.stripTrailingCr] is true) followed by
+/// a `type: patch` map.
+///
+/// [patchesDir] is the absolute or relative directory that patch files live in.
+/// Patch paths in the returned maps are written relative to that directory so
+/// the subdirectory structure is preserved (e.g. `patches/subdir/foo.patch`).
+List<Map<String, dynamic>> buildPatchSourceMaps(
+  List<PatchEntry> patches,
+  String patchesDir,
+) {
+  final absPatchesDir = p.absolute(patchesDir);
+  final result = <Map<String, dynamic>>[];
+
+  for (final patch in patches) {
+    final dest = patch.version != null ? patch.dest(patch.version!) : null;
+    final relFromPatchesDir =
+        p.relative(p.absolute(patch.path), from: absPatchesDir);
+    final patchPath = 'patches/$relFromPatchesDir';
+
+    if (patch.stripTrailingCr && dest != null) {
+      final targetFile = _parsePatchTarget(patch.path);
+      if (targetFile != null) {
+        result.add({
+          'type': 'shell',
+          'commands': ["sed -i 's/\\r//' $dest/$targetFile"],
+        });
+      }
+    }
+
+    result.add({
+      'type': 'patch',
+      if (dest != null) 'dest': dest,
+      'path': patchPath,
+      if (patch.options.isNotEmpty) 'options': patch.options,
+    });
+  }
+
+  return result;
 }
 
 /// Pins screenshot URLs in a metainfo XML file from `/main/` to [ref].

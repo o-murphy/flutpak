@@ -5,9 +5,6 @@ ManifestConfig _baseConfig({
   String appId = 'io.github.example.myapp',
   String? command,
   List<String> sdkExtensions = const [],
-  List<String> finishArgs = const [],
-  String? repoUrl,
-  List<IconEntry> icons = const [],
 }) =>
     ManifestConfig(
       appId: appId,
@@ -15,18 +12,35 @@ ManifestConfig _baseConfig({
       sdkExtensions: sdkExtensions,
       command: command ?? appId.split('.').last,
       commandInferred: command == null,
-      finishArgs: finishArgs,
-      repoUrl: repoUrl,
+    );
+
+
+ManifestGenerator _generator({
+  ManifestConfig? cfg,
+  String? resolvedRepoUrl,
+  bool hasFlutter = true,
+  String outputRelDir = 'flatpak',
+  String metainfoPath =
+      'app/share/metainfo/io.github.example.myapp.metainfo.xml',
+  String desktopEntryPath =
+      'app/share/applications/io.github.example.myapp.desktop',
+  List<IconEntry> icons = const [],
+}) =>
+    ManifestGenerator(
+      cfg: cfg ?? _baseConfig(),
+      generatedSourcesPath: 'flatpak/generated-sources.json',
+      outputRelDir: outputRelDir,
+      resolvedRepoUrl: resolvedRepoUrl,
+      hasFlutter: hasFlutter,
+      metainfoPath: metainfoPath,
+      desktopEntryPath: desktopEntryPath,
       icons: icons,
     );
 
 void main() {
   group('ManifestGenerator.generate', () {
     test('includes app-id, runtime, sdk, command', () {
-      final yaml = ManifestGenerator(
-        cfg: _baseConfig(command: 'myapp'),
-        generatedSourcesPath: 'flatpak/generated-sources.json',
-      ).generate();
+      final yaml = _generator(cfg: _baseConfig(command: 'myapp')).generate();
 
       expect(yaml, contains('app-id: io.github.example.myapp'));
       expect(yaml, contains('runtime: org.freedesktop.Platform'));
@@ -35,34 +49,21 @@ void main() {
       expect(yaml, contains('command: myapp'));
     });
 
-    test('includes finish-args when provided', () {
-      final yaml = ManifestGenerator(
-        cfg: _baseConfig(
-            command: 'myapp',
-            finishArgs: ['--share=ipc', '--socket=wayland']),
-        generatedSourcesPath: 'flatpak/generated-sources.json',
-      ).generate();
+    test('always includes default finish-args', () {
+      final yaml = _generator(cfg: _baseConfig(command: 'myapp')).generate();
 
       expect(yaml, contains('finish-args:'));
       expect(yaml, contains('- --share=ipc'));
+      expect(yaml, contains('- --socket=fallback-x11'));
       expect(yaml, contains('- --socket=wayland'));
-    });
-
-    test('omits finish-args when empty', () {
-      final yaml = ManifestGenerator(
-        cfg: _baseConfig(command: 'myapp'),
-        generatedSourcesPath: 'flatpak/generated-sources.json',
-      ).generate();
-
-      expect(yaml, isNot(contains('finish-args:')));
+      expect(yaml, contains('- --device=dri'));
     });
 
     test('includes sdk-extensions when provided', () {
-      final yaml = ManifestGenerator(
+      final yaml = _generator(
         cfg: _baseConfig(
             command: 'myapp',
             sdkExtensions: ['org.freedesktop.Sdk.Extension.llvm20']),
-        generatedSourcesPath: 'flatpak/generated-sources.json',
       ).generate();
 
       expect(yaml, contains('sdk-extensions:'));
@@ -70,11 +71,10 @@ void main() {
     });
 
     test('auto-adds llvm path to append-path when llvm extension present', () {
-      final yaml = ManifestGenerator(
+      final yaml = _generator(
         cfg: _baseConfig(
             command: 'myapp',
             sdkExtensions: ['org.freedesktop.Sdk.Extension.llvm20']),
-        generatedSourcesPath: 'flatpak/generated-sources.json',
       ).generate();
 
       expect(yaml, contains('/usr/lib/sdk/llvm20/bin'));
@@ -82,95 +82,65 @@ void main() {
       expect(yaml, contains('prepend-ld-library-path: /usr/lib/sdk/llvm20/lib'));
     });
 
-    test('includes __FLATPAK_TAG__ and __FLATPAK_COMMIT__ placeholders', () {
-      final yaml = ManifestGenerator(
-        cfg: _baseConfig(
-            command: 'myapp',
-            repoUrl: 'https://github.com/example/app.git'),
-        generatedSourcesPath: 'flatpak/generated-sources.json',
+    test('does not include tag or commit in template (set by generate via yaml_edit)', () {
+      final yaml = _generator(
+        cfg: _baseConfig(command: 'myapp'),
+        resolvedRepoUrl: 'https://github.com/example/app.git',
       ).generate();
 
-      expect(yaml, contains('tag: __FLATPAK_TAG__'));
-      expect(yaml, contains('commit: __FLATPAK_COMMIT__'));
+      expect(yaml, isNot(contains('tag:')));
+      expect(yaml, isNot(contains('commit:')));
     });
 
-    test('includes repo url in git source when provided via cfg', () {
-      final yaml = ManifestGenerator(
-        cfg: _baseConfig(
-            command: 'myapp',
-            repoUrl: 'https://github.com/example/app.git'),
-        generatedSourcesPath: 'flatpak/generated-sources.json',
+    test('includes repo url in git source when provided via resolvedRepoUrl', () {
+      final yaml = _generator(
+        cfg: _baseConfig(command: 'myapp'),
+        resolvedRepoUrl: 'https://github.com/example/app.git',
       ).generate();
 
       expect(yaml, contains('url: https://github.com/example/app.git'));
     });
 
-    test('resolvedRepoUrl overrides cfg.repoUrl', () {
-      final yaml = ManifestGenerator(
-        cfg: _baseConfig(repoUrl: 'https://github.com/example/old.git'),
-        generatedSourcesPath: 'flatpak/generated-sources.json',
+    test('resolvedRepoUrl is used when provided', () {
+      final yaml = _generator(
         resolvedRepoUrl: 'https://github.com/example/resolved.git',
       ).generate();
 
       expect(yaml, contains('url: https://github.com/example/resolved.git'));
-      expect(yaml, isNot(contains('url: https://github.com/example/old.git')));
     });
 
-    test('resolvedRepoUrl is used when cfg.repoUrl is null', () {
-      final yaml = ManifestGenerator(
-        cfg: _baseConfig(),
-        generatedSourcesPath: 'flatpak/generated-sources.json',
-        resolvedRepoUrl: 'https://github.com/example/auto.git',
-      ).generate();
-
-      expect(yaml, contains('url: https://github.com/example/auto.git'));
-    });
-
-    test('omits url when both cfg.repoUrl and resolvedRepoUrl are null', () {
-      final yaml = ManifestGenerator(
-        cfg: _baseConfig(),
-        generatedSourcesPath: 'flatpak/generated-sources.json',
-      ).generate();
+    test('omits url when resolvedRepoUrl is null', () {
+      final yaml = _generator().generate();
 
       expect(yaml, isNot(contains('url:')));
     });
 
-    test('includes generated-sources.json reference', () {
-      final yaml = ManifestGenerator(
-        cfg: _baseConfig(command: 'myapp'),
-        generatedSourcesPath: 'flatpak/generated-sources.json',
-      ).generate();
+    test('does not include generated-sources.json (injected at generate time)', () {
+      final yaml = _generator(cfg: _baseConfig(command: 'myapp')).generate();
 
-      expect(yaml, contains('- generated-sources.json'));
+      // generated-sources.json may appear in the header comment but not as a source entry
+      expect(yaml, isNot(contains('- generated-sources.json')));
     });
 
-    test('does not include patch sources (injected at generate time)', () {
-      final yaml = ManifestGenerator(
-        cfg: _baseConfig(command: 'myapp'),
-        generatedSourcesPath: 'flatpak/generated-sources.json',
-      ).generate();
+    test('does not include patch or extra sources (injected at generate time)', () {
+      final yaml = _generator(cfg: _baseConfig(command: 'myapp')).generate();
 
       expect(yaml, isNot(contains('type: patch')));
-      expect(yaml, contains('"flutpak generate" injects patch sources'));
+      expect(yaml, isNot(contains('type: archive')));
     });
 
     test('header contains template guidance comments', () {
-      final yaml = ManifestGenerator(
-        cfg: _baseConfig(command: 'myapp'),
-        generatedSourcesPath: 'flatpak/generated-sources.json',
-      ).generate();
+      final yaml = _generator(cfg: _baseConfig(command: 'myapp')).generate();
 
       expect(yaml, contains('editable TEMPLATE manifest'));
       expect(yaml, contains('SAFE TO EDIT'));
-      expect(yaml, contains('DO NOT REMOVE'));
       expect(yaml, contains('AUTO-INJECTED'));
     });
 
     test('includes Flutter cache stamp copy commands when hasFlutter is true',
         () {
-      final yaml = ManifestGenerator(
+      final yaml = _generator(
         cfg: _baseConfig(command: 'myapp'),
-        generatedSourcesPath: 'flatpak/generated-sources.json',
         hasFlutter: true,
       ).generate();
 
@@ -181,9 +151,8 @@ void main() {
     });
 
     test('omits Flutter build commands when hasFlutter is false', () {
-      final yaml = ManifestGenerator(
+      final yaml = _generator(
         cfg: _baseConfig(command: 'myapp'),
-        generatedSourcesPath: 'flatpak/generated-sources.json',
         hasFlutter: false,
       ).generate();
 
@@ -194,9 +163,8 @@ void main() {
     });
 
     test('pure-Dart build omits flutter/bin from append-path', () {
-      final yaml = ManifestGenerator(
+      final yaml = _generator(
         cfg: _baseConfig(command: 'myapp'),
-        generatedSourcesPath: 'flatpak/generated-sources.json',
         hasFlutter: false,
       ).generate();
 
@@ -204,9 +172,8 @@ void main() {
     });
 
     test('includes wrapper install command when hasFlutter is true', () {
-      final yaml = ManifestGenerator(
+      final yaml = _generator(
         cfg: _baseConfig(command: 'myapp'),
-        generatedSourcesPath: 'flatpak/generated-sources.json',
         outputRelDir: 'flatpak',
         hasFlutter: true,
       ).generate();
@@ -216,9 +183,8 @@ void main() {
     });
 
     test('includes arch-specific BUNDLE_PATH env vars when hasFlutter', () {
-      final yaml = ManifestGenerator(
+      final yaml = _generator(
         cfg: _baseConfig(command: 'myapp'),
-        generatedSourcesPath: 'flatpak/generated-sources.json',
         hasFlutter: true,
       ).generate();
 
@@ -229,9 +195,8 @@ void main() {
     });
 
     test('omits arch BUNDLE_PATH env when hasFlutter is false', () {
-      final yaml = ManifestGenerator(
+      final yaml = _generator(
         cfg: _baseConfig(command: 'myapp'),
-        generatedSourcesPath: 'flatpak/generated-sources.json',
         hasFlutter: false,
       ).generate();
 
@@ -240,18 +205,24 @@ void main() {
     });
 
     test('app module name is last segment of app-id', () {
-      final yaml = ManifestGenerator(
+      final yaml = _generator(
         cfg: _baseConfig(appId: 'io.github.example.myapp', command: 'myapp'),
-        generatedSourcesPath: 'flatpak/generated-sources.json',
       ).generate();
 
       expect(yaml, contains('name: myapp'));
     });
 
     test('uses default 256x256 icon install command when icons empty', () {
-      final yaml = ManifestGenerator(
+      // When icons list is empty, caller should pass the effective icons.
+      final effectiveIcons = [
+        const IconEntry(
+          size: '256x256',
+          path: 'app/share/icons/hicolor/256x256/apps/io.github.example.myapp.png',
+        ),
+      ];
+      final yaml = _generator(
         cfg: _baseConfig(command: 'myapp'),
-        generatedSourcesPath: 'flatpak/generated-sources.json',
+        icons: effectiveIcons,
       ).generate();
 
       expect(
@@ -265,17 +236,14 @@ void main() {
     });
 
     test('uses scalable icon with svg extension when size is scalable', () {
-      final yaml = ManifestGenerator(
-        cfg: _baseConfig(
-          command: 'myapp',
-          icons: [
-            const IconEntry(
-                size: '256x256',
-                path: 'app/share/icons/hicolor/256x256/apps/myapp.png'),
-            const IconEntry(size: 'scalable', path: 'assets/icon.svg'),
-          ],
-        ),
-        generatedSourcesPath: 'flatpak/generated-sources.json',
+      final yaml = _generator(
+        cfg: _baseConfig(command: 'myapp'),
+        icons: [
+          const IconEntry(
+              size: '256x256',
+              path: 'app/share/icons/hicolor/256x256/apps/myapp.png'),
+          const IconEntry(size: 'scalable', path: 'assets/icon.svg'),
+        ],
       ).generate();
 
       expect(
@@ -287,10 +255,11 @@ void main() {
       );
     });
 
-    test('includes metainfo install command using effectiveMetainfoPath', () {
-      final yaml = ManifestGenerator(
+    test('includes metainfo install command using provided metainfoPath', () {
+      final yaml = _generator(
         cfg: _baseConfig(command: 'myapp'),
-        generatedSourcesPath: 'flatpak/generated-sources.json',
+        metainfoPath:
+            'app/share/metainfo/io.github.example.myapp.metainfo.xml',
       ).generate();
 
       expect(
@@ -303,11 +272,12 @@ void main() {
       );
     });
 
-    test('includes desktop entry install command using effectiveDesktopEntryPath',
+    test('includes desktop entry install command using provided desktopEntryPath',
         () {
-      final yaml = ManifestGenerator(
+      final yaml = _generator(
         cfg: _baseConfig(command: 'myapp'),
-        generatedSourcesPath: 'flatpak/generated-sources.json',
+        desktopEntryPath:
+            'app/share/applications/io.github.example.myapp.desktop',
       ).generate();
 
       expect(
@@ -321,10 +291,7 @@ void main() {
     });
 
     test('header comment is present', () {
-      final yaml = ManifestGenerator(
-        cfg: _baseConfig(command: 'myapp'),
-        generatedSourcesPath: 'flatpak/generated-sources.json',
-      ).generate();
+      final yaml = _generator(cfg: _baseConfig(command: 'myapp')).generate();
 
       expect(
         yaml,
