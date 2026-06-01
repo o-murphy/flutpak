@@ -37,7 +37,9 @@ jobs:
         run: dart pub get
 
       - name: Build binary
-        run: dart compile exe bin/flutpak.dart -o ${{ matrix.artifact }}
+        run: |
+          dart compile exe bin/flutpak.dart -o ${{ matrix.artifact }} \
+            --define=version=${{ inputs.tag_name }}
 
       - name: Upload to release
         uses: softprops/action-gh-release@v3

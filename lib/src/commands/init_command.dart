@@ -54,24 +54,23 @@ class InitCommand extends Command<void> {
     }
 
     // Validate asset files exist.
-    validateManifestAssets(manifestCfg);
+    validateManifestAssets(cfg, manifestCfg.appId);
 
     // Auto-detect repo URL.
-    String? resolvedRepoUrl = manifestCfg.repoUrl;
+    String? resolvedRepoUrl = cfg.repoUrl;
     if (resolvedRepoUrl == null) {
       final result = Process.runSync('git', ['remote', 'get-url', 'origin']);
       if (result.exitCode == 0) {
         resolvedRepoUrl = (result.stdout as String).trim();
-        stderr.writeln(
-            'ℹ  manifest.repo_url not set — using "$resolvedRepoUrl" '
-            '(from git remote origin); set manifest.repo_url explicitly to override');
+        stderr.writeln('ℹ  repo-url not set — using "$resolvedRepoUrl" '
+            '(from git remote origin); set repo-url explicitly to override');
       }
     }
 
     if (manifestCfg.commandInferred) {
       stderr.writeln(
           'ℹ  manifest.command not set — using "${manifestCfg.command}" '
-          '(last segment of app_id); set manifest.command explicitly to override');
+          '(last segment of app-id); set manifest.command explicitly to override');
     }
 
     // Generate template manifest (patches are injected at generate time,
@@ -85,6 +84,9 @@ class InitCommand extends Command<void> {
       outputRelDir: cfg.output,
       resolvedRepoUrl: resolvedRepoUrl,
       hasFlutter: hasFlutter,
+      metainfoPath: cfg.effectiveMetainfoPath(manifestCfg.appId),
+      desktopEntryPath: cfg.effectiveDesktopEntryPath(manifestCfg.appId),
+      icons: cfg.effectiveIcons(manifestCfg.appId),
     );
     final templateFile = File(templatePath)..createSync(recursive: true);
     templateFile.writeAsStringSync(generator.generate());

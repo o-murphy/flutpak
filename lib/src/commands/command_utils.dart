@@ -1,11 +1,11 @@
 import 'dart:io';
 import '../config.dart';
 
-void validateManifestAssets(ManifestConfig cfg) {
+void validateManifestAssets(FlatpakGenConfig cfg, String appId) {
   final checks = [
-    cfg.effectiveMetainfoPath(),
-    cfg.effectiveDesktopEntryPath(),
-    ...cfg.effectiveIcons().map((e) => e.path),
+    cfg.effectiveMetainfoPath(appId),
+    cfg.effectiveDesktopEntryPath(appId),
+    ...cfg.effectiveIcons(appId).map((e) => e.path),
   ];
   final missing = checks.where((path) => !File(path).existsSync()).toList();
   if (missing.isNotEmpty) {

@@ -4,7 +4,7 @@ description: >
   Flutter applications. One command prepares everything needed for a
   Flathub-compatible offline build: generated-sources.json, manifest with
   placeholders, patches, and Flutter SDK sources.
-version: 0.4.0-beta.4
+version: 0.4.0-rc.1
 repository: https://github.com/o-murphy/flutpak
 topics:
   - flatpak
@@ -27,6 +27,7 @@ dependencies:
   path: ^1.9.0
   pub_semver: ^2.1.4
   yaml: ^3.1.2
+  yaml_edit: ^2.2.4
 
 dev_dependencies:
   lints: ^6.1.0

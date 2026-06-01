@@ -3,7 +3,7 @@
 [![Pub Version](https://img.shields.io/pub/v/flutpak?logo=dart&link=https%3A%2F%2Fpub.dev%2Fpackages%2Fflutpak)](https://pub.dev/packages/flutpak)
 
 A Dart CLI tool that automates Flatpak packaging for Flutter applications.
-Describe your config once in `pubspec.yaml`, run `flutpak init` once to
+Describe your config once in `flutpak.yaml`, run `flutpak init` once to
 scaffold your template manifest, then run `flutpak generate` on every CI
 build to produce a fully-substituted, `flatpak-builder`-ready output.
 
@@ -11,10 +11,10 @@ build to produce a fully-substituted, `flatpak-builder`-ready output.
 
 - **`init` + `generate` split** — one-time scaffold vs. every-build generation; the editable template is committed to git, the substituted output is gitignored
 - **No Python** — pure Dart, compiles to a single native binary for CI
-- **Config in `pubspec.yaml`** — same pattern as `msix_config`, `flutter_native_splash`
-- **Placeholder substitution** — `__FLATPAK_TAG__` and `__FLATPAK_COMMIT__` are resolved by `generate` at build time, never baked into the template
+- **Standalone `flutpak.yaml`** — recommended; keeps Flatpak config separate from your Dart project metadata (a `flutpak:` section in `pubspec.yaml` is also supported)
+- **yaml_edit injection** — `generate` sets `tag:` and `commit:` directly in the git source block via `yaml_edit`; no placeholder strings to maintain in the template
 - **Patches registry** — known packages (e.g. `objectbox_flutter_libs`) get their patches resolved and injected into the generated manifest automatically at `generate` time
-- **Validation on every run** — `generate` errors early if the template is missing placeholders or its fields diverge from config
+- **Validation on every run** — `generate` errors early if the template is missing or its `app-id`, `command`, or `runtime-version` diverge from config
 - **Retry on transient errors** — pub.dev and Flutter artifact downloads retry on 429/5xx
 
 ## Table of Contents
@@ -28,7 +28,7 @@ build to produce a fully-substituted, `flatpak-builder`-ready output.
     - [Via setup-flutpak action (CI)](#via-setup-flutpak-action-ci)
     - [From source](#from-source)
   - [Step-by-step setup](#step-by-step-setup)
-    - [Step 1 — Add config to `pubspec.yaml`](#step-1--add-config-to-pubspecyaml)
+    - [Step 1 — Create `flutpak.yaml`](#step-1--create-flutpakyaml)
     - [Step 2 — Create required asset files](#step-2--create-required-asset-files)
     - [Step 3 — First run](#step-3--first-run)
     - [Step 4 — Review and customize the template](#step-4--review-and-customize-the-template)
@@ -121,45 +121,48 @@ sudo mv flutpak /usr/local/bin/
 Without `make`:
 
 ```bash
-dart run tool/update_version.dart
-dart compile exe bin/flutpak.dart -o flutpak
+dart compile exe bin/flutpak.dart -o flutpak --define=version=$(git describe --tags --always)
 ```
 
 ---
 
 ## Step-by-step setup
 
-### Step 1 — Add config to `pubspec.yaml`
+### Step 1 — Create `flutpak.yaml`
 
-Add a `flutpak:` section to your app's `pubspec.yaml` (or create a standalone
-`flutpak.yaml` — but not both).
+Create a standalone `flutpak.yaml` in your project root. This is the
+recommended approach — it keeps Flatpak config separate from your Dart project
+metadata and avoids any key-convention ambiguity with `pubspec.yaml`.
 
-**Minimum viable config** — only `app_id` and `finish_args` are truly required:
+> [!TIP]
+> **Alternative:** you can put a `flutpak:` section directly in `pubspec.yaml`
+> instead, but not both at once. Note that `pubspec.yaml` conventionally uses
+> snake_case for its own keys; flutpak uses kebab-case, so a standalone
+> `flutpak.yaml` is cleaner.
+
+**Minimum viable config** — only `app-id` is truly required:
 
 ```yaml
-flutpak:
-  manifest:
-    app_id: io.github.YourOrg.YourApp
-    finish_args:
-      - --share=ipc
-      - --socket=wayland
-      - --device=dri
+# flutpak.yaml
+manifest:
+  app-id: io.github.YourOrg.YourApp
 ```
 
 Everything else is either optional or auto-detected at runtime. For Flutter
 projects, add the SDK path:
 
 ```yaml
-flutpak:
-  flutter:
-    sdk: $FLUTTER_ROOT        # or absolute path; omit for pure-Dart projects
-  manifest:
-    app_id: io.github.YourOrg.YourApp
-    finish_args:
-      - --share=ipc
-      - --socket=wayland
-      - --device=dri
+# flutpak.yaml
+flutter:
+  sdk: $FLUTTER_ROOT        # or absolute path; omit for pure-Dart projects
+manifest:
+  app-id: io.github.YourOrg.YourApp
 ```
+
+> [!TIP]
+> **Sandbox permissions (`finish-args`)** are written into the template by
+> `flutpak init` with sensible Flutter desktop defaults. Edit them directly
+> in `flatpak/<app-id>.yml` — no config change needed.
 
 See [Full config reference](#full-config-reference) for all options.
 
@@ -177,17 +180,17 @@ Create and commit them first:
 └── app/
     └── share/
         ├── metainfo/
-        │   └── <app_id>.metainfo.xml
+        │   └── <app-id>.metainfo.xml
         ├── applications/
-        │   └── <app_id>.desktop
+        │   └── <app-id>.desktop
         └── icons/
             └── hicolor/
                 └── 256x256/
                     └── apps/
-                        └── <app_id>.png    # minimum 256x256 required by Flathub
+                        └── <app-id>.png    # minimum 256x256 required by Flathub
 ```
 
-**Minimal `<app_id>.desktop`:**
+**Minimal `<app-id>.desktop`:**
 
 ```ini
 [Desktop Entry]
@@ -198,7 +201,7 @@ Type=Application
 Categories=Utility;
 ```
 
-**Minimal `<app_id>.metainfo.xml`:**
+**Minimal `<app-id>.metainfo.xml`:**
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -230,18 +233,18 @@ immediately runs `generate` to populate `flatpak/generated/`:
 
 ```
 flatpak/
-├── <app_id>.yml          # editable template manifest — commit this
+├── <app-id>.yml          # editable template manifest — commit this
 ├── <name>-wrapper.sh     # Flutter launcher wrapper — commit this
 ├── flathub.json          # Flathub submission config — commit this
 ├── .gitignore            # contains: generated/
 └── generated/            # gitignored, ready for flatpak-builder
-    ├── <app_id>.yml
+    ├── <app-id>.yml
     ├── flathub.json
     ├── generated-sources.json
     └── patches/
 ```
 
-**Commit** `flatpak/<app_id>.yml`, `flatpak/<name>-wrapper.sh`,
+**Commit** `flatpak/<app-id>.yml`, `flatpak/<name>-wrapper.sh`,
 `flatpak/flathub.json`, and `flatpak/.gitignore`. Do not commit
 `flatpak/generated/` — it is gitignored by design.
 
@@ -252,7 +255,7 @@ overwrite an existing scaffold.
 
 ### Step 4 — Review and customize the template
 
-Open `flatpak/<app_id>.yml` and adjust `build-commands`, `sdk-extensions`,
+Open `flatpak/<app-id>.yml` and adjust `build-commands`, `sdk-extensions`,
 `finish-args`, and any other fields for your project. The template is yours —
 `flutpak` never overwrites it on subsequent runs.
 
@@ -267,7 +270,7 @@ which sections are safe to edit. Key rules:
 | `sdk-extensions:` | Safe to edit |
 | `modules:` | Safe to edit — add extra modules |
 | `sources:` — extra archives | Safe to add/remove |
-| `__FLATPAK_TAG__` / `__FLATPAK_COMMIT__` | **Do not remove** — required by `generate` |
+| `tag:` / `commit:` in git source | Set automatically by `generate` via `yaml_edit` — you can leave them absent or set them manually; `generate` will overwrite them |
 | Patch sources (`type: patch`) | **Do not add manually** — injected automatically by `generate` from your `patches:` config; adding them to the template causes duplicates |
 
 ---
@@ -278,7 +281,7 @@ Point `flatpak-builder` at the generated manifest:
 
 ```bash
 flatpak-builder --repo=repo --force-clean build-dir \
-  flatpak/generated/<app_id>.yml
+  flatpak/generated/<app-id>.yml
 ```
 
 See [Validating and building locally](#validating-and-building-locally) for
@@ -294,9 +297,9 @@ On every release build, run `generate` with the release tag:
 flutpak generate --tag ${{ github.ref_name }}
 ```
 
-This reads the committed template, resolves the tag and commit SHA, generates
-`generated-sources.json`, substitutes `__FLATPAK_TAG__` and
-`__FLATPAK_COMMIT__`, and writes everything to `flatpak/generated/`.
+This reads the committed template, resolves the tag and commit SHA, sets
+`tag:` and `commit:` in the git source block, generates `generated-sources.json`,
+and writes everything to `flatpak/generated/`.
 
 See [CI/CD integration](#cicd-integration) for a complete GitHub Actions
 workflow.
@@ -310,7 +313,7 @@ Open a PR to your app's Flathub repository. Copy the contents of
 
 ```
 <flathub-repo>/
-├── <app_id>.yml               # flatpak/generated/<app_id>.yml
+├── <app-id>.yml               # flatpak/generated/<app-id>.yml
 ├── generated-sources.json     # flatpak/generated/generated-sources.json
 ├── flathub.json               # flatpak/generated/flathub.json
 └── patches/                   # flatpak/generated/patches/ (if any)
@@ -325,73 +328,70 @@ For complete submission requirements see the
 
 Config lives in **one** of two places (error if both exist):
 
-| Location | Key |
+| Location | Notes |
 |---|---|
-| `pubspec.yaml` | `flutpak:` section |
-| `flutpak.yaml` | standalone file |
+| `flutpak.yaml` | **Recommended** — standalone file |
+| `pubspec.yaml` | `flutpak:` section — also works; note that flutpak uses kebab-case keys which look unusual alongside pubspec's own snake_case keys |
 
 ### Complete YAML with all options
 
 ```yaml
-# pubspec.yaml — flutpak: section (or standalone flutpak.yaml)
-flutpak:
-  output: flatpak                    # default
+# flutpak.yaml (recommended) — or flutpak: section in pubspec.yaml
+output: flatpak                    # default
 
-  pub:
-    locks:
-      - pubspec.lock
-      - $FLUTTER_ROOT/packages/flutter_tools/pubspec.lock  # optional
+pub:
+  locks:
+    - pubspec.lock
+    - $FLUTTER_ROOT/packages/flutter_tools/pubspec.lock  # optional
 
-  flutter:
-    sdk: /home/user/flutter          # or set $FLUTTER_ROOT; omit for pure-Dart
-    patch: flatpak/patches/flutter/shared.sh.patch  # optional
+flutter:
+  sdk: /home/user/flutter          # or set $FLUTTER_ROOT; omit for pure-Dart
+  patch: flatpak/patches/flutter/shared.sh.patch  # optional
 
-  patches:                           # optional project-level patches
-    - package: objectbox_flutter_libs
-      path: flatpak/patches/objectbox.patch
-      dest_subpath: linux            # optional: subdirectory inside package root
-      strip_trailing_cr: true        # optional: strip \r before patching (CRLF sources)
-      options:                       # optional: extra flags passed to patch(1)
-        - --some-flag
+patches:                           # optional project-level patches
+  - package: objectbox_flutter_libs
+    path: flatpak/patches/objectbox.patch
+    dest-subpath: linux            # optional: subdirectory inside package root
+    strip-trailing-cr: true        # optional: strip \r before patching (CRLF sources)
+    options:                       # optional: extra flags passed to patch(1)
+      - --some-flag
 
-  manifest:
-    app_id: io.github.YourOrg.YourApp  # required
-    runtime_version: '25.08'           # default: '25.08'
-    finish_args:                        # required
-      - --share=ipc
-      - --socket=wayland
-      - --device=dri
-    sdk_extensions:
-      - org.freedesktop.Sdk.Extension.llvm20
+# flutpak-specific overrides (not part of the Flatpak manifest schema):
+repo-url: https://github.com/...   # default: git remote get-url origin
+metainfo-path: app/share/metainfo/<app-id>.metainfo.xml   # default
+desktop-entry-path: app/share/applications/<app-id>.desktop  # default
 
-    # Auto-detected if omitted (info printed on init):
-    command: yourapp                  # default: last segment of app_id
-    repo_url: https://github.com/... # default: git remote get-url origin
+icons:                             # default: single 256x256 entry
+  - size: 256x256                  # required when icons: key is present
+    path: app/share/icons/hicolor/256x256/apps/<app-id>.png
+  # optional additional sizes:
+  - size: 512x512
+    path: app/share/icons/hicolor/512x512/apps/<app-id>.png
+  - size: scalable
+    path: app/share/icons/hicolor/scalable/apps/<app-id>.svg
 
-    # Asset source paths (relative to project root):
-    metainfo_path: app/share/metainfo/<app_id>.metainfo.xml   # default
-    desktop_entry_path: app/share/applications/<app_id>.desktop  # default
-    icons:                            # default: single 256x256 entry
-      - size: 256x256                 # required when icons: key is present
-        path: app/share/icons/hicolor/256x256/apps/<app_id>.png
-      # optional additional sizes:
-      - size: 512x512
-        path: app/share/icons/hicolor/512x512/apps/<app_id>.png
-      - size: scalable
-        path: app/share/icons/hicolor/scalable/apps/<app_id>.svg
+modules:
+  - flatpak/modules/bclibc.yml
 
-    # Other optional fields:
-    extra_modules:
-      - flatpak/modules/bclibc.yml
-    extra_sources: []
-    env: {}
-    build_options:
-      append_path: /custom/bin
-      prepend_ld_library_path: /custom/lib
-      env:
-        MY_VAR: value
+manifest:
+  app-id: io.github.YourOrg.YourApp  # required
+  runtime-version: '25.08'           # default: '25.08'
+  sdk-extensions:
+    - org.freedesktop.Sdk.Extension.llvm20
 
-  flutter_version_file: flatpak/flutter.version  # default when flutter configured
+  # Auto-detected if omitted (info printed on init):
+  command: yourapp                   # default: last segment of app-id
+
+  # Verbatim flatpak source entries appended to the app module:
+  sources: []
+  env: {}
+  build-options:
+    append-path: /custom/bin
+    prepend-ld-library-path: /custom/lib
+    env:
+      MY_VAR: value
+
+flutter-version-file: flatpak/flutter.version  # default when flutter configured
 ```
 
 ### Field reference table
@@ -402,25 +402,34 @@ flutpak:
 | `pub.locks` | list | `[pubspec.lock]` | Lock files to scan; `$ENV` vars expanded |
 | `flutter.sdk` | string | `$FLUTTER_ROOT` | Flutter SDK path; omit for pure-Dart |
 | `flutter.patch` | string | — | Custom patch for `setup-flutter.sh` |
-| `flutter_version_file` | string | `<output>/flutter.version` | Written when Flutter is configured |
+| `flutter-version-file` | string | `<output>/flutter.version` | Written when Flutter is configured |
 | `patches` | list | `[]` | Project-level package patches |
 | `patches[].options` | list | `[]` | Extra flags forwarded to `patch(1)` |
-| `patches[].strip_trailing_cr` | bool | `false` | Inject a `sed -i 's/\r//'` shell step before patching; use when the upstream pub.dev archive has CRLF line endings |
-| `manifest.app_id` | string | **required** | Reverse-DNS app ID |
-| `manifest.runtime_version` | string | `25.08` | Freedesktop runtime version |
-| `manifest.command` | string | last segment of `app_id` | Executable name inside `/app/bin/` |
-| `manifest.repo_url` | string | `git remote get-url origin` | Source git URL written into template |
-| `manifest.finish_args` | list | **required** | Flatpak sandbox permissions |
-| `manifest.sdk_extensions` | list | `[]` | e.g. `llvm20`, `rust` |
-| `manifest.metainfo_path` | string | `app/share/metainfo/<id>.metainfo.xml` | Validated on `init` and `generate` |
-| `manifest.desktop_entry_path` | string | `app/share/applications/<id>.desktop` | Validated on `init` and `generate` |
-| `manifest.icons` | list | `[{size: 256x256, path: app/share/icons/…}]` | Must include 256x256 if key is present |
-| `manifest.extra_modules` | list | `[]` | YAML files included verbatim in modules |
-| `manifest.extra_sources` | list | `[]` | Verbatim flatpak source entries |
+| `patches[].strip-trailing-cr` | bool | `false` | Inject a `sed -i 's/\r//'` shell step before patching; use when the upstream pub.dev archive has CRLF line endings |
+| `repo-url` | string | `git remote get-url origin` | Source git URL written into template |
+| `metainfo-path` | string | `app/share/metainfo/<id>.metainfo.xml` | Validated on `init` and `generate` |
+| `desktop-entry-path` | string | `app/share/applications/<id>.desktop` | Validated on `init` and `generate` |
+| `icons` | list | `[{size: 256x256, path: app/share/icons/…}]` | Must include 256x256 if key is present |
+| `modules` | list | `[]` | YAML files injected as extra modules before the app module |
+| `manifest.app-id` | string | **required** | Reverse-DNS app ID |
+| `manifest.runtime-version` | string | `25.08` | Freedesktop runtime version |
+| `manifest.command` | string | last segment of `app-id` | Executable name inside `/app/bin/` |
+| `manifest.sdk-extensions` | list | `[]` | e.g. `llvm20`, `rust` |
+| `manifest.sources` | list | `[]` | Verbatim flatpak source entries appended to the app module |
 | `manifest.env` | map | `{}` | Build-time env vars (shorthand) |
-| `manifest.build_options.append_path` | string | — | Appended to `PATH` during build |
-| `manifest.build_options.prepend_ld_library_path` | string | — | Prepended to `LD_LIBRARY_PATH` |
-| `manifest.build_options.env` | map | `{}` | Merged with top-level `env:` |
+| `manifest.build-options.append-path` | string | — | Appended to `PATH` during build |
+| `manifest.build-options.prepend-ld-library-path` | string | — | Prepended to `LD_LIBRARY_PATH` |
+| `manifest.build-options.env` | map | `{}` | Merged with top-level `env:` |
+
+> [!NOTE]
+> The `manifest:` section currently supports only the fields listed
+> above. It is **not** a full Flatpak manifest — fields like `finish-args`,
+> `build-commands`, and `modules` are not read from config. Edit the template
+> file (`flatpak/<app-id>.yml`) directly to change those.
+>
+> Future versions plan to treat `manifest:` as a full Flatpak manifest fragment,
+> with flutpak injecting sources, patches, and modules in merge mode (adding
+> only what is not already present) rather than generating a fixed template.
 
 ---
 
@@ -435,7 +444,7 @@ flutpak init [--config <path>] [--sdk <path>] [--force]
 One-time setup. Generates the editable template manifest, wrapper script,
 `flathub.json`, and `flatpak/.gitignore`, then immediately runs `generate`.
 
-- Errors if the template (`flatpak/<app_id>.yml`) already exists — use
+- Errors if the template (`flatpak/<app-id>.yml`) already exists — use
   `--force` to overwrite.
 - Validates that all asset files (metainfo, desktop entry, icons) exist.
 - Auto-detects `repo_url` from `git remote get-url origin`.
@@ -454,12 +463,10 @@ flutpak generate [--tag v1.2.3] [--commit sha] [--config <path>] [--sdk <path>]
 ```
 
 Every-build command. Reads the committed template, validates it against
-config, generates `generated-sources.json`, substitutes `__FLATPAK_TAG__` and
-`__FLATPAK_COMMIT__`, and writes everything to `flatpak/generated/`.
+config, sets `tag:` and `commit:` in the git source block via `yaml_edit`,
+generates `generated-sources.json`, and writes everything to `flatpak/generated/`.
 
 - Errors if the template does not exist (run `flutpak init` first).
-- Errors if `__FLATPAK_TAG__` or `__FLATPAK_COMMIT__` are missing from the
-  template.
 - Errors if `app-id`, `command`, or `runtime-version` in the template differ
   from config.
 - Errors if any asset file (metainfo, desktop entry, icon) does not exist.
@@ -546,14 +553,13 @@ generated output (gitignored):
 
 ```
 flatpak/
-├── <app_id>.yml          <- editable template — committed to git
-│                            contains __FLATPAK_TAG__ and __FLATPAK_COMMIT__
+├── <app-id>.yml          <- editable template — committed to git
 ├── <name>-wrapper.sh     <- committed to git
 ├── flathub.json          <- committed to git
 ├── patches/              <- patch files — committed to git
 ├── .gitignore            <- contains: generated/
 └── generated/            <- gitignored, never commit this
-    ├── <app_id>.yml      <- final manifest (placeholders substituted)
+    ├── <app-id>.yml      <- final manifest (tag/commit set, sources injected)
     ├── flathub.json      <- copy
     ├── generated-sources.json
     └── patches/          <- copy
@@ -561,16 +567,18 @@ flatpak/
 
 **Phase 1 — `flutpak init`** (run once)
 
-Creates `flatpak/<app_id>.yml` with `__FLATPAK_TAG__` and `__FLATPAK_COMMIT__`
-in the app git source block. Commit this file — it is the starting point that
-reviewers inspect and that `generate` reads on every subsequent build.
+Creates `flatpak/<app-id>.yml` — the editable template with guidance comments
+and a git source block (no `tag:` / `commit:` yet). Commit this file — it is
+the starting point that reviewers inspect and that `generate` reads on every
+subsequent build.
 
 **Phase 2 — `flutpak generate --tag vX.Y.Z`** (run on every CI build)
 
-Reads the committed template, resolves the tag and commit SHA, generates
-`generated-sources.json`, substitutes the placeholders, and copies everything
-to `flatpak/generated/`. The template is never modified. `flatpak-builder`
-consumes `flatpak/generated/<app_id>.yml`.
+Reads the committed template, resolves the tag and commit SHA, sets `tag:` and
+`commit:` directly in the git source block (via `yaml_edit`), generates
+`generated-sources.json`, and copies everything to `flatpak/generated/`. The
+template is never modified. `flatpak-builder` consumes
+`flatpak/generated/<app-id>.yml`.
 
 ---
 
@@ -626,7 +634,7 @@ and sources as a workflow artifact. Requires Flutter to be installed beforehand
   with:
     tag: ${{ inputs.tag }}      # or pass 'commit:' for non-tag builds
     # commit: ${{ github.sha }} # used when 'tag' is empty
-    metainfo-path: app/share/metainfo/<app_id>.metainfo.xml
+    metainfo-path: app/share/metainfo/<app-id>.metainfo.xml
     artifact-name: flatpak-generated
 ```
 
@@ -649,7 +657,7 @@ lints the repo, exports a `.flatpak` bundle, and optionally uploads it.
 - uses: o-murphy/flutpak/.github/actions/build-flatpak@main
   id: build
   with:
-    manifest: flatpak/generated/<app_id>.yml
+    manifest: flatpak/generated/<app-id>.yml
     app-id: io.github.YourOrg.YourApp
     artifact-name: myapp-flatpak
     github-token: ${{ secrets.GITHUB_TOKEN }}   # for private source downloads
@@ -707,7 +715,7 @@ jobs:
       - uses: o-murphy/flutpak/.github/actions/generate@main
         with:
           tag: ${{ github.ref_name }}
-          metainfo-path: app/share/metainfo/<app_id>.metainfo.xml
+          metainfo-path: app/share/metainfo/<app-id>.metainfo.xml
           artifact-name: flatpak-generated
 
   build:
@@ -727,7 +735,7 @@ jobs:
       - uses: o-murphy/flutpak/.github/actions/build-flatpak@main
         id: build
         with:
-          manifest: flatpak/generated/<app_id>.yml
+          manifest: flatpak/generated/<app-id>.yml
           app-id: io.github.YourOrg.YourApp
           artifact-name: myapp-${{ matrix.arch }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -794,7 +802,7 @@ flatpak install flathub org.freedesktop.Sdk//25.08
 
 ```bash
 appstreamcli validate --explain --no-net \
-  app/share/metainfo/<app_id>.metainfo.xml
+  app/share/metainfo/<app-id>.metainfo.xml
 ```
 
 ### 2. Lint the manifest
@@ -805,7 +813,7 @@ dbus-run-session flatpak run \
   --command=flatpak-builder-lint \
   org.flatpak.Builder \
   --exceptions \
-  manifest flatpak/generated/<app_id>.yml
+  manifest flatpak/generated/<app-id>.yml
 ```
 
 `--exceptions` applies the built-in Flathub exception list. Run this before
@@ -824,7 +832,7 @@ Flathub-specific flags.
 ```bash
 dbus-run-session flatpak run --command=flathub-build \
   org.flatpak.Builder \
-  flatpak/generated/<app_id>.yml
+  flatpak/generated/<app-id>.yml
 ```
 
 ### 4. Lint the built repo
@@ -841,9 +849,9 @@ dbus-run-session flatpak run \
 ### 5. Export a single-file bundle (optional)
 
 ```bash
-flatpak build-bundle repo myapp.flatpak <app_id>
+flatpak build-bundle repo myapp.flatpak <app-id>
 flatpak install --user myapp.flatpak
-flatpak run <app_id>
+flatpak run <app-id>
 ```
 
 ---
@@ -953,7 +961,7 @@ copy it to `generated/patches/` and inject it into the manifest automatically.
 
 Some upstream packages ship sources with CRLF line endings (e.g.
 `objectbox_flutter_libs` ≥ 5.3.2). GNU `patch(1)` fails with "different line
-endings" in this case even with `--ignore-whitespace`. Use `strip_trailing_cr:
+endings" in this case even with `--ignore-whitespace`. Use `strip-trailing-cr:
 true` instead — flutpak injects a `type: shell` source that runs
 `sed -i 's/\r//'` on the target file before the patch is applied:
 
@@ -961,7 +969,7 @@ true` instead — flutpak injects a `type: shell` source that runs
 patches:
   - package: objectbox_flutter_libs
     path: flatpak/patches/objectbox_flutter_libs/CMakeLists.txt.patch
-    strip_trailing_cr: true
+    strip-trailing-cr: true
 ```
 
 ### Wrapper script
@@ -982,15 +990,13 @@ libraries bundled with the app.
 
 ### Template vs generated
 
-The template (`flatpak/<app_id>.yml`) is a valid Flatpak manifest with two
-placeholder strings:
+The template (`flatpak/<app-id>.yml`) is a standard Flatpak manifest that you
+commit to git. It contains no placeholder strings — `generate` writes `tag:` and
+`commit:` directly into the git source block via `yaml_edit`.
 
-- `__FLATPAK_TAG__` — replaced by the git tag (e.g. `v1.2.3`) or HEAD SHA
-- `__FLATPAK_COMMIT__` — replaced by the full commit SHA
-
-`generate` copies the template to `flatpak/generated/<app_id>.yml`,
-substitutes the placeholders, and **injects patch sources** immediately after
-the `generated-sources.json` reference. Patches are never baked into the
+`generate` copies the template to `flatpak/generated/<app-id>.yml`, sets `tag:`
+and `commit:` in the git source block, and **injects patch sources** immediately
+after the `generated-sources.json` reference. Patches are never baked into the
 template — they are resolved from `pubspec.lock` at generate time so the
 `dest:` path always contains the correct package version. The template is
 never modified; the generated file is gitignored and rebuilt on every CI run.
@@ -998,9 +1004,9 @@ never modified; the generated file is gitignored and rebuilt on every CI run.
 `generate` also validates consistency between the template and config before
 writing anything:
 
-- `app-id` in template must match `manifest.app_id` in config
+- `app-id` in template must match `manifest.app-id` in config
 - `command` in template must match `manifest.command` in config (or its default)
-- `runtime-version` in template must match `manifest.runtime_version` in config
+- `runtime-version` in template must match `manifest.runtime-version` in config
 
 ---
 
@@ -1010,18 +1016,16 @@ writing anything:
 git clone https://github.com/o-murphy/flutpak.git
 cd flutpak
 make test        # run test suite
-make build       # regenerate version.dart + compile binary
-make version     # regenerate version.dart only
+make build       # compile binary (version from git describe --tags)
 ```
 
 ### Bumping the version
 
 1. Update `version:` in `pubspec.yaml`
-2. Run `make version` (or `dart run tool/update_version.dart`) — rewrites
-   `lib/src/version.dart`
-3. Commit both files
+2. Commit and tag (`git tag v1.2.3`) — `make build` picks the version from the
+   tag automatically via `git describe`
 
-During a release, `release.yml` performs steps 1–3 automatically when a `v*`
+During a release, `release.yml` performs step 1 automatically when a `v*`
 tag is pushed, so the compiled binaries always report the correct version.
 
 ---
