@@ -1,22 +1,18 @@
-import 'dart:io';
 import 'package:flutpak/src/version.dart';
 import 'package:test/test.dart';
-import 'package:yaml/yaml.dart';
 
 void main() {
-  test('packageVersion matches pubspec.yaml version', () {
-    final pubspec = File('pubspec.yaml');
-    expect(pubspec.existsSync(), isTrue, reason: 'pubspec.yaml not found');
+  test('packageVersion is a non-empty string', () {
+    expect(packageVersion, isNotEmpty);
+  });
 
-    final yaml = loadYaml(pubspec.readAsStringSync()) as YamlMap;
-    final pubspecVersion = yaml['version']?.toString();
-
+  test('packageVersion defaults to "dev" when not injected at compile time', () {
+    // When running under `dart test` (no --define=version=...), the value is 'dev'.
+    // In release builds the Makefile/CI passes --define=version=<tag>.
     expect(
       packageVersion,
-      equals(pubspecVersion),
-      reason:
-          'lib/src/version.dart is out of sync with pubspec.yaml.\n'
-          'Run: dart run tool/update_version.dart',
+      anyOf(equals('dev'), matches(r'^\d+\.\d+\.\d+')),
+      reason: 'packageVersion must be "dev" or a semver string',
     );
   });
 }

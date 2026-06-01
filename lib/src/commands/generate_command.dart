@@ -1,6 +1,8 @@
 import 'dart:io';
 import 'package:args/command_runner.dart';
 import 'package:path/path.dart' as p;
+import 'package:yaml/yaml.dart';
+import 'package:yaml_edit/yaml_edit.dart';
 import '../config.dart';
 import '../generators/flutter_sdk.dart';
 import '../generators/manifest_generator.dart';
@@ -112,20 +114,8 @@ class GenerateCommand extends Command<void> {
     // Validate YAML fields in template vs config.
     _validateTemplate(templateContent, manifestCfg, templatePath);
 
-    // Validate placeholders.
-    if (!templateContent.contains(tagPlaceholder)) {
-      stderr.writeln(
-          'error: $tagPlaceholder not found in template: $templatePath');
-      exit(1);
-    }
-    if (!templateContent.contains(commitPlaceholder)) {
-      stderr.writeln(
-          'error: $commitPlaceholder not found in template: $templatePath');
-      exit(1);
-    }
-
     // ── Validate asset files exist ────────────────────────────────────────
-    validateManifestAssets(manifestCfg);
+    validateManifestAssets(cfg, manifestCfg.appId);
 
     // ── Output paths ──────────────────────────────────────────────────────
     final generatedDir = p.join(outputDir, 'generated');
@@ -192,29 +182,27 @@ class GenerateCommand extends Command<void> {
       }
     }
 
-    // ── Copy template with substituted placeholders ───────────────────────
     if (commit == null) {
-      if (templateContent.contains(commitPlaceholder)) {
-        stderr.writeln(
-            '⚠  commit hash unknown (not in a git repo and --commit not set);\n'
-            '   $commitPlaceholder placeholder will remain in $generatedManifestPath');
-      }
+      stderr.writeln(
+          '⚠  commit hash unknown (not in a git repo and --commit not set);\n'
+          '   commit: will be missing from $generatedManifestPath');
     }
 
-    final effectiveCommit = commit ?? commitPlaceholder;
     var generatedContent = stripTemplateGuidance(templateContent);
-    generatedContent = patchManifestPlaceholders(
-      generatedContent,
+
+    // ── Inject tag/commit, modules, and sources via yaml_edit ────────────
+    generatedContent = _injectGeneratedContent(
+      content: generatedContent,
+      manifestCfg: manifestCfg,
+      extraModules: cfg.extraModules,
+      sourcesPath: sourcesPath,
+      patchesDir: patchesDir,
+      flutterPatchAbsPath: flutterPatchAbsPath,
+      patchEntries: patchEntries,
       tag: tag,
-      commit: effectiveCommit,
+      commit: commit,
     );
-    final allPatches = [
-      if (flutterPatchAbsPath != null)
-        PatchEntry(package: 'flutter', path: flutterPatchAbsPath),
-      ...patchEntries,
-    ];
-    generatedContent =
-        injectPatchSources(generatedContent, allPatches, patchesDir);
+
     File(generatedManifestPath)
       ..createSync(recursive: true)
       ..writeAsStringSync(generatedContent);
@@ -269,7 +257,7 @@ class GenerateCommand extends Command<void> {
     final appId = extractField('app-id');
     if (appId != null && appId != cfg.appId) {
       stderr.writeln(
-          'error: template app-id "$appId" does not match config app_id "${cfg.appId}": $templatePath');
+          'error: template app-id "$appId" does not match config app-id "${cfg.appId}": $templatePath');
       exit(1);
     }
 
@@ -283,7 +271,7 @@ class GenerateCommand extends Command<void> {
     final runtimeVersion = extractField('runtime-version');
     if (runtimeVersion != null && runtimeVersion != cfg.runtimeVersion) {
       stderr.writeln(
-          'error: template runtime-version "$runtimeVersion" does not match config runtime_version "${cfg.runtimeVersion}": $templatePath');
+          'error: template runtime-version "$runtimeVersion" does not match config runtime-version "${cfg.runtimeVersion}": $templatePath');
       exit(1);
     }
   }
@@ -310,5 +298,107 @@ class GenerateCommand extends Command<void> {
         _copyDirectory(entity, Directory(destPath));
       }
     }
+  }
+
+  /// Injects tag/commit, modules, manifest.sources, generated-sources.json,
+  /// and patches into the manifest YAML using yaml_edit.
+  ///
+  /// - tag and commit are set on the git source entry.
+  /// - modules file contents are inserted before the app module.
+  /// - generated-sources.json, manifest.sources, and patch sources are appended
+  ///   to the app module's sources list.
+  String _injectGeneratedContent({
+    required String content,
+    required ManifestConfig manifestCfg,
+    required List<String> extraModules,
+    required String sourcesPath,
+    required String patchesDir,
+    required String? flutterPatchAbsPath,
+    required List<PatchEntry> patchEntries,
+    required String? tag,
+    required String? commit,
+  }) {
+    final editor = YamlEditor(content);
+    final yamlTree = loadYaml(content);
+
+    final modules = yamlTree['modules'];
+    if (modules is! List) {
+      stderr.writeln(
+          '⚠  modules key not found or not a list in template — skipping injection');
+      return content;
+    }
+
+    final appName = manifestCfg.appId.split('.').last;
+    final appModuleIdx =
+        modules.toList().indexWhere((m) => m is Map && m['name'] == appName);
+    if (appModuleIdx < 0) {
+      stderr.writeln(
+          '⚠  app module "$appName" not found in template — skipping injection');
+      return content;
+    }
+
+    final appModule = modules.toList()[appModuleIdx];
+    if (appModule is! Map || appModule['sources'] is! List) {
+      stderr.writeln(
+          '⚠  sources key not found or not a list in app module "$appName" — skipping injection');
+      return content;
+    }
+
+    // ── Set tag and commit on git source ──────────────────────────────────
+    // Both fields are always written (when commit is available). When no
+    // --tag is given, _resolveRefs returns (sha, sha) so both fields get the
+    // same SHA value.
+    final sourcesBase = ['modules', appModuleIdx, 'sources'];
+    final appSources = modules.toList()[appModuleIdx]['sources'];
+    if (appSources is List && (tag != null || commit != null)) {
+      final gitSrcIdx = appSources.toList().indexWhere(
+            (s) => s is Map && s['type'] == 'git',
+          );
+      if (gitSrcIdx >= 0) {
+        final gitBase = [...sourcesBase, gitSrcIdx];
+        if (tag != null) editor.update([...gitBase, 'tag'], tag);
+        if (commit != null) editor.update([...gitBase, 'commit'], commit);
+      }
+    }
+
+    // ── Append to app module sources ──────────────────────────────────────
+    // Order: generated-sources.json → manifest.sources → flutter patch → pub patches
+
+    editor.appendToList(sourcesBase, p.basename(sourcesPath));
+
+    for (final src in manifestCfg.sources) {
+      editor.appendToList(sourcesBase, Map<String, dynamic>.from(src));
+    }
+
+    final allPatches = [
+      if (flutterPatchAbsPath != null)
+        PatchEntry(package: 'flutter', path: flutterPatchAbsPath),
+      ...patchEntries,
+    ];
+    for (final patchMap in buildPatchSourceMaps(allPatches, patchesDir)) {
+      editor.appendToList(sourcesBase, patchMap);
+    }
+
+    // ── Insert modules before app module ────────────────────────────
+    // Iterate in reverse so that sequential insertions at the same index
+    // preserve the original order from modules.
+    var insertIdx = appModuleIdx;
+    for (final modPath in extraModules.reversed) {
+      final f = File(modPath);
+      if (!f.existsSync()) {
+        stderr.writeln('⚠  modules: file not found: $modPath');
+        continue;
+      }
+      final modYaml = loadYaml(f.readAsStringSync());
+      if (modYaml is List) {
+        for (final mod in modYaml.reversed) {
+          editor.insertIntoList(['modules'], insertIdx, mod);
+        }
+      } else if (modYaml is Map) {
+        editor.insertIntoList(['modules'], insertIdx, modYaml);
+      }
+    }
+
+    return editor.toString();
   }
 }

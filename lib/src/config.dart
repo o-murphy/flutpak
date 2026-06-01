@@ -39,9 +39,9 @@ class PatchEntry {
       package: yaml['package'] as String,
       version: yaml['version'] as String?,
       path: yaml['path'] as String,
-      destSubpath: yaml['dest_subpath'] as String?,
+      destSubpath: yaml['dest-subpath'] as String?,
       options: options,
-      stripTrailingCr: yaml['strip_trailing_cr'] as bool? ?? false,
+      stripTrailingCr: yaml['strip-trailing-cr'] as bool? ?? false,
     );
   }
 }
@@ -136,11 +136,7 @@ class ManifestConfig {
   /// True when [command] was derived from [appId] rather than set explicitly.
   final bool commandInferred;
 
-  final List<String> finishArgs;
-
   /// Paths to extra module YAML files (e.g. bclibc module).
-  final List<String> extraModules;
-
   /// Additional PATH entries for build-options.append-path.
   final String? appendPath;
 
@@ -150,25 +146,10 @@ class ManifestConfig {
   /// Environment variables for build-options.env.
   final Map<String, String> env;
 
-  /// Git repository URL for the app source entry.
-  final String? repoUrl;
-
   /// Extra flatpak sources inserted verbatim into the app module sources list.
   /// Use for arch-specific prebuilt archives (e.g. objectbox-c) that have no
   /// pub package equivalent.
-  final List<Map<String, dynamic>> extraSources;
-
-  /// Override for the metainfo XML path. When null, [effectiveMetainfoPath()]
-  /// computes the default.
-  final String? metainfoPath;
-
-  /// Override for the desktop entry path. When null,
-  /// [effectiveDesktopEntryPath()] computes the default.
-  final String? desktopEntryPath;
-
-  /// Icon entries. When empty, [effectiveIcons()] returns the default 256x256
-  /// icon derived from [appId].
-  final List<IconEntry> icons;
+  final List<Map<String, dynamic>> sources;
 
   const ManifestConfig({
     required this.appId,
@@ -176,96 +157,46 @@ class ManifestConfig {
     this.sdkExtensions = const [],
     required this.command,
     this.commandInferred = false,
-    this.finishArgs = const [],
-    this.extraModules = const [],
     this.appendPath,
     this.prependLdLibraryPath,
     this.env = const {},
-    this.repoUrl,
-    this.extraSources = const [],
-    this.metainfoPath,
-    this.desktopEntryPath,
-    this.icons = const [],
+    this.sources = const [],
   });
 
-  /// Effective metainfo XML path (config override or default).
-  String effectiveMetainfoPath() =>
-      metainfoPath ?? 'app/share/metainfo/$appId.metainfo.xml';
-
-  /// Effective .desktop entry path (config override or default).
-  String effectiveDesktopEntryPath() =>
-      desktopEntryPath ?? 'app/share/applications/$appId.desktop';
-
-  /// Effective icon list. Returns the default 256x256 icon when [icons] is
-  /// empty.
-  List<IconEntry> effectiveIcons() => icons.isEmpty
-      ? [
-          IconEntry(
-            size: '256x256',
-            path: 'app/share/icons/hicolor/256x256/apps/$appId.png',
-          )
-        ]
-      : icons;
-
   factory ManifestConfig.fromYaml(Map yaml) {
-    final appId = yaml['app_id'];
+    final appId = yaml['app-id'];
     if (appId == null) {
-      throw ArgumentError('manifest.app_id is required in flutpak config');
+      throw ArgumentError('manifest.app-id is required in flutpak config');
     }
 
     final commandRaw = yaml['command'] as String?;
     final commandInferred = commandRaw == null;
     final command = commandRaw ?? (appId as String).split('.').last;
 
-    final exts = (yaml['sdk_extensions'] as List?)?.cast<String>() ?? [];
-    final finArgs = (yaml['finish_args'] as List?)?.cast<String>() ?? [];
-    final extraMods = (yaml['extra_modules'] as List?)?.cast<String>() ?? [];
-    final buildOpts = yaml['build_options'] as Map? ?? {};
+    final exts = (yaml['sdk-extensions'] as List?)?.cast<String>() ?? [];
+    final buildOpts = yaml['build-options'] as Map? ?? {};
 
-    // Accept env at both manifest.env and manifest.build_options.env levels;
-    // build_options.env takes precedence for overlapping keys.
+    // Accept env at both manifest.env and manifest.build-options.env levels;
+    // build-options.env takes precedence for overlapping keys.
     final envTop = (yaml['env'] as Map? ?? {})
         .map((k, v) => MapEntry(k as String, v.toString()));
     final envOpts = (buildOpts['env'] as Map? ?? {})
         .map((k, v) => MapEntry(k as String, v.toString()));
     final envMap = {...envTop, ...envOpts};
 
-    final extraSourcesRaw = yaml['extra_sources'] as List? ?? [];
-
-    // Parse icons list.
-    final iconsRaw = yaml['icons'] as List?;
-    final List<IconEntry> iconsList;
-    if (iconsRaw != null) {
-      iconsList = iconsRaw.map((e) => IconEntry.fromYaml(e as Map)).toList();
-      // Validate: if icons key is present, there must be a 256x256 entry.
-      final has256 = iconsList.any((e) => e.size == '256x256');
-      if (!has256) {
-        throw ArgumentError(
-          'manifest.icons must contain a 256x256 entry when icons: is specified',
-        );
-      }
-    } else {
-      iconsList = const [];
-    }
+    final sourcesRaw = yaml['sources'] as List? ?? [];
 
     return ManifestConfig(
       appId: appId as String,
-      runtimeVersion: (yaml['runtime_version'] ?? '25.08').toString(),
+      runtimeVersion: (yaml['runtime-version'] ?? '25.08').toString(),
       sdkExtensions: exts,
       command: command,
       commandInferred: commandInferred,
-      finishArgs: finArgs,
-      extraModules: extraMods,
-      appendPath: buildOpts['append_path'] as String?,
-      prependLdLibraryPath: buildOpts['prepend_ld_library_path'] as String?,
+      appendPath: buildOpts['append-path'] as String?,
+      prependLdLibraryPath: buildOpts['prepend-ld-library-path'] as String?,
       env: envMap,
-      repoUrl: yaml['repo_url'] as String?,
-      extraSources: extraSourcesRaw
-          .map((e) => Map<String, dynamic>.from(e as Map))
-          .toList(),
-      metainfoPath: yaml['metainfo_path'] as String?,
-      desktopEntryPath: yaml['desktop_entry_path'] as String?,
-      icons: iconsList,
+      sources:
+          sourcesRaw.map((e) => Map<String, dynamic>.from(e as Map)).toList(),
     );
   }
 }
@@ -290,6 +221,27 @@ class FlatpakGenConfig {
   /// Project-level patch entries applied to specific pub packages.
   final List<PatchEntry> patches;
 
+  /// Project-level icon entries passed to the manifest generator.
+  /// When empty, [effectiveIcons()] returns the default 256x256
+  /// icon derived from the app-id.
+  final List<IconEntry> icons;
+
+  /// Paths to extra module YAML files injected before the app module at
+  /// generate time. Each file may contain a single module map or a list of
+  /// module maps.
+  final List<String> extraModules;
+
+  /// Git repository URL for the app source entry.
+  final String? repoUrl;
+
+  /// Override for the metainfo XML path. When null, [effectiveMetainfoPath()]
+  /// computes the default.
+  final String? metainfoPath;
+
+  /// Override for the desktop entry path. When null,
+  /// [effectiveDesktopEntryPath()] computes the default.
+  final String? desktopEntryPath;
+
   /// Optional manifest generation config.
   final ManifestConfig? manifest;
 
@@ -300,8 +252,32 @@ class FlatpakGenConfig {
     this.patchPath,
     this.flutterVersionFile,
     this.patches = const [],
+    this.icons = const [],
+    this.extraModules = const [],
+    this.repoUrl,
+    this.metainfoPath,
+    this.desktopEntryPath,
     this.manifest,
   });
+
+  /// Effective metainfo XML path (config override or default).
+  String effectiveMetainfoPath(String appId) =>
+      metainfoPath ?? 'app/share/metainfo/$appId.metainfo.xml';
+
+  /// Effective .desktop entry path (config override or default).
+  String effectiveDesktopEntryPath(String appId) =>
+      desktopEntryPath ?? 'app/share/applications/$appId.desktop';
+
+  /// Effective icon list. Returns the default 256x256 icon when [icons] is
+  /// empty.
+  List<IconEntry> effectiveIcons(String appId) => icons.isEmpty
+      ? [
+          IconEntry(
+            size: '256x256',
+            path: 'app/share/icons/hicolor/256x256/apps/$appId.png',
+          )
+        ]
+      : icons;
 
   /// Returns lock paths with any remaining `\$FLUTTER_ROOT` placeholders
   /// substituted by [sdkPath]. Use this instead of [pubLocks] whenever
@@ -338,10 +314,28 @@ class FlatpakGenConfig {
 
     final output = yaml['output'] as String? ?? 'flatpak';
 
+    // Parse project-level icons list with 256x256 validation.
+    final iconsRaw = yaml['icons'] as List?;
+    final List<IconEntry> iconsList;
+    if (iconsRaw != null) {
+      iconsList = iconsRaw.map((e) => IconEntry.fromYaml(e as Map)).toList();
+      final has256 = iconsList.any((e) => e.size == '256x256');
+      if (!has256) {
+        throw ArgumentError(
+          'flutpak.icons must contain a 256x256 entry when icons: is specified',
+        );
+      }
+    } else {
+      iconsList = const [];
+    }
+
     // Determine if a Flutter SDK is configured (either via flutter.sdk or
     // FLUTTER_ROOT env var) to decide the default flutter_version_file path.
     final flutterSdkPresent =
         flutter['sdk'] != null || Platform.environment['FLUTTER_ROOT'] != null;
+
+    final extraModules =
+        (yaml['modules'] as List?)?.cast<String>() ?? const <String>[];
 
     return FlatpakGenConfig(
       output: output,
@@ -353,10 +347,15 @@ class FlatpakGenConfig {
       flutterSdk: flutter['sdk'] != null
           ? tryResolve(flutter['sdk'] as String)
           : Platform.environment['FLUTTER_ROOT'],
-      patchPath: (flutter['patch'] ?? yaml['patch_path']) as String?,
-      flutterVersionFile: yaml['flutter_version_file'] as String? ??
+      patchPath: flutter['patch'] as String?,
+      flutterVersionFile: yaml['flutter-version-file'] as String? ??
           (flutterSdkPresent ? p.join(output, 'flutter.version') : null),
       patches: patchEntries,
+      icons: iconsList,
+      extraModules: extraModules,
+      repoUrl: yaml['repo-url'] as String?,
+      metainfoPath: yaml['metainfo-path'] as String?,
+      desktopEntryPath: yaml['desktop-entry-path'] as String?,
       manifest: yaml['manifest'] != null
           ? ManifestConfig.fromYaml(yaml['manifest'] as Map)
           : null,

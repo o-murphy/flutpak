@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:http/http.dart' as http;
 import '../generators/flutter_sdk.dart';
 import '../generators/pub_sources.dart';
 import '../models/flatpak_source.dart';
@@ -21,11 +22,13 @@ Future<void> generateSourcesJson({
 }) async {
   final allSources = <Map<String, dynamic>>[];
   final cache = LocalDownloadCache();
+  final pubClient = http.Client();
 
   try {
     final pubFuture = flutterOnly
         ? Future<List<FlatpakSource>>.value(const [])
-        : PubSourcesGenerator(lockFilePaths: lockPaths).generate();
+        : PubSourcesGenerator(lockFilePaths: lockPaths, client: pubClient)
+            .generate();
 
     Future<List<FlatpakSource>> flutterFuture;
     if (pubOnly || sdkPath == null) {
@@ -57,6 +60,7 @@ Future<void> generateSourcesJson({
       stderr.writeln('flutter: ${flutterSources.length} entries');
     }
   } finally {
+    pubClient.close();
     cache.dispose();
   }
 

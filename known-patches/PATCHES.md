@@ -3,13 +3,12 @@
 Patches for packages that commonly need modifications for Flatpak offline builds.
 
 Copy the relevant `.patch` file to your project's `flatpak/patches/` directory
-and reference it in `flutpak.yaml` (or `pubspec.yaml`):
+and reference it in `flutpak.yaml`:
 
 ```yaml
-flutpak:
-  patches:
-    - package: objectbox_flutter_libs
-      path: flatpak/patches/objectbox_flutter_libs/CMakeLists.txt.patch
+patches:
+  - package: objectbox_flutter_libs
+    path: flatpak/patches/objectbox_flutter_libs/CMakeLists.txt.patch
 ```
 
 `flutpak generate` will then copy the file to `flatpak/generated/patches/` and
@@ -42,37 +41,23 @@ Flatpak sandbox builds where network access is not available.
 
 **Usage:**
 
-1. Add the objectbox-c prebuilt archive to `extra_sources` in your config:
+1. Copy `objectbox_flutter_libs/5.3.1/objectbox-c.yml` to `flatpak/modules/objectbox-c.yml`
 
-```yaml
-flutpak:
-  manifest:
-    env:
-      OBJECTBOX_PREBUILT_DIR: /run/build/<appname>/objectbox-c
-    extra_sources:
-      - type: archive
-        only-arches: [x86_64]
-        url: https://github.com/objectbox/objectbox-c/releases/download/v5.3.1/objectbox-linux-x64.tar.gz
-        sha256: <sha256>
-        dest: objectbox-c
-        strip-components: 0
-      - type: archive
-        only-arches: [aarch64]
-        url: https://github.com/objectbox/objectbox-c/releases/download/v5.3.1/objectbox-linux-aarch64.tar.gz
-        sha256: <sha256>
-        dest: objectbox-c
-        strip-components: 0
-```
-
-2. Copy this patch to `flatpak/patches/objectbox_flutter_libs/CMakeLists.txt.patch`
+2. Copy `objectbox_flutter_libs/5.3.1/CMakeLists.txt.patch` to `flatpak/patches/objectbox_flutter_libs/CMakeLists.txt.patch`
 
 3. Add to your `flutpak.yaml`:
 
 ```yaml
-flutpak:
-  patches:
-    - package: objectbox_flutter_libs
-      path: flatpak/patches/objectbox_flutter_libs/CMakeLists.txt.patch
+modules:
+  - flatpak/modules/objectbox-c.yml
+
+manifest:
+  env:
+    OBJECTBOX_PREBUILT_DIR: /app
+
+patches:
+  - package: objectbox_flutter_libs
+    path: flatpak/patches/objectbox_flutter_libs/CMakeLists.txt.patch
 ```
 
 ---
@@ -86,43 +71,29 @@ for offline/sandboxed Flatpak builds.
 
 > **Note on line endings:** `objectbox_flutter_libs` 5.3.2 ships
 > `linux/CMakeLists.txt` with CRLF line endings in the pub.dev archive, while
-> this patch is stored with LF. Use `strip_trailing_cr: true` so flutpak injects
+> this patch is stored with LF. Use `strip-trailing-cr: true` so flutpak injects
 > a `type: shell` source that runs `sed -i 's/\r//'` on the file before the patch
 > is applied. GNU `patch(1)` does not reliably handle CRLF/LF mismatches even
 > with `--ignore-whitespace`.
 
 **Usage:**
 
-1. Add the objectbox-c prebuilt archive to `extra_sources` in your config:
+1. Copy `objectbox_flutter_libs/5.3.2/objectbox-c.yml` to `flatpak/modules/objectbox-c.yml`
 
-```yaml
-flutpak:
-  manifest:
-    env:
-      OBJECTBOX_PREBUILT_DIR: /run/build/<appname>/objectbox-c
-    extra_sources:
-      - type: archive
-        only-arches: [x86_64]
-        url: https://github.com/objectbox/objectbox-c/releases/download/v5.3.2/objectbox-linux-x64.tar.gz
-        sha256: 6dbb5450c36dd11ee9074f16ecc61e79b45ff43c2082934601f3166b39c8a613
-        dest: objectbox-c
-        strip-components: 0
-      - type: archive
-        only-arches: [aarch64]
-        url: https://github.com/objectbox/objectbox-c/releases/download/v5.3.2/objectbox-linux-aarch64.tar.gz
-        sha256: bdfbfbf4971057e11018ca6645697d8a40ebc7df56ccde63397cbb0e0609c0e8
-        dest: objectbox-c
-        strip-components: 0
-```
-
-2. Copy this patch to `flatpak/patches/objectbox_flutter_libs/CMakeLists.txt.patch`
+2. Copy `objectbox_flutter_libs/5.3.2/CMakeLists.txt.patch` to `flatpak/patches/objectbox_flutter_libs/CMakeLists.txt.patch`
 
 3. Add to your `flutpak.yaml`:
 
 ```yaml
-flutpak:
-  patches:
-    - package: objectbox_flutter_libs
-      path: flatpak/patches/objectbox_flutter_libs/CMakeLists.txt.patch
-      strip_trailing_cr: true
+modules:
+  - flatpak/modules/objectbox-c.yml
+
+manifest:
+  env:
+    OBJECTBOX_PREBUILT_DIR: /app
+
+patches:
+  - package: objectbox_flutter_libs
+    path: flatpak/patches/objectbox_flutter_libs/CMakeLists.txt.patch
+    strip-trailing-cr: true
 ```

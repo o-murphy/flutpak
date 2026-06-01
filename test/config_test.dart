@@ -12,8 +12,8 @@ void main() {
         },
         'flutter': {
           'sdk': '/home/user/flutter',
+          'patch': 'flatpak/patches/flutter/shared.sh.patch',
         },
-        'patch_path': 'flatpak/patches/flutter/shared.sh.patch',
       });
 
       expect(cfg.output, 'flatpak');
@@ -105,7 +105,7 @@ void main() {
           {
             'package': 'objectbox_flutter_libs',
             'path': 'flatpak/patches/objectbox.patch',
-            'dest_subpath': 'linux',
+            'dest-subpath': 'linux',
           },
         ],
       });
@@ -115,23 +115,112 @@ void main() {
       expect(cfg.patches.first.destSubpath, 'linux');
     });
 
-    test('parses manifest config', () {
+    test('parses manifest config (kebab-case keys)', () {
       final cfg = FlatpakGenConfig.fromYaml({
         'manifest': {
-          'app_id': 'io.github.example.myapp',
-          'runtime_version': '25.08',
+          'app-id': 'io.github.example.myapp',
+          'runtime-version': '25.08',
           'command': 'myapp',
-          'finish_args': ['--share=ipc', '--socket=wayland'],
-          'sdk_extensions': ['org.freedesktop.Sdk.Extension.llvm20'],
+          'sdk-extensions': ['org.freedesktop.Sdk.Extension.llvm20'],
         },
       });
       expect(cfg.manifest, isNotNull);
       expect(cfg.manifest!.appId, 'io.github.example.myapp');
       expect(cfg.manifest!.runtimeVersion, '25.08');
       expect(cfg.manifest!.command, 'myapp');
-      expect(cfg.manifest!.finishArgs, contains('--share=ipc'));
       expect(cfg.manifest!.sdkExtensions,
           contains('org.freedesktop.Sdk.Extension.llvm20'));
+    });
+
+    test('parses root-level icons', () {
+      final cfg = FlatpakGenConfig.fromYaml({
+        'icons': [
+          {'size': '256x256', 'path': 'app/share/icons/256/myapp.png'},
+          {'size': '512x512', 'path': 'app/share/icons/512/myapp.png'},
+        ],
+        'manifest': {'app-id': 'io.example.app'},
+      });
+      expect(cfg.icons, hasLength(2));
+      expect(cfg.icons.first.size, '256x256');
+    });
+
+    test('icons without 256x256 throws ArgumentError', () {
+      expect(
+        () => FlatpakGenConfig.fromYaml({
+          'icons': [
+            {'size': '512x512', 'path': 'app/share/icons/512/myapp.png'},
+          ],
+          'manifest': {'app-id': 'io.example.app'},
+        }),
+        throwsArgumentError,
+      );
+    });
+
+    test('icons empty when key absent', () {
+      final cfg = FlatpakGenConfig.fromYaml({
+        'manifest': {'app-id': 'io.example.app'},
+      });
+      expect(cfg.icons, isEmpty);
+    });
+
+    test('parses repo-url, metainfo-path, desktop-entry-path from root config', () {
+      final cfg = FlatpakGenConfig.fromYaml({
+        'repo-url': 'https://github.com/example/app.git',
+        'metainfo-path': 'custom/path.metainfo.xml',
+        'desktop-entry-path': 'custom/app.desktop',
+      });
+      expect(cfg.repoUrl, 'https://github.com/example/app.git');
+      expect(cfg.metainfoPath, 'custom/path.metainfo.xml');
+      expect(cfg.desktopEntryPath, 'custom/app.desktop');
+    });
+
+    test('effectiveMetainfoPath() returns default', () {
+      final cfg = FlatpakGenConfig.fromYaml({});
+      expect(cfg.effectiveMetainfoPath('io.example.app'),
+          'app/share/metainfo/io.example.app.metainfo.xml');
+    });
+
+    test('effectiveMetainfoPath() returns config override', () {
+      final cfg = FlatpakGenConfig.fromYaml({
+        'metainfo-path': 'custom/path.metainfo.xml',
+      });
+      expect(cfg.effectiveMetainfoPath('io.example.app'),
+          'custom/path.metainfo.xml');
+    });
+
+    test('effectiveDesktopEntryPath() returns default', () {
+      final cfg = FlatpakGenConfig.fromYaml({});
+      expect(cfg.effectiveDesktopEntryPath('io.example.app'),
+          'app/share/applications/io.example.app.desktop');
+    });
+
+    test('effectiveDesktopEntryPath() returns config override', () {
+      final cfg = FlatpakGenConfig.fromYaml({
+        'desktop-entry-path': 'custom/app.desktop',
+      });
+      expect(cfg.effectiveDesktopEntryPath('io.example.app'),
+          'custom/app.desktop');
+    });
+
+    test('effectiveIcons() returns default 256x256 when icons empty', () {
+      final cfg = FlatpakGenConfig.fromYaml({});
+      final icons = cfg.effectiveIcons('io.example.app');
+      expect(icons, hasLength(1));
+      expect(icons.first.size, '256x256');
+      expect(icons.first.path,
+          'app/share/icons/hicolor/256x256/apps/io.example.app.png');
+    });
+
+    test('effectiveIcons() returns configured icons when present', () {
+      final cfg = FlatpakGenConfig.fromYaml({
+        'icons': [
+          {'size': '256x256', 'path': 'assets/256.png'},
+          {'size': 'scalable', 'path': 'assets/icon.svg'},
+        ],
+      });
+      final icons = cfg.effectiveIcons('io.example.app');
+      expect(icons, hasLength(2));
+      expect(icons[1].size, 'scalable');
     });
   });
 
@@ -217,13 +306,13 @@ flutpak:
   });
 
   group('ManifestConfig.fromYaml', () {
-    test('parses build_options env and append_path', () {
+    test('parses build-options env and append-path (kebab-case)', () {
       final cfg = ManifestConfig.fromYaml({
-        'app_id': 'io.example.app',
-        'runtime_version': '25.08',
+        'app-id': 'io.example.app',
+        'runtime-version': '25.08',
         'command': 'app',
-        'build_options': {
-          'append_path': '/custom/bin',
+        'build-options': {
+          'append-path': '/custom/bin',
           'env': {
             'MY_VAR': 'value',
           },
@@ -234,104 +323,29 @@ flutpak:
     });
 
     test('commandInferred is true when command not set', () {
-      final cfg = ManifestConfig.fromYaml({'app_id': 'io.github.example.myapp'});
+      final cfg = ManifestConfig.fromYaml({'app-id': 'io.github.example.myapp'});
       expect(cfg.commandInferred, isTrue);
       expect(cfg.command, 'myapp');
     });
 
     test('commandInferred is false when command explicitly set', () {
       final cfg = ManifestConfig.fromYaml({
-        'app_id': 'io.github.example.myapp',
+        'app-id': 'io.github.example.myapp',
         'command': 'launcher',
       });
       expect(cfg.commandInferred, isFalse);
       expect(cfg.command, 'launcher');
     });
 
-    test('throws when app_id is missing', () {
+    test('throws when app-id is missing', () {
       expect(
         () => ManifestConfig.fromYaml({}),
         throwsArgumentError,
       );
     });
-
-    test('icons: with 256x256 entry parses correctly', () {
-      final cfg = ManifestConfig.fromYaml({
-        'app_id': 'io.example.app',
-        'icons': [
-          {'size': '256x256', 'path': 'assets/icon.png'},
-          {'size': '512x512', 'path': 'assets/icon-512.png'},
-        ],
-      });
-      expect(cfg.icons, hasLength(2));
-      expect(cfg.icons.first.size, '256x256');
-      expect(cfg.icons.first.path, 'assets/icon.png');
-    });
-
-    test('icons: without 256x256 throws ArgumentError', () {
-      expect(
-        () => ManifestConfig.fromYaml({
-          'app_id': 'io.example.app',
-          'icons': [
-            {'size': '512x512', 'path': 'assets/icon-512.png'},
-          ],
-        }),
-        throwsArgumentError,
-      );
-    });
-
-    test('effectiveMetainfoPath() returns default', () {
-      final cfg = ManifestConfig.fromYaml({'app_id': 'io.example.app'});
-      expect(cfg.effectiveMetainfoPath(),
-          'app/share/metainfo/io.example.app.metainfo.xml');
-    });
-
-    test('effectiveMetainfoPath() returns config override', () {
-      final cfg = ManifestConfig.fromYaml({
-        'app_id': 'io.example.app',
-        'metainfo_path': 'custom/path.metainfo.xml',
-      });
-      expect(cfg.effectiveMetainfoPath(), 'custom/path.metainfo.xml');
-    });
-
-    test('effectiveDesktopEntryPath() returns default', () {
-      final cfg = ManifestConfig.fromYaml({'app_id': 'io.example.app'});
-      expect(cfg.effectiveDesktopEntryPath(),
-          'app/share/applications/io.example.app.desktop');
-    });
-
-    test('effectiveDesktopEntryPath() returns config override', () {
-      final cfg = ManifestConfig.fromYaml({
-        'app_id': 'io.example.app',
-        'desktop_entry_path': 'custom/app.desktop',
-      });
-      expect(cfg.effectiveDesktopEntryPath(), 'custom/app.desktop');
-    });
-
-    test('effectiveIcons() returns default 256x256 when icons empty', () {
-      final cfg = ManifestConfig.fromYaml({'app_id': 'io.example.app'});
-      final icons = cfg.effectiveIcons();
-      expect(icons, hasLength(1));
-      expect(icons.first.size, '256x256');
-      expect(icons.first.path,
-          'app/share/icons/hicolor/256x256/apps/io.example.app.png');
-    });
-
-    test('effectiveIcons() returns configured icons when present', () {
-      final cfg = ManifestConfig.fromYaml({
-        'app_id': 'io.example.app',
-        'icons': [
-          {'size': '256x256', 'path': 'assets/256.png'},
-          {'size': 'scalable', 'path': 'assets/icon.svg'},
-        ],
-      });
-      final icons = cfg.effectiveIcons();
-      expect(icons, hasLength(2));
-      expect(icons[1].size, 'scalable');
-    });
   });
 
-  group('FlatpakGenConfig flutter_version_file defaults', () {
+  group('FlatpakGenConfig flutter-version-file defaults', () {
     test('defaults to <output>/flutter.version when flutter sdk is configured',
         () {
       final cfg = FlatpakGenConfig.fromYaml({
@@ -341,16 +355,16 @@ flutpak:
       expect(cfg.flutterVersionFile, 'flatpak/flutter.version');
     });
 
-    test('explicit flutter_version_file overrides default', () {
+    test('explicit flutter-version-file overrides default', () {
       final cfg = FlatpakGenConfig.fromYaml({
         'output': 'flatpak',
         'flutter': {'sdk': '/home/user/flutter'},
-        'flutter_version_file': 'custom/my.version',
+        'flutter-version-file': 'custom/my.version',
       });
       expect(cfg.flutterVersionFile, 'custom/my.version');
     });
 
-    test('flutter_version_file is null for pure-Dart projects with no SDK', () {
+    test('flutter-version-file is null for pure-Dart projects with no SDK', () {
       if (Platform.environment.containsKey('FLUTTER_ROOT')) return;
       final cfg = FlatpakGenConfig.fromYaml({'output': 'flatpak'});
       expect(cfg.flutterVersionFile, isNull);
