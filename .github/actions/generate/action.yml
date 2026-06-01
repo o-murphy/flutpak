@@ -64,9 +64,10 @@ runs:
           SRC_DIR="$GITHUB_ACTION_PATH/../../.."
         fi
         cd "$SRC_DIR"
-        dart run tool/update_version.dart
         dart pub get
-        dart compile exe bin/flutpak.dart -o "$RUNNER_TEMP/flutpak"
+        FLUTPAK_VERSION=$(git describe --tags --always --dirty 2>/dev/null || echo "dev")
+        dart compile exe bin/flutpak.dart -o "$RUNNER_TEMP/flutpak" \
+          --define=version="$FLUTPAK_VERSION"
         sudo mv "$RUNNER_TEMP/flutpak" /usr/local/bin/flutpak
         sudo chmod +x /usr/local/bin/flutpak
 

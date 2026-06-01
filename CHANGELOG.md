@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 
+## [0.4.0-rc.2] - 2026-06-01
+
+### Fixed
+- `generate` composite action still called `dart run tool/update_version.dart`
+  (deleted in rc.1); now builds with `--define=version=$(git describe)` like
+  the other actions.
+
+
 ## [0.4.0-rc.1] - 2026-06-01
 
 ### Changed
@@ -478,7 +486,8 @@ git remote.
   output files
 - MIT License
 
-[Unreleased]: https://github.com/o-murphy/flutpak/compare/v0.4.0-rc.1...HEAD
+[Unreleased]: https://github.com/o-murphy/flutpak/compare/v0.4.0-rc.2...HEAD
+[0.4.0-rc.2]: https://github.com/o-murphy/flutpak/compare/v0.4.0-rc.2
 [0.4.0-rc.1]: https://github.com/o-murphy/flutpak/releases/tag/v0.4.0-rc.1
 [0.4.0-beta.4]: https://github.com/o-murphy/flutpak/releases/tag/v0.4.0-beta.4
 [0.4.0-beta.3]: https://github.com/o-murphy/flutpak/releases/tag/v0.4.0-beta.3
