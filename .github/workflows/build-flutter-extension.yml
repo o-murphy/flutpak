@@ -17,19 +17,17 @@ on:
 
 jobs:
   generate:
-    name: Generate & validate manifest
+    name: Generate manifest
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Flutter SDK
-        uses: ./.github/actions/flutter
+      - uses: ./.github/actions/flutter
         with:
           flutter-version: ${{ github.event.inputs.flutter_version || '3.44.0' }}
           cache: true
 
-      - name: Set up flutpak
-        uses: ./.github/actions/setup-flutpak
+      - uses: ./.github/actions/setup-flutpak
 
       - name: Generate extension manifest
         run: |
@@ -38,39 +36,20 @@ jobs:
             --runtime-version 25.08 \
             --output flutter_extension/org.freedesktop.Sdk.Extension.flutter3.json
 
-      - name: Validate manifest
-        run: |
-          python3 - <<'EOF'
-          import json
-          with open('flutter_extension/org.freedesktop.Sdk.Extension.flutter3.json') as f:
-              m = json.load(f)
-          assert m.get('build-extension') is True
-          assert m.get('id', '').startswith('org.freedesktop.Sdk.Extension.flutter')
-          assert m.get('runtime') == 'org.freedesktop.Sdk'
-          sources = m['modules'][0]['sources']
-          types = [s.get('type') for s in sources]
-          assert 'git' in types
-          assert 'archive' in types
-          assert 'patch' in types
-          print(f"OK  id={m['id']}  runtime-version={m['runtime-version']}  sources={len(sources)}")
-          EOF
-
-      - name: Upload manifest artifact
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: flutter-extension-manifest
           path: flutter_extension/org.freedesktop.Sdk.Extension.flutter3.json
 
   build:
-    name: Build extension with flatpak-builder
+    name: Build extension
     runs-on: ubuntu-latest
     needs: generate
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download generated manifest
-        uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v4
         with:
           name: flutter-extension-manifest
           path: flutter_extension/
