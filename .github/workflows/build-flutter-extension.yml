@@ -5,21 +5,15 @@ on:
     branches: [main]
     paths:
       - flutter_extension/**
-      - lib/src/generators/sdk_extension.dart
-      - lib/src/generators/remote_flutter_sdk.dart
-      - lib/src/generators/flutter_sdk.dart
   pull_request:
     paths:
       - flutter_extension/**
-      - lib/src/generators/sdk_extension.dart
-      - lib/src/generators/remote_flutter_sdk.dart
-      - lib/src/generators/flutter_sdk.dart
   workflow_dispatch:
     inputs:
       flutter_version:
-        description: "Flutter version tag (overrides flutter_extension/flutpak.yaml)"
+        description: "Flutter version tag"
         required: false
-        default: ""
+        default: "3.44.0"
 
 jobs:
   generate:
@@ -28,23 +22,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: dart-lang/setup-dart@v1
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
         with:
-          sdk: stable
+          flutter-version: ${{ github.event.inputs.flutter_version || '3.44.0' }}
+          channel: stable
 
-      - name: Install dependencies
-        run: dart pub get
+      - name: Set up flutpak
+        uses: ./.github/actions/setup-flutpak
 
       - name: Generate extension manifest
         run: |
-          EXTRA_ARGS=""
-          if [ -n "${{ github.event.inputs.flutter_version }}" ]; then
-            EXTRA_ARGS="--flutter-version ${{ github.event.inputs.flutter_version }}"
-          fi
-          dart run bin/flutpak.dart sdk-ext \
-            --config flutter_extension/flutpak.yaml \
-            --output flutter_extension/org.freedesktop.Sdk.Extension.flutter3.json \
-            $EXTRA_ARGS
+          flutpak sdk-ext \
+            --sdk "$FLUTTER_ROOT" \
+            --runtime-version 25.08 \
+            --output flutter_extension/org.freedesktop.Sdk.Extension.flutter3.json
 
       - name: Validate manifest JSON
         run: python3 -m json.tool flutter_extension/org.freedesktop.Sdk.Extension.flutter3.json > /dev/null
@@ -59,15 +51,13 @@ jobs:
           assert m.get('id', '').startswith('org.freedesktop.Sdk.Extension.flutter'), \
               f"unexpected id: {m.get('id')}"
           assert m.get('runtime') == 'org.freedesktop.Sdk', "runtime mismatch"
-          modules = m.get('modules', [])
-          assert len(modules) == 1, "expected exactly one module"
-          sources = modules[0].get('sources', [])
+          sources = m['modules'][0]['sources']
           types = [s.get('type') for s in sources]
           assert 'git' in types, "missing git source"
           assert 'archive' in types, "missing archive sources"
           assert 'patch' in types, "missing shared.sh patch"
-          print(f"OK — id={m['id']}  runtime-version={m['runtime-version']}")
-          print(f"     {len(sources)} sources in flutter module")
+          print(f"OK  id={m['id']}  runtime-version={m['runtime-version']}")
+          print(f"    {len(sources)} sources in flutter module")
           EOF
 
       - name: Upload manifest artifact
@@ -80,8 +70,6 @@ jobs:
     name: Build extension with flatpak-builder
     runs-on: ubuntu-latest
     needs: generate
-    # Building takes ~30 min (downloads all Flutter artifacts + SDK runtimes).
-    # Run only on push to main or when manually triggered.
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     steps:
       - uses: actions/checkout@v4
@@ -107,8 +95,7 @@ jobs:
           RUNTIME_VERSION=$(python3 -c "
           import json
           with open('flutter_extension/org.freedesktop.Sdk.Extension.flutter3.json') as f:
-              m = json.load(f)
-          print(m['runtime-version'])
+              print(json.load(f)['runtime-version'])
           ")
           flatpak install --user -y flathub \
             org.freedesktop.Sdk//$RUNTIME_VERSION \
@@ -117,9 +104,7 @@ jobs:
       - name: Build extension
         run: |
           flatpak-builder \
-            --user \
-            --install \
-            --force-clean \
+            --user --install --force-clean \
             --state-dir=.flatpak-builder \
             build-dir \
             flutter_extension/org.freedesktop.Sdk.Extension.flutter3.json

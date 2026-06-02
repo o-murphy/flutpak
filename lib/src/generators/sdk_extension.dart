@@ -1,14 +1,7 @@
 import '../utils/download_cache.dart';
 import 'flutter_sdk.dart';
-import 'remote_flutter_sdk.dart';
 
 /// Generates a Flathub SDK Extension manifest for Flutter.
-///
-/// Supports two source modes:
-/// - **Local** (`sdkPath`): reads version files from an existing Flutter SDK
-///   clone on disk. Original behaviour, requires `FLUTTER_ROOT` or `--sdk`.
-/// - **Remote** (`flutterVersion`): fetches version files from GitHub and
-///   resolves the commit SHA via `git ls-remote`. No local SDK clone needed.
 ///
 /// The resulting manifest can be submitted as
 /// `org.freedesktop.Sdk.Extension.flutter3` (or versioned variant),
@@ -21,53 +14,31 @@ import 'remote_flutter_sdk.dart';
 ///
 /// instead of bundling the Flutter SDK in their own sources.
 class SdkExtensionGenerator {
-  final String? sdkPath;
-  final String? flutterVersion;
+  final String sdkPath;
   final String runtimeVersion; // e.g. '25.08'
   final String? patchPath;
-  final String? extensionId;
   final DownloadCache _cache;
 
   SdkExtensionGenerator({
-    this.sdkPath,
-    this.flutterVersion,
+    required this.sdkPath,
     required this.runtimeVersion,
     this.patchPath,
-    this.extensionId,
     DownloadCache? cache,
-  })  : assert(sdkPath != null || flutterVersion != null,
-            'Either sdkPath or flutterVersion must be provided'),
-        _cache = cache ?? LocalDownloadCache();
+  }) : _cache = cache ?? LocalDownloadCache();
 
   Future<Map<String, dynamic>> generate() async {
-    final String flutterTag;
-    final List sdkSources;
+    final flutterTag = FlutterSdkGenerator.readFlutterVersion(sdkPath);
+    final majorMinor = _majorMinor(flutterTag); // e.g. '3.41' → '3'
 
-    if (flutterVersion != null) {
-      // Remote mode: fetch version files from GitHub.
-      flutterTag = flutterVersion!;
-      final remoteGen = RemoteFlutterSdkGenerator(
-        flutterTag: flutterTag,
-        patchPath: patchPath,
-        cache: _cache,
-      );
-      sdkSources = (await remoteGen.generate()).map((s) => s.toJson()).toList();
-    } else {
-      // Local mode: read version files from the local SDK clone.
-      flutterTag = FlutterSdkGenerator.readFlutterVersion(sdkPath!);
-      final sdkGen = FlutterSdkGenerator(
-        sdkPath: sdkPath!,
-        patchPath: patchPath,
-        cache: _cache,
-      );
-      sdkSources = (await sdkGen.generate()).map((s) => s.toJson()).toList();
-    }
-
-    final major = flutterTag.split('.').first;
-    final id = extensionId ?? 'org.freedesktop.Sdk.Extension.flutter$major';
+    final sdkGen = FlutterSdkGenerator(
+      sdkPath: sdkPath,
+      patchPath: patchPath,
+      cache: _cache,
+    );
+    final sdkSources = await sdkGen.generate();
 
     return {
-      'id': id,
+      'id': 'org.freedesktop.Sdk.Extension.flutter$majorMinor',
       'branch': runtimeVersion,
       'runtime': 'org.freedesktop.Sdk',
       'runtime-version': runtimeVersion,
@@ -79,7 +50,7 @@ class SdkExtensionGenerator {
           'name': 'flutter',
           'buildsystem': 'simple',
           'build-commands': _buildCommands(flutterTag),
-          'sources': sdkSources,
+          'sources': sdkSources.map((s) => s.toJson()).toList(),
         }
       ],
     };
@@ -103,4 +74,9 @@ class SdkExtensionGenerator {
             '> /usr/lib/sdk/flutter/enable.sh',
         'chmod 755 /usr/lib/sdk/flutter/enable.sh',
       ];
+
+  static String _majorMinor(String tag) {
+    // '3.41.9' → '3', just use major version for the extension ID
+    return tag.split('.').first;
+  }
 }
