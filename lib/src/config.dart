@@ -201,6 +201,36 @@ class ManifestConfig {
   }
 }
 
+/// Configuration for generating a Flatpak SDK Extension manifest.
+/// Read from the `extension:` key inside `flutpak:` in `flutpak.yaml`.
+class ExtensionConfig {
+  /// Flutter version tag to embed in the extension (e.g. "3.44.0").
+  /// When set, the generator fetches version files from GitHub instead of
+  /// reading a local SDK clone.
+  final String? flutterVersion;
+
+  /// Freedesktop SDK runtime version (e.g. "25.08").
+  final String runtimeVersion;
+
+  /// Override for the extension app-id.
+  /// Defaults to `org.freedesktop.Sdk.Extension.flutter<major>`.
+  final String? id;
+
+  const ExtensionConfig({
+    this.flutterVersion,
+    this.runtimeVersion = '25.08',
+    this.id,
+  });
+
+  factory ExtensionConfig.fromYaml(Map yaml) {
+    return ExtensionConfig(
+      flutterVersion: yaml['flutter-version'] as String?,
+      runtimeVersion: yaml['runtime-version'] as String? ?? '25.08',
+      id: yaml['id'] as String?,
+    );
+  }
+}
+
 /// Parsed contents of `flutpak:` in `pubspec.yaml` or `flutpak.yaml`.
 class FlatpakGenConfig {
   /// Directory where flatpak artifacts are written.
@@ -245,6 +275,9 @@ class FlatpakGenConfig {
   /// Optional manifest generation config.
   final ManifestConfig? manifest;
 
+  /// Optional SDK extension generation config.
+  final ExtensionConfig? extension;
+
   const FlatpakGenConfig({
     required this.output,
     required this.pubLocks,
@@ -258,6 +291,7 @@ class FlatpakGenConfig {
     this.metainfoPath,
     this.desktopEntryPath,
     this.manifest,
+    this.extension,
   });
 
   /// Effective metainfo XML path (config override or default).
@@ -358,6 +392,9 @@ class FlatpakGenConfig {
       desktopEntryPath: yaml['desktop-entry-path'] as String?,
       manifest: yaml['manifest'] != null
           ? ManifestConfig.fromYaml(yaml['manifest'] as Map)
+          : null,
+      extension: yaml['extension'] != null
+          ? ExtensionConfig.fromYaml(yaml['extension'] as Map)
           : null,
     );
   }
