@@ -49,12 +49,16 @@ lint_flatpak_repo() {
 }
 
 export_flatpak_bundle() {
-  local arch="${1:?Usage: export_flatpak_bundle <arch> <repo> <output> <app_id>}"
-  local repo="${2:?Usage: export_flatpak_bundle <arch> <repo> <output> <app_id>}"
-  local output="${3:?Usage: export_flatpak_bundle <arch> <repo> <output> <app_id>}"
-  local app_id="${4:?Usage: export_flatpak_bundle <arch> <repo> <output> <app_id>}"
+  local arch="${1:?Usage: export_flatpak_bundle <arch> <repo> <output> <app_id> [runtime]}"
+  local repo="${2:?Usage: export_flatpak_bundle <arch> <repo> <output> <app_id> [runtime]}"
+  local output="${3:?Usage: export_flatpak_bundle <arch> <repo> <output> <app_id> [runtime]}"
+  local app_id="${4:?Usage: export_flatpak_bundle <arch> <repo> <output> <app_id> [runtime]}"
+  local runtime="${5:-}"
+  local extra_args=()
+  [ -n "$runtime" ] && extra_args+=(--runtime)
   flatpak build-bundle \
     --arch="$arch" \
+    "${extra_args[@]}" \
     "$repo" \
     "$output" \
     "$app_id"

@@ -58,4 +58,5 @@ jobs:
         with:
           manifest: flutter_extension/io.github.o_murphy.flutter.json
           app-id: io.github.o_murphy.flutter
+          runtime: true
           artifact-name: flutter-extension-bundle

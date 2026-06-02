@@ -26,6 +26,10 @@ inputs:
     description: "Upload the bundle as this artifact name. Skip upload if empty."
     required: false
     default: ""
+  runtime:
+    description: "Export as a runtime/extension bundle (passes --runtime to flatpak build-bundle)"
+    required: false
+    default: ""
   retention-days:
     description: "Artifact retention in days"
     required: false
@@ -108,9 +112,10 @@ runs:
         META_ARCH: ${{ steps.meta.outputs.arch }}
         META_BUNDLE: ${{ steps.meta.outputs.bundle }}
         INPUT_APP_ID: ${{ inputs.app-id }}
+        INPUT_RUNTIME: ${{ inputs.runtime }}
       run: |
         source "$GITHUB_ACTION_PATH/../../../scripts/flatpak-build.sh"
-        export_flatpak_bundle "$META_ARCH" repo "$META_BUNDLE" "$INPUT_APP_ID"
+        export_flatpak_bundle "$META_ARCH" repo "$META_BUNDLE" "$INPUT_APP_ID" "$INPUT_RUNTIME"
 
     - name: Upload bundle artifact
       id: upload
