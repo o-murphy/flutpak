@@ -121,11 +121,11 @@ class RemoteFlutterSdkGenerator {
     if (outputDir == null) return null;
 
     final target =
-        File(p.join(outputDir!, FlutterSdkGenerator.defaultSharedShPatchPath));
+        File(p.join(outputDir!, defaultSharedShPatchPath));
     target.createSync(recursive: true);
-    target.writeAsStringSync(FlutterSdkGenerator.builtinSharedShPatch);
+    target.writeAsStringSync(builtinSharedShPatch);
     stderr.writeln('flutter: wrote built-in shared.sh patch → ${target.path}');
-    return FlutterSdkGenerator.defaultSharedShPatchPath;
+    return defaultSharedShPatchPath;
   }
 
   static Future<String> _fetchRaw(String url, http.Client client) async {
