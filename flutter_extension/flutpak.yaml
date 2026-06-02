@@ -1,4 +1,3 @@
-flutpak:
-  extension:
-    flutter-version: "3.44.0"
-    runtime-version: "25.08"
+extension:
+  flutter-version: "3.44.0"
+  runtime-version: "25.08"
