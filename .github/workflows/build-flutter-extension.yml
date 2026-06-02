@@ -36,6 +36,12 @@ jobs:
             --runtime-version 25.08 \
             --output flutter_extension/org.freedesktop.Sdk.Extension.flutter3.json
 
+      - name: Lint extension manifest
+        run: |
+          source scripts/flatpak-build.sh
+          install_flatpak_builder
+          lint_flatpak_manifest flutter_extension/org.freedesktop.Sdk.Extension.flutter3.json
+
       - uses: actions/upload-artifact@v7
         with:
           name: flutter-extension-manifest
@@ -79,7 +85,7 @@ jobs:
         run: |
           dbus-run-session flatpak install --user -y --noninteractive flathub \
             org.freedesktop.Sdk//25.08
-          flatpak install --user -y io.github.o_murphy.flutter_x86_64.flatpak
+          flatpak install --user -y org.freedesktop.Sdk.Extension.flutter3_x86_64.flatpak
 
       - name: Smoke-test Flutter inside SDK build environment
         run: |
