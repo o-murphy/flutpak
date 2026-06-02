@@ -22,10 +22,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Flutter
+      - name: Set up Flutter SDK
         uses: ./.github/actions/flutter
         with:
           flutter-version: ${{ github.event.inputs.flutter_version || '3.44.0' }}
+          cache: true
 
       - name: Set up flutpak
         uses: ./.github/actions/setup-flutpak
@@ -37,26 +38,21 @@ jobs:
             --runtime-version 25.08 \
             --output flutter_extension/org.freedesktop.Sdk.Extension.flutter3.json
 
-      - name: Validate manifest JSON
-        run: python3 -m json.tool flutter_extension/org.freedesktop.Sdk.Extension.flutter3.json > /dev/null
-
-      - name: Check required manifest fields
+      - name: Validate manifest
         run: |
           python3 - <<'EOF'
-          import json, sys
+          import json
           with open('flutter_extension/org.freedesktop.Sdk.Extension.flutter3.json') as f:
               m = json.load(f)
-          assert m.get('build-extension') is True, "build-extension must be true"
-          assert m.get('id', '').startswith('org.freedesktop.Sdk.Extension.flutter'), \
-              f"unexpected id: {m.get('id')}"
-          assert m.get('runtime') == 'org.freedesktop.Sdk', "runtime mismatch"
+          assert m.get('build-extension') is True
+          assert m.get('id', '').startswith('org.freedesktop.Sdk.Extension.flutter')
+          assert m.get('runtime') == 'org.freedesktop.Sdk'
           sources = m['modules'][0]['sources']
           types = [s.get('type') for s in sources]
-          assert 'git' in types, "missing git source"
-          assert 'archive' in types, "missing archive sources"
-          assert 'patch' in types, "missing shared.sh patch"
-          print(f"OK  id={m['id']}  runtime-version={m['runtime-version']}")
-          print(f"    {len(sources)} sources in flutter module")
+          assert 'git' in types
+          assert 'archive' in types
+          assert 'patch' in types
+          print(f"OK  id={m['id']}  runtime-version={m['runtime-version']}  sources={len(sources)}")
           EOF
 
       - name: Upload manifest artifact
