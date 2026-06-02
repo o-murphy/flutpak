@@ -33,14 +33,14 @@ jobs:
         run: |
           flutpak sdk-ext \
             --sdk "$FLUTTER_ROOT" \
-            --app-id com.github.o_murphy.flutter \
+            --app-id io.github.o_murphy.flutter \
             --runtime-version 25.08 \
-            --output flutter_extension/com.github.o_murphy.flutter.json
+            --output flutter_extension/io.github.o_murphy.flutter.json
 
       - uses: actions/upload-artifact@v7
         with:
           name: flutter-extension-manifest
-          path: flutter_extension/com.github.o_murphy.flutter.json
+          path: flutter_extension/io.github.o_murphy.flutter.json
 
   build:
     name: Build extension
@@ -56,6 +56,6 @@ jobs:
 
       - uses: ./.github/actions/build-flatpak
         with:
-          manifest: flutter_extension/com.github.o_murphy.flutter.json
-          app-id: com.github.o_murphy.flutter
+          manifest: flutter_extension/io.github.o_murphy.flutter.json
+          app-id: io.github.o_murphy.flutter
           artifact-name: flutter-extension-bundle
