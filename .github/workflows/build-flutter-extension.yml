@@ -40,7 +40,7 @@ jobs:
       - uses: actions/upload-artifact@v7
         with:
           name: flutter-extension-manifest
-          path: flutter_extension/io.github.o_murphy.flutter.json
+          path: flutter_extension/
 
   build:
     name: Build extension
