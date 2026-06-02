@@ -31,11 +31,9 @@ jobs:
 
       - name: Generate extension manifest
         run: |
-          FLUTTER_VERSION=$(cat "$FLUTTER_ROOT/version")
           flutpak sdk-ext \
             --sdk "$FLUTTER_ROOT" \
             --app-id com.github.o_murphy.flutter \
-            --branch "$FLUTTER_VERSION" \
             --runtime-version 25.08 \
             --output flutter_extension/com.github.o_murphy.flutter.json
 
