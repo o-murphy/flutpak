@@ -16,19 +16,25 @@ import 'flutter_sdk.dart';
 class SdkExtensionGenerator {
   final String sdkPath;
   final String runtimeVersion; // e.g. '25.08'
+  final String? appId;   // if null: org.freedesktop.Sdk.Extension.flutter{major}
+  final String? branch;  // if null: uses Flutter version tag
   final String? patchPath;
   final DownloadCache _cache;
 
   SdkExtensionGenerator({
     required this.sdkPath,
     required this.runtimeVersion,
+    this.appId,
+    this.branch,
     this.patchPath,
     DownloadCache? cache,
   }) : _cache = cache ?? LocalDownloadCache();
 
   Future<Map<String, dynamic>> generate() async {
     final flutterTag = FlutterSdkGenerator.readFlutterVersion(sdkPath);
-    final majorMinor = _majorMinor(flutterTag); // e.g. '3.41' → '3'
+    final effectiveAppId =
+        appId ?? 'org.freedesktop.Sdk.Extension.flutter${_majorMinor(flutterTag)}';
+    final effectiveBranch = branch ?? flutterTag;
 
     final sdkGen = FlutterSdkGenerator(
       sdkPath: sdkPath,
@@ -38,8 +44,8 @@ class SdkExtensionGenerator {
     final sdkSources = await sdkGen.generate();
 
     return {
-      'id': 'org.freedesktop.Sdk.Extension.flutter$majorMinor',
-      'branch': runtimeVersion,
+      'id': effectiveAppId,
+      'branch': effectiveBranch,
       'runtime': 'org.freedesktop.Sdk',
       'runtime-version': runtimeVersion,
       'sdk': 'org.freedesktop.Sdk',
@@ -67,12 +73,13 @@ class SdkExtensionGenerator {
         'cp flutter/bin/internal/engine.version flutter/bin/cache/linux-sdk.stamp',
         // Install into SDK extension path
         'install -d /usr/lib/sdk/flutter/',
-        'cp -a flutter/. /usr/lib/sdk/flutter/',
-        // env activation script (sourced by apps via sdk-extensions)
+        // Write enable.sh before cp -a: rofiles-fuse rejects O_CREAT on a
+        // directory that already has content written through it.
         r"printf '%s\n' 'export PATH=$PATH:/usr/lib/sdk/flutter/bin' "
             r"'export FLUTTER_ROOT=/usr/lib/sdk/flutter' "
             '> /usr/lib/sdk/flutter/enable.sh',
         'chmod 755 /usr/lib/sdk/flutter/enable.sh',
+        'cp -a flutter/. /usr/lib/sdk/flutter/',
       ];
 
   static String _majorMinor(String tag) {

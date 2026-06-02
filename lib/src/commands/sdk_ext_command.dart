@@ -25,6 +25,14 @@ class SdkExtCommand extends Command<void> {
           abbr: 'o',
           help: 'Output YAML manifest file.',
           defaultsTo: 'org.freedesktop.Sdk.Extension.flutter3.yml')
+      ..addOption('app-id',
+          abbr: 'a',
+          help:
+              'Flatpak app ID. Defaults to org.freedesktop.Sdk.Extension.flutter{major}.')
+      ..addOption('branch',
+          abbr: 'b',
+          help:
+              'Manifest branch. Defaults to the Flutter version read from the SDK.')
       ..addOption('patch',
           help: 'Relative path to shared.sh.patch to embed in sources.')
       ..addOption('config',
@@ -46,6 +54,8 @@ class SdkExtCommand extends Command<void> {
 
     final runtimeVersion = argResults!['runtime-version'] as String;
     final output = argResults!['output'] as String;
+    final appId = argResults!['app-id'] as String?;
+    final branch = argResults!['branch'] as String?;
     final patchPath = argResults!['patch'] as String? ?? cfg.patchPath;
 
     final cache = LocalDownloadCache();
@@ -53,6 +63,8 @@ class SdkExtCommand extends Command<void> {
       final gen = SdkExtensionGenerator(
         sdkPath: sdkPath,
         runtimeVersion: runtimeVersion,
+        appId: appId,
+        branch: branch,
         patchPath: patchPath,
         cache: cache,
       );

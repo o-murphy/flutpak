@@ -20,7 +20,7 @@ jobs:
     name: Generate manifest
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - uses: ./.github/actions/flutter
         with:
@@ -31,30 +31,33 @@ jobs:
 
       - name: Generate extension manifest
         run: |
+          FLUTTER_VERSION=$(cat "$FLUTTER_ROOT/version")
           flutpak sdk-ext \
             --sdk "$FLUTTER_ROOT" \
+            --app-id com.github.o_murphy.flutter \
+            --branch "$FLUTTER_VERSION" \
             --runtime-version 25.08 \
-            --output flutter_extension/org.freedesktop.Sdk.Extension.flutter3.json
+            --output flutter_extension/com.github.o_murphy.flutter.json
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: flutter-extension-manifest
-          path: flutter_extension/org.freedesktop.Sdk.Extension.flutter3.json
+          path: flutter_extension/com.github.o_murphy.flutter.json
 
   build:
     name: Build extension
     runs-on: ubuntu-latest
     needs: generate
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: flutter-extension-manifest
           path: flutter_extension/
 
       - uses: ./.github/actions/build-flatpak
         with:
-          manifest: flutter_extension/org.freedesktop.Sdk.Extension.flutter3.json
-          app-id: org.freedesktop.Sdk.Extension.flutter3
+          manifest: flutter_extension/com.github.o_murphy.flutter.json
+          app-id: com.github.o_murphy.flutter
           artifact-name: flutter-extension-bundle
