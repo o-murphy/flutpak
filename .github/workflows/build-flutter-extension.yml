@@ -33,9 +33,8 @@ jobs:
         run: |
           flutpak sdk-ext \
             --sdk "$FLUTTER_ROOT" \
-            --app-id io.github.o_murphy.flutter \
             --runtime-version 25.08 \
-            --output flutter_extension/io.github.o_murphy.flutter.json
+            --output flutter_extension/org.freedesktop.Sdk.Extension.flutter3.json
 
       - uses: actions/upload-artifact@v7
         with:
@@ -56,8 +55,8 @@ jobs:
 
       - uses: ./.github/actions/build-flatpak
         with:
-          manifest: flutter_extension/io.github.o_murphy.flutter.json
-          app-id: io.github.o_murphy.flutter
+          manifest: flutter_extension/org.freedesktop.Sdk.Extension.flutter3.json
+          app-id: org.freedesktop.Sdk.Extension.flutter3
           runtime: true
           artifact-name: flutter-extension-bundle
 
@@ -87,6 +86,6 @@ jobs:
           flatpak build-init testdir io.test.SmokeTest \
             org.freedesktop.Sdk org.freedesktop.Sdk 25.08
           dbus-run-session flatpak build \
-            --sdk-extension=io.github.o_murphy.flutter \
+            --sdk-extension=org.freedesktop.Sdk.Extension.flutter3 \
             testdir \
             bash -c 'source /usr/lib/sdk/flutter/enable.sh && flutter --version'
