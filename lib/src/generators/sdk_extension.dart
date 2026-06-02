@@ -16,9 +16,10 @@ import 'flutter_sdk.dart';
 class SdkExtensionGenerator {
   final String sdkPath;
   final String runtimeVersion; // e.g. '25.08'
-  final String? appId;   // if null: org.freedesktop.Sdk.Extension.flutter{major}
-  final String? branch;  // if null: uses Flutter version tag
+  final String? appId;      // if null: org.freedesktop.Sdk.Extension.flutter{major}
+  final String? branch;     // if null: uses Flutter version tag
   final String? patchPath;
+  final String? outputDir;  // directory of the output manifest; needed to write the patch
   final DownloadCache _cache;
 
   SdkExtensionGenerator({
@@ -27,6 +28,7 @@ class SdkExtensionGenerator {
     this.appId,
     this.branch,
     this.patchPath,
+    this.outputDir,
     DownloadCache? cache,
   }) : _cache = cache ?? LocalDownloadCache();
 
@@ -39,6 +41,7 @@ class SdkExtensionGenerator {
     final sdkGen = FlutterSdkGenerator(
       sdkPath: sdkPath,
       patchPath: patchPath,
+      outputDir: outputDir,
       cache: _cache,
     );
     final sdkSources = await sdkGen.generate();

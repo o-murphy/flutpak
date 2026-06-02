@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:args/command_runner.dart';
+import 'package:path/path.dart' as p;
 import '../config.dart';
 import '../generators/sdk_extension.dart';
 import '../utils/download_cache.dart';
@@ -66,6 +67,7 @@ class SdkExtCommand extends Command<void> {
         appId: appId,
         branch: branch,
         patchPath: patchPath,
+        outputDir: p.dirname(p.absolute(output)),
         cache: cache,
       );
       final manifest = await gen.generate();
