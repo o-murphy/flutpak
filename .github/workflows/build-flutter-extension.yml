@@ -60,3 +60,33 @@ jobs:
           app-id: io.github.o_murphy.flutter
           runtime: true
           artifact-name: flutter-extension-bundle
+
+  test:
+    name: Test extension
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Install Flatpak and add Flathub remote
+        run: |
+          sudo apt-get install -y flatpak
+          flatpak remote-add --user --if-not-exists flathub \
+            https://dl.flathub.org/repo/flathub.flatpakrepo
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: flutter-extension-bundle
+
+      - name: Install SDK runtime and Flutter extension
+        run: |
+          dbus-run-session flatpak install --user -y --noninteractive flathub \
+            org.freedesktop.Sdk//25.08
+          flatpak install --user -y io.github.o_murphy.flutter_x86_64.flatpak
+
+      - name: Smoke-test Flutter inside SDK build environment
+        run: |
+          flatpak build-init testdir io.test.SmokeTest \
+            org.freedesktop.Sdk org.freedesktop.Sdk 25.08
+          dbus-run-session flatpak build \
+            --sdk-extension=io.github.o_murphy.flutter \
+            testdir \
+            bash -c 'source /usr/lib/sdk/flutter/enable.sh && flutter --version'
