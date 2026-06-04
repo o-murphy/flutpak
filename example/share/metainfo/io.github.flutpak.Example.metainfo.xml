@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.flutpak.Example</id>
+  <metadata_license>MIT</metadata_license>
+  <project_license>MIT</project_license>
+  <name>Flutpak Example</name>
+  <summary>Minimal Flutter hello-world app for testing flutpak</summary>
+  <description>
+    <p>
+      A minimal Flutter Linux application used to validate the flutpak
+      Flatpak toolchain end-to-end in CI.
+    </p>
+  </description>
+  <launchable type="desktop-id">io.github.flutpak.Example.desktop</launchable>
+  <url type="homepage">https://github.com/o-murphy/flutpak</url>
+  <releases>
+    <release version="0.1.0" date="2025-01-01"/>
+  </releases>
+  <content_rating type="oars-1.1"/>
+</component>

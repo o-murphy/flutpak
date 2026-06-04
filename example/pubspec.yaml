@@ -1,0 +1,15 @@
+name: flutpak_example
+description: Minimal Flutter hello-world app used to test flutpak Flatpak builds.
+publish_to: 'none'
+version: 0.1.0
+
+environment:
+  sdk: '>=3.4.0 <4.0.0'
+  flutter: '>=3.27.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true

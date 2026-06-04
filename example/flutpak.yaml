@@ -1,0 +1,8 @@
+manifest:
+  app-id: io.github.flutpak.Example
+  runtime-version: '24.08'
+
+metainfo: share/metainfo/io.github.flutpak.Example.metainfo.xml
+desktop-entry: share/applications/io.github.flutpak.Example.desktop
+
+output: flatpak

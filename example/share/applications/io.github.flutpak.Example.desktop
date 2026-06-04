@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=Flutpak Example
+Comment=Minimal Flutter hello-world app for testing flutpak
+Exec=Example
+Icon=io.github.flutpak.Example
+Terminal=false
+Type=Application
+Categories=Utility;
