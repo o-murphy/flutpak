@@ -732,8 +732,6 @@ jobs:
         arch: [amd64, arm64]
     runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
     steps:
-      - uses: actions/checkout@v6
-
       - uses: actions/download-artifact@v8
         with:
           name: flatpak-generated
