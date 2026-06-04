@@ -1,0 +1,55 @@
+name: Build Flatpak (official action)
+description: >
+  Builds a Flatpak bundle using the official flatpak/flatpak-github-actions.
+
+  IMPORTANT: the calling job must configure:
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-48
+      options: --privileged
+
+inputs:
+  manifest-path:
+    description: "Path to the Flatpak manifest (.yml / .json)"
+    required: true
+  bundle:
+    description: "Output .flatpak bundle filename"
+    required: false
+    default: "app.flatpak"
+  arch:
+    description: "CPU architecture to build for (x86_64 or aarch64)"
+    required: false
+    default: "x86_64"
+  cache-key:
+    description: "Cache key for .flatpak-builder directory. Defaults to flatpak-builder-<arch>-<sha>."
+    required: false
+    default: ""
+  repository-name:
+    description: "Flatpak remote name used to fetch the runtime"
+    required: false
+    default: "flathub"
+  repository-url:
+    description: "Flatpak remote URL used to fetch the runtime"
+    required: false
+    default: "https://flathub.org/repo/flathub.flatpakrepo"
+  upload-artifact:
+    description: "Upload the produced bundle as a GitHub Actions artifact"
+    required: false
+    default: "false"
+
+outputs:
+  bundle:
+    description: "Filename of the produced .flatpak bundle"
+    value: ${{ inputs.bundle }}
+
+runs:
+  using: composite
+  steps:
+    - uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+      with:
+        manifest-path: ${{ inputs.manifest-path }}
+        bundle: ${{ inputs.bundle }}
+        arch: ${{ inputs.arch }}
+        cache-key: ${{ inputs.cache-key != '' && inputs.cache-key || format('flatpak-builder-{0}-{1}', inputs.arch, github.sha) }}
+        repository-name: ${{ inputs.repository-name }}
+        repository-url: ${{ inputs.repository-url }}
+        upload-artifact: ${{ inputs.upload-artifact }}
