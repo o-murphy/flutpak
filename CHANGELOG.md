@@ -7,6 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Breaking Changes
+
+- **`patches[].strip-trailing-cr` renamed to `patches[].crlf`** (boolean).
+  The old key is still accepted as a fallback for backward compatibility but is
+  considered deprecated. Update your `flutpak.yaml`:
+  ```yaml
+  # before
+  patches:
+    - package: objectbox_flutter_libs
+      path: flatpak/patches/objectbox_flutter_libs/CMakeLists.txt.patch
+      strip-trailing-cr: true
+
+  # after
+  patches:
+    - package: objectbox_flutter_libs
+      path: flatpak/patches/objectbox_flutter_libs/CMakeLists.txt.patch
+      crlf: true
+  ```
+
+### Fixed
+
+- **`strip-trailing-cr: true`** no longer injects a `type: shell` source running
+  `sed -i 's/\r//'` on the target file. `flutpak generate` now normalises the patch
+  file itself: `crlf: true` → CRLF, `crlf: false` (default) → LF. This keeps the
+  generated manifest clean and avoids the `type: shell` pattern that Flathub reviewers
+  flag as a code smell.
+- Line-ending normalisation is now **deterministic on any host OS** — patches are
+  always rewritten to the correct encoding regardless of git `autocrlf` settings or
+  platform defaults.
+
+### Changed
+
+- **`--binary` is always added to every `type: patch` entry** in the generated manifest.
+  This prevents `patch(1)` from silently stripping `\r` bytes, which was the root cause
+  of "Hunk FAILED at N (different line endings)" errors for CRLF target files. Harmless
+  for LF patches against LF targets.
+
+### Added
+
+- **`.gitattributes`** — `*.patch -text` prevents git from normalising line endings in
+  patch files on any platform. Without this, git on Windows would re-convert CRLF
+  patches to LF on checkout, defeating `--binary`.
+
 
 ## [0.4.0] — 2026-06-02
 
@@ -47,7 +90,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`actions/build-flatpak`** composite action — installs `org.flatpak.Builder`, lints the manifest, builds the Flatpak, lints the repo, exports a `.flatpak` bundle. Outputs `bundle`, `arch`, `artifact-url`.
 - **`scripts/flatpak-build.sh`** — shared shell library with reusable Flatpak build functions.
 - **`patches[].options`** — extra flags forwarded to the `patch(1)` command via the flatpak-builder patch source `options` field.
-- **`patches[].strip_trailing_cr`** — when `true`, injects a `type: shell` source that runs `sed -i 's/\r//'` on the target file. Useful for packages with CRLF line endings (e.g. `objectbox_flutter_libs` ≥ 5.3.2).
+- **`patches[].strip-trailing-cr`** — when `true`, flutpak converts the patch file to CRLF line endings in `generated/patches/` and adds `--binary` to the patch options, so `patch(1)` applies it cleanly to CRLF target files. Useful for packages with CRLF line endings (e.g. `objectbox_flutter_libs` ≥ 5.3.2).
 - **`known-patches/`** — directory with ready-to-use reference patches:
   - `flutter/shared.sh.patch`
   - `objectbox_flutter_libs/5.3.1/CMakeLists.txt.patch`

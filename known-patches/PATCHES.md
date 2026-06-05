@@ -70,11 +70,11 @@ patches:
 for offline/sandboxed Flatpak builds.
 
 > **Note on line endings:** `objectbox_flutter_libs` 5.3.2 ships
-> `linux/CMakeLists.txt` with CRLF line endings in the pub.dev archive, while
-> this patch is stored with LF. Use `strip-trailing-cr: true` so flutpak injects
-> a `type: shell` source that runs `sed -i 's/\r//'` on the file before the patch
-> is applied. GNU `patch(1)` does not reliably handle CRLF/LF mismatches even
-> with `--ignore-whitespace`.
+> `linux/CMakeLists.txt` with CRLF line endings in the pub.dev archive. Use
+> `crlf: true` so `flutpak generate` normalises the patch to CRLF in
+> `generated/patches/` and adds `--binary` to the patch options, allowing
+> `patch(1)` to apply it directly to the CRLF target without line-ending
+> mismatches.
 
 **Usage:**
 
@@ -95,5 +95,5 @@ manifest:
 patches:
   - package: objectbox_flutter_libs
     path: flatpak/patches/objectbox_flutter_libs/CMakeLists.txt.patch
-    strip-trailing-cr: true
+    crlf: true
 ```

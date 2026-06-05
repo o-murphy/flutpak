@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:path/path.dart' as p;
 import 'package:yaml/yaml.dart';
+import 'utils/log.dart';
 
 /// A project-level patch entry: applies a patch file to a specific pub package.
 class PatchEntry {
@@ -13,10 +14,13 @@ class PatchEntry {
   /// patch source `options` field (e.g. `["--ignore-whitespace"]`).
   final List<String> options;
 
-  /// When true, a `type: shell` source is injected before this patch to strip
-  /// trailing `\r` from the target file. Use this when the pub.dev archive for
-  /// the package has CRLF line endings but the patch file uses LF.
-  final bool stripTrailingCr;
+  /// When true, `flutpak generate` normalises the patch file to CRLF line
+  /// endings in `generated/patches/`. Use when the pub.dev archive for the
+  /// package ships sources with CRLF line endings (e.g. `objectbox_flutter_libs`
+  /// ≥ 5.3.2). When false (default) the patch is normalised to LF. In both
+  /// cases `--binary` is added to the flatpak-builder patch source options so
+  /// that `patch(1)` preserves line endings exactly as written.
+  final bool crlf;
 
   const PatchEntry({
     required this.package,
@@ -24,7 +28,7 @@ class PatchEntry {
     required this.path,
     this.destSubpath,
     this.options = const [],
-    this.stripTrailingCr = false,
+    this.crlf = false,
   });
 
   /// Resolves the dest path for this patch given the package version.
@@ -35,13 +39,18 @@ class PatchEntry {
 
   factory PatchEntry.fromYaml(Map yaml) {
     final options = (yaml['options'] as List?)?.cast<String>() ?? [];
+    final hasLegacyKey = yaml.containsKey('strip-trailing-cr');
+    if (hasLegacyKey) {
+      logWarn('patches[${yaml['package']}]: strip-trailing-cr is deprecated, '
+          'use crlf: true instead.');
+    }
     return PatchEntry(
       package: yaml['package'] as String,
       version: yaml['version'] as String?,
       path: yaml['path'] as String,
       destSubpath: yaml['dest-subpath'] as String?,
       options: options,
-      stripTrailingCr: yaml['strip-trailing-cr'] as bool? ?? false,
+      crlf: yaml['crlf'] as bool? ?? yaml['strip-trailing-cr'] as bool? ?? false,
     );
   }
 }

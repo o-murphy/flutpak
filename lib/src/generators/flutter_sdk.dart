@@ -3,6 +3,7 @@ import 'package:path/path.dart' as p;
 import 'package:yaml/yaml.dart';
 import '../models/flatpak_source.dart';
 import '../utils/download_cache.dart';
+import '../utils/log.dart';
 
 /// Describes one artifact entry in the Flutter engine infra.
 class _Artifact {
@@ -92,7 +93,7 @@ class FlutterSdkGenerator {
     final flutterTag = readFlutterVersion(sdkPath);
     final flutterCommit = _gitRevParse(sdkPath);
 
-    stderr.writeln('flutter: version=$flutterTag engine=$engineHash');
+    logInfo('flutter: version=$flutterTag engine=$engineHash');
 
     final sources = <FlatpakSource>[];
 
@@ -187,7 +188,7 @@ class FlutterSdkGenerator {
     final target = File(p.join(outputDir!, defaultSharedShPatchPath));
     target.createSync(recursive: true);
     target.writeAsStringSync(builtinSharedShPatch);
-    stderr.writeln('flutter: wrote built-in shared.sh patch → ${target.path}');
+    logInfo('✓  flutter: wrote built-in shared.sh patch → ${target.path}');
     return defaultSharedShPatchPath;
   }
 
@@ -292,7 +293,7 @@ class FlutterSdkGenerator {
         File(p.join(p.absolute(outputDir), defaultSharedShPatchPath));
     target.createSync(recursive: true);
     target.writeAsStringSync(builtinSharedShPatch);
-    stderr.writeln('flutter: wrote built-in shared.sh patch → ${target.path}');
+    logInfo('✓  flutter: wrote built-in shared.sh patch → ${target.path}');
     return target.path;
   }
 
