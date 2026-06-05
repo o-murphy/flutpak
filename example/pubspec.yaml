@@ -1,6 +1,7 @@
 name: flutpak_example
 description: Minimal Flutter hello-world app used to test flutpak Flatpak builds.
 publish_to: 'none'
+resolution: local
 version: 0.1.0
 
 environment:
