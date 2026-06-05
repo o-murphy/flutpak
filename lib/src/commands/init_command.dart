@@ -28,8 +28,8 @@ class InitCommand extends Command<void> {
 
   @override
   Future<void> run() async {
-    final configPath = argResults!['config'] as String;
-    final configDir = p.dirname(p.absolute(configPath));
+    final configPath = p.absolute(argResults!['config'] as String);
+    final configDir = p.dirname(configPath);
     final cfg = FlatpakGenConfig.load(configPath, configDir);
     final sdkPath = argResults!['sdk'] as String? ??
         cfg.flutterSdk ??

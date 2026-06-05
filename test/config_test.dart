@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutpak/flutpak.dart';
+import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 
 void main() {
@@ -64,14 +65,15 @@ void main() {
     });
 
     test('effectivePubLocks substitutes \$FLUTTER_ROOT with sdkPath', () {
-      final cfg = FlatpakGenConfig.fromYaml({
-        'pub': {
-          'locks': [
-            'pubspec.lock',
-            r'$FLUTTER_ROOT/packages/flutter_tools/pubspec.lock',
-          ],
-        },
-      });
+      // Bypass fromYaml (which eagerly substitutes $FLUTTER_ROOT from the
+      // environment) so the literal placeholder is preserved for the test.
+      final cfg = FlatpakGenConfig(
+        output: 'flatpak',
+        pubLocks: [
+          'pubspec.lock',
+          r'$FLUTTER_ROOT/packages/flutter_tools/pubspec.lock',
+        ],
+      );
       final effective = cfg.effectivePubLocks('/home/user/flutter');
       expect(effective, [
         'pubspec.lock',
@@ -279,6 +281,22 @@ flutpak:
       final cfg = FlatpakGenConfig.load('flutpak.yaml', tmpDir.path);
       expect(cfg.output, 'flatpak');
       expect(cfg.pubLocks, contains('pubspec.lock'));
+    });
+
+    test('does not double subdirectory when configPath includes a subdir', () {
+      // Regression: generate_command passes configDir=dirname(absolute(configPath))
+      // as workingDir. If load() does p.join(workingDir, configPath) with a
+      // relative configPath that already contains the subdir, the path doubles.
+      final subDir = Directory('${tmpDir.path}/subdir')..createSync();
+      File('${subDir.path}/flutpak.yaml')
+          .writeAsStringSync('output: flatpak/gen\n');
+
+      // Симулює generate_command: configPath вже абсолютний, configDir = dirname
+      final configPath = p.absolute(p.join(subDir.path, 'flutpak.yaml'));
+      final configDir = p.dirname(configPath);
+      final cfg = FlatpakGenConfig.load(configPath, configDir);
+
+      expect(cfg.output, 'flatpak/gen');
     });
   });
 

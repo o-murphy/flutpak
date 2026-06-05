@@ -50,7 +50,8 @@ class PatchEntry {
       path: yaml['path'] as String,
       destSubpath: yaml['dest-subpath'] as String?,
       options: options,
-      crlf: yaml['crlf'] as bool? ?? yaml['strip-trailing-cr'] as bool? ?? false,
+      crlf:
+          yaml['crlf'] as bool? ?? yaml['strip-trailing-cr'] as bool? ?? false,
     );
   }
 }

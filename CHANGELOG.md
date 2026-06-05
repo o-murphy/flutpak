@@ -34,6 +34,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`--config` with a subdirectory path** (e.g. `--config subdir/flutpak.yaml`) now
+  resolves the config file correctly. Previously, `flutpak init` and `flutpak generate`
+  doubled the subdirectory component and failed to find the file.
+
 - **`strip-trailing-cr: true`** no longer injects a `type: shell` source running
   `sed -i 's/\r//'` on the target file. `flutpak generate` now normalises the patch
   file itself: `crlf: true` → CRLF, `crlf: false` (default) → LF. This keeps the

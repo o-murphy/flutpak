@@ -137,7 +137,8 @@ class PubSourcesGenerator {
       final response = await _client.get(uri, headers: headers);
       if (!_retryStatuses.contains(response.statusCode)) return response;
       if (attempt == 4) return response;
-      logWarn('$tag ${response.statusCode} — retry $attempt/3 in ${delay.inSeconds}s');
+      logWarn(
+          '$tag ${response.statusCode} — retry $attempt/3 in ${delay.inSeconds}s');
       await Future.delayed(delay);
       delay *= 2;
     }

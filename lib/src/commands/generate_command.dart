@@ -46,8 +46,8 @@ class GenerateCommand extends Command<void> {
 
   @override
   Future<void> run() async {
-    final configPath = argResults!['config'] as String;
-    final configDir = p.dirname(p.absolute(configPath));
+    final configPath = p.absolute(argResults!['config'] as String);
+    final configDir = p.dirname(configPath);
     final cfg = FlatpakGenConfig.load(configPath, configDir);
 
     final tagArg = argResults!['tag'] as String?;
@@ -258,19 +258,22 @@ class GenerateCommand extends Command<void> {
 
     final appId = extractField('app-id');
     if (appId != null && appId != cfg.appId) {
-      logError('template app-id "$appId" does not match config "${cfg.appId}": $templatePath');
+      logError(
+          'template app-id "$appId" does not match config "${cfg.appId}": $templatePath');
       exit(1);
     }
 
     final command = extractField('command');
     if (command != null && command != cfg.command) {
-      logError('template command "$command" does not match config "${cfg.command}": $templatePath');
+      logError(
+          'template command "$command" does not match config "${cfg.command}": $templatePath');
       exit(1);
     }
 
     final runtimeVersion = extractField('runtime-version');
     if (runtimeVersion != null && runtimeVersion != cfg.runtimeVersion) {
-      logError('template runtime-version "$runtimeVersion" does not match config "${cfg.runtimeVersion}": $templatePath');
+      logError(
+          'template runtime-version "$runtimeVersion" does not match config "${cfg.runtimeVersion}": $templatePath');
       exit(1);
     }
   }
@@ -341,7 +344,8 @@ class GenerateCommand extends Command<void> {
 
     final modules = yamlTree['modules'];
     if (modules is! List) {
-      logWarn('modules key not found or not a list in template — skipping injection');
+      logWarn(
+          'modules key not found or not a list in template — skipping injection');
       return content;
     }
 
@@ -349,13 +353,15 @@ class GenerateCommand extends Command<void> {
     final appModuleIdx =
         modules.toList().indexWhere((m) => m is Map && m['name'] == appName);
     if (appModuleIdx < 0) {
-      logWarn('app module "$appName" not found in template — skipping injection');
+      logWarn(
+          'app module "$appName" not found in template — skipping injection');
       return content;
     }
 
     final appModule = modules.toList()[appModuleIdx];
     if (appModule is! Map || appModule['sources'] is! List) {
-      logWarn('sources key not found or not a list in app module "$appName" — skipping injection');
+      logWarn(
+          'sources key not found or not a list in app module "$appName" — skipping injection');
       return content;
     }
 
