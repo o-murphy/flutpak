@@ -29,7 +29,7 @@
   <screenshots>
     <screenshot type="default">
       <image>
-        https://raw.githubusercontent.com/o-murphy/flutpak/c1c95cb48ea244ce79c9d8a918afbc0cffbd634b/examples/demo_app/screenshots/home.png</image>
+        https://raw.githubusercontent.com/o-murphy/flutpak/v0.5.0/examples/demo_app/screenshots/home.png</image>
       <caption>Home screen</caption>
     </screenshot>
   </screenshots>
