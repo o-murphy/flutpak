@@ -7,6 +7,7 @@ import '../config.dart';
 import '../generators/flutter_sdk.dart';
 import '../generators/manifest_generator.dart';
 import '../patches_registry.dart';
+import '../utils/log.dart';
 import '../utils/sources_util.dart';
 import 'command_utils.dart';
 
@@ -62,8 +63,8 @@ class GenerateCommand extends Command<void> {
     if (dryRun) {
       final (tag, commit) = _resolveRefs(tagArg: tagArg, commitArg: commitArg);
       final ref = tag ?? commit?.substring(0, 12) ?? '(no ref)';
-      stderr.writeln('dry-run: generate  ref=$ref');
-      stderr.writeln('(dry-run: no files written)');
+      logDebug('dry-run: generate  ref=$ref');
+      logDebug('(dry-run: no files written)');
       return;
     }
 
@@ -94,7 +95,7 @@ class GenerateCommand extends Command<void> {
   }) async {
     final manifestCfg = cfg.manifest;
     if (manifestCfg == null) {
-      stderr.writeln('error: manifest section required in config for generate');
+      logError('manifest section required in config for generate');
       exit(1);
     }
 
@@ -105,8 +106,8 @@ class GenerateCommand extends Command<void> {
     final templatePath = p.join(outputDir, '${manifestCfg.appId}.yml');
     final templateFile = File(templatePath);
     if (!templateFile.existsSync()) {
-      stderr.writeln('error: template not found: $templatePath\n'
-          '  Run `flutpak init` first to create the template.');
+      logError('template not found: $templatePath');
+      logError('  Run `flutpak init` first to create the template.');
       exit(1);
     }
     final templateContent = templateFile.readAsStringSync();
@@ -137,11 +138,11 @@ class GenerateCommand extends Command<void> {
         projectPatches: cfg.patches,
       );
     } on Exception catch (e) {
-      stderr.writeln('error: $e');
+      logError('$e');
       exit(1);
     }
     if (patchEntries.isNotEmpty) {
-      stderr.writeln('patches: ${patchEntries.length} entries resolved');
+      logInfo('patches: ${patchEntries.length} entries resolved');
     }
 
     // ── Resolve Flutter patch (write built-in if needed) ─────────────────
@@ -173,19 +174,16 @@ class GenerateCommand extends Command<void> {
     // ── Write flutter version file ────────────────────────────────────────
     if (cfg.flutterVersionFile != null) {
       if (sdkPath == null) {
-        stderr.writeln(
-          '⚠  flutter_version_file is set but Flutter SDK path could not be '
-          'resolved (\$FLUTTER_ROOT not set); skipping',
-        );
+        logWarn('flutter_version_file is set but Flutter SDK path could not be '
+            'resolved (\$FLUTTER_ROOT not set); skipping');
       } else {
         _writeFlutterVersionFile(sdkPath, p.absolute(cfg.flutterVersionFile!));
       }
     }
 
     if (commit == null) {
-      stderr.writeln(
-          '⚠  commit hash unknown (not in a git repo and --commit not set);\n'
-          '   commit: will be missing from $generatedManifestPath');
+      logWarn('commit hash unknown (not in a git repo and --commit not set); '
+          'commit will be missing from $generatedManifestPath');
     }
 
     var generatedContent = stripTemplateGuidance(templateContent);
@@ -206,11 +204,24 @@ class GenerateCommand extends Command<void> {
     File(generatedManifestPath)
       ..createSync(recursive: true)
       ..writeAsStringSync(generatedContent);
-    stderr.writeln('✓  generated manifest → $generatedManifestPath');
+    logInfo('✓  generated manifest → $generatedManifestPath');
 
     // ── Copy patches ──────────────────────────────────────────────────────
+    // Every patch is normalised to a deterministic line-ending on copy:
+    //   crlf: true  → CRLF  (target file in the pub.dev archive uses CRLF)
+    //   crlf: false → LF    (default; most Linux packages)
+    // This guarantees generated/patches/ is portable regardless of the host
+    // OS or git line-ending settings.
     if (Directory(patchesDir).existsSync()) {
-      _copyDirectory(Directory(patchesDir), Directory(generatedPatchesDir));
+      final crlfPaths = {
+        for (final e in patchEntries)
+          if (e.crlf) p.canonicalize(e.path),
+      };
+      _copyPatches(
+        Directory(patchesDir),
+        Directory(generatedPatchesDir),
+        crlfPaths: crlfPaths,
+      );
     }
 
     // ── Copy flathub.json ─────────────────────────────────────────────────
@@ -222,7 +233,7 @@ class GenerateCommand extends Command<void> {
     }
 
     final ref = tag ?? commit?.substring(0, 12) ?? '(no ref)';
-    stderr.writeln('✓  generate complete  ref=$ref');
+    logInfo('✓  generate complete  ref=$ref');
   }
 
   (String?, String?) _resolveRefs({String? tagArg, String? commitArg}) {
@@ -230,7 +241,7 @@ class GenerateCommand extends Command<void> {
     if (tagArg != null) {
       final resolved = _gitRevParse('$tagArg^{}') ?? _gitRevParse(tagArg);
       if (resolved == null) {
-        stderr.writeln('⚠  could not resolve commit for tag $tagArg...');
+        logWarn('could not resolve commit for tag $tagArg');
       }
       return (tagArg, resolved);
     }
@@ -248,7 +259,6 @@ class GenerateCommand extends Command<void> {
 
   void _validateTemplate(
       String content, ManifestConfig cfg, String templatePath) {
-    // Parse simple key: value fields from the YAML text for validation.
     String? extractField(String key) {
       final m = RegExp('^$key:\\s*(.+)\$', multiLine: true).firstMatch(content);
       return m?.group(1)?.trim().replaceAll("'", '').replaceAll('"', '');
@@ -256,22 +266,19 @@ class GenerateCommand extends Command<void> {
 
     final appId = extractField('app-id');
     if (appId != null && appId != cfg.appId) {
-      stderr.writeln(
-          'error: template app-id "$appId" does not match config app-id "${cfg.appId}": $templatePath');
+      logError('template app-id "$appId" does not match config "${cfg.appId}": $templatePath');
       exit(1);
     }
 
     final command = extractField('command');
     if (command != null && command != cfg.command) {
-      stderr.writeln(
-          'error: template command "$command" does not match config command "${cfg.command}": $templatePath');
+      logError('template command "$command" does not match config "${cfg.command}": $templatePath');
       exit(1);
     }
 
     final runtimeVersion = extractField('runtime-version');
     if (runtimeVersion != null && runtimeVersion != cfg.runtimeVersion) {
-      stderr.writeln(
-          'error: template runtime-version "$runtimeVersion" does not match config runtime-version "${cfg.runtimeVersion}": $templatePath');
+      logError('template runtime-version "$runtimeVersion" does not match config "${cfg.runtimeVersion}": $templatePath');
       exit(1);
     }
   }
@@ -285,17 +292,36 @@ class GenerateCommand extends Command<void> {
       ..writeAsStringSync(
           '# Generated by flutpak — https://github.com/o-murphy/flutpak\n'
           '$version\n');
-    stderr.writeln('✓  flutter.version → $outputPath ($version)');
+    logInfo('✓  flutter.version → $outputPath ($version)');
   }
 
-  void _copyDirectory(Directory source, Directory dest) {
+  /// Copies [source] into [dest] recursively, normalising line endings.
+  ///
+  /// Every patch file is rewritten with deterministic endings:
+  /// - Files whose absolute path is in [crlfPaths] → CRLF.
+  /// - All other files → LF.
+  ///
+  /// This ensures generated/patches/ is portable regardless of host OS or
+  /// git autocrlf settings.
+  void _copyPatches(
+    Directory source,
+    Directory dest, {
+    Set<String> crlfPaths = const {},
+  }) {
     dest.createSync(recursive: true);
     for (final entity in source.listSync()) {
       final destPath = p.join(dest.path, p.basename(entity.path));
       if (entity is File) {
-        entity.copySync(destPath);
+        final content = entity.readAsStringSync();
+        final absPath = p.canonicalize(entity.path);
+        if (crlfPaths.contains(absPath)) {
+          File(destPath).writeAsStringSync(convertPatchToCrlf(content));
+          logInfo('✓  patch → CRLF: ${p.relative(entity.path)}');
+        } else {
+          File(destPath).writeAsStringSync(content.replaceAll('\r\n', '\n'));
+        }
       } else if (entity is Directory) {
-        _copyDirectory(entity, Directory(destPath));
+        _copyPatches(entity, Directory(destPath), crlfPaths: crlfPaths);
       }
     }
   }
@@ -323,8 +349,7 @@ class GenerateCommand extends Command<void> {
 
     final modules = yamlTree['modules'];
     if (modules is! List) {
-      stderr.writeln(
-          '⚠  modules key not found or not a list in template — skipping injection');
+      logWarn('modules key not found or not a list in template — skipping injection');
       return content;
     }
 
@@ -332,15 +357,13 @@ class GenerateCommand extends Command<void> {
     final appModuleIdx =
         modules.toList().indexWhere((m) => m is Map && m['name'] == appName);
     if (appModuleIdx < 0) {
-      stderr.writeln(
-          '⚠  app module "$appName" not found in template — skipping injection');
+      logWarn('app module "$appName" not found in template — skipping injection');
       return content;
     }
 
     final appModule = modules.toList()[appModuleIdx];
     if (appModule is! Map || appModule['sources'] is! List) {
-      stderr.writeln(
-          '⚠  sources key not found or not a list in app module "$appName" — skipping injection');
+      logWarn('sources key not found or not a list in app module "$appName" — skipping injection');
       return content;
     }
 
@@ -386,7 +409,7 @@ class GenerateCommand extends Command<void> {
     for (final modPath in extraModules.reversed) {
       final f = File(modPath);
       if (!f.existsSync()) {
-        stderr.writeln('⚠  modules: file not found: $modPath');
+        logWarn('modules: file not found: $modPath');
         continue;
       }
       final modYaml = loadYaml(f.readAsStringSync());

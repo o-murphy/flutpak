@@ -322,6 +322,31 @@ packages:
       expect(entries.first.package, 'my_custom_package');
     });
 
+    test('preserves crlf flag from project patch during version resolution', () {
+      final lockPath = writeLock('''
+packages:
+  mypkg:
+    source: hosted
+    version: "1.2.3"
+''');
+
+      final projectPatch = PatchEntry(
+        package: 'mypkg',
+        path: 'patches/mypkg.patch',
+        crlf: true,
+      );
+
+      final entries = resolvePatchEntries(
+        lockPaths: [lockPath],
+        patchesDir: '${tmpDir.path}/flatpak/patches',
+        projectPatches: [projectPatch],
+      );
+
+      expect(entries, hasLength(1));
+      expect(entries.first.crlf, isTrue);
+      expect(entries.first.version, '1.2.3');
+    });
+
     test('handles missing lock file gracefully', () {
       final entries = resolvePatchEntries(
         lockPaths: ['${tmpDir.path}/nonexistent.lock'],

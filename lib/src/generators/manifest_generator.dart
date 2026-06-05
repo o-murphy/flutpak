@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:path/path.dart' as p;
 import '../config.dart';
 
@@ -244,26 +243,12 @@ String stripTemplateGuidance(String content) {
   return result;
 }
 
-/// Reads the first `--- a/<path>` line of a unified diff and returns the
-/// target file path with the leading `a/` stripped (i.e. the path after `-p1`
-/// stripping). Returns null if the header is not found or the file cannot be read.
-String? _parsePatchTarget(String patchPath) {
-  try {
-    for (final line in File(patchPath).readAsLinesSync()) {
-      if (line.startsWith('--- ')) {
-        final path = line.substring(4).trim();
-        if (path == '/dev/null') return null;
-        return path.startsWith('a/') ? path.substring(2) : path;
-      }
-    }
-  } catch (_) {}
-  return null;
-}
-
 /// Builds a list of flatpak source maps for [patches] suitable for passing to
-/// yaml_edit. Each [PatchEntry] may produce one or two maps: an optional
-/// `type: shell` map (when [PatchEntry.stripTrailingCr] is true) followed by
-/// a `type: patch` map.
+/// yaml_edit. Each [PatchEntry] produces a single `type: patch` map.
+///
+/// Every entry always includes `--binary` in `options` so that `patch(1)`
+/// never converts line endings — required for CRLF patches to apply cleanly
+/// to CRLF target files, and harmless for LF patches.
 ///
 /// [patchesDir] is the absolute or relative directory that patch files live in.
 /// Patch paths in the returned maps are written relative to that directory so
@@ -281,26 +266,33 @@ List<Map<String, dynamic>> buildPatchSourceMaps(
         p.relative(p.absolute(patch.path), from: absPatchesDir);
     final patchPath = 'patches/$relFromPatchesDir';
 
-    if (patch.stripTrailingCr && dest != null) {
-      final targetFile = _parsePatchTarget(patch.path);
-      if (targetFile != null) {
-        result.add({
-          'type': 'shell',
-          'commands': ["sed -i 's/\\r//' $dest/$targetFile"],
-        });
-      }
-    }
-
     result.add({
       'type': 'patch',
       if (dest != null) 'dest': dest,
       'path': patchPath,
-      if (patch.options.isNotEmpty) 'options': patch.options,
+      // --binary is always set so that `patch` never converts line endings in
+      // either the patch file or the target, which is required for CRLF patches
+      // and harmless for LF-only ones.
+      'options': ['--binary', ...patch.options],
     });
   }
 
   return result;
 }
+
+/// Converts [content] (a unified diff) to CRLF line endings.
+///
+/// Normalises any pre-existing `\r\n` sequences first to avoid doubling.
+String convertPatchToCrlf(String content) =>
+    content.replaceAll('\r\n', '\n').replaceAll('\n', '\r\n');
+
+/// Converts [content] (a unified diff) to LF line endings.
+String convertPatchToLf(String content) => content.replaceAll('\r\n', '\n');
+
+/// Returns true if [content] contains at least one bare `\n` not preceded by
+/// `\r`, i.e. the string has LF line endings.
+bool patchHasLfLineEndings(String content) =>
+    RegExp(r'(?<!\r)\n').hasMatch(content);
 
 /// Pins screenshot URLs in a metainfo XML file from `/main/` to [ref].
 /// Replaces the entire `<screenshots>` block in [content] with one built

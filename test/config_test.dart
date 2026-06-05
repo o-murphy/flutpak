@@ -303,6 +303,53 @@ flutpak:
       expect(entry.dest('5.3.1'),
           '.pub-cache/hosted/pub.dev/objectbox_flutter_libs-5.3.1');
     });
+
+    group('fromYaml', () {
+      test('parses crlf: true', () {
+        final entry = PatchEntry.fromYaml({
+          'package': 'objectbox_flutter_libs',
+          'path': 'patches/objectbox.patch',
+          'crlf': true,
+        });
+        expect(entry.crlf, isTrue);
+      });
+
+      test('crlf defaults to false when absent', () {
+        final entry = PatchEntry.fromYaml({
+          'package': 'foo',
+          'path': 'patches/foo.patch',
+        });
+        expect(entry.crlf, isFalse);
+      });
+
+      test('deprecated strip-trailing-cr sets crlf', () {
+        final entry = PatchEntry.fromYaml({
+          'package': 'objectbox_flutter_libs',
+          'path': 'patches/objectbox.patch',
+          'strip-trailing-cr': true,
+        });
+        expect(entry.crlf, isTrue);
+      });
+
+      test('crlf takes precedence over strip-trailing-cr', () {
+        final entry = PatchEntry.fromYaml({
+          'package': 'foo',
+          'path': 'patches/foo.patch',
+          'crlf': false,
+          'strip-trailing-cr': true,
+        });
+        expect(entry.crlf, isFalse);
+      });
+
+      test('parses options list', () {
+        final entry = PatchEntry.fromYaml({
+          'package': 'foo',
+          'path': 'patches/foo.patch',
+          'options': ['--ignore-whitespace'],
+        });
+        expect(entry.options, ['--ignore-whitespace']);
+      });
+    });
   });
 
   group('ManifestConfig.fromYaml', () {
