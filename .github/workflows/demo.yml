@@ -1,4 +1,4 @@
-name: Demo — Flatpak
+name: Demo
 
 on:
   pull_request:
@@ -29,7 +29,7 @@ jobs:
       - uses: ./.github/actions/generate
         with:
           config: examples/demo_app/flutpak.yaml
-          commit: ${{ github.sha }}
+          commit: ${{ github.event.pull_request.head.sha || github.sha }}
           metainfo-path: examples/demo_app/app/share/metainfo/io.github.o_murphy.flutpak.demo.metainfo.xml
           artifact-path: examples/demo_app/flatpak/generated/
           artifact-name: flatpak-generated

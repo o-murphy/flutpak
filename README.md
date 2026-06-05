@@ -7,7 +7,8 @@
 [![GitHub License]](LICENSE)
 [![GitHub last commit]][Github commits]
 [![Made in Ukraine]][SWUBadge]
-
+[![CI](https://github.com/o-murphy/flutpak/actions/workflows/ci.yml/badge.svg)](https://github.com/o-murphy/flutpak/actions/workflows/ci.yml)
+[![Demo](https://github.com/o-murphy/flutpak/actions/workflows/demo.yml/badge.svg)](https://github.com/o-murphy/flutpak/actions/workflows/demo.yml)
 
 Dart CLI tool that automates Flatpak packaging for Flutter applications.
 Describe your config once in `flutpak.yaml`, run `flutpak init` once to
@@ -24,10 +25,47 @@ build to produce a fully-substituted, `flatpak-builder`-ready output.
 - **Validation on every run** — `generate` errors early if the template is missing or its `app-id`, `command`, or `runtime-version` diverge from config
 - **Retry on transient errors** — pub.dev and Flutter artifact downloads retry on 429/5xx
 
+## Demo application
+
+The repository ships a real Flutter application in [`examples/demo_app/`](examples/demo_app/)
+that is built on every pull request via the `demo.yml` workflow — an end-to-end
+**proof of concept** that the tool works, and a **proof of work** that every PR
+is gated on a real Flatpak build.
+
+The CI pipeline runs the full cycle:
+
+1. `flutpak generate --commit <sha>` — generates the manifest and sources
+2. `flatpak-builder` via `flathub-build` — builds and lints the Flatpak
+3. `flatpak install` + smoke test — installs the app and verifies it starts
+
+The demo is intentionally built from the **same git repository** it lives in
+(`repo-url: https://github.com/o-murphy/flutpak.git`), with
+`subdir: examples/demo_app` in the Flatpak module. This exercises several
+features added in v0.5.0:
+
+- **Subdirectory project support** — the Flutter project lives inside a larger
+  git repo; the generated `cp` stamp commands use `$FLATPAK_BUILDER_BUILDDIR`
+  so they resolve correctly regardless of `subdir:`.
+- **LLVM SDK extension auto-injection** — `runtime-version: '25.08'` is all
+  that is needed; `flutpak` injects `org.freedesktop.Sdk.Extension.llvm20`
+  automatically.
+- **`--config` with a subdirectory path** — the workflow passes
+  `--config examples/demo_app/flutpak.yaml`; all paths are resolved relative
+  to the config file's directory.
+- **Minimum viable `flutpak.yaml`** — the demo config has only `app-id`,
+  `runtime-version`, `command`, `flutter.sdk`, and `repo-url`; everything
+  else is auto-detected.
+
+The demo app config: [`examples/demo_app/flutpak.yaml`](examples/demo_app/flutpak.yaml)
+The template manifest: [`examples/demo_app/flatpak/io.github.o_murphy.flutpak.demo.yml`](examples/demo_app/flatpak/io.github.o_murphy.flutpak.demo.yml)
+
+---
+
 ## Table of Contents
 
 - [flutpak](#flutpak)
   - [Highlights](#highlights)
+  - [Demo application](#demo-application)
   - [Table of Contents](#table-of-contents)
   - [Prerequisites](#prerequisites)
   - [Installation](#installation)
@@ -111,7 +149,7 @@ The repository ships a composite action that compiles and installs `flutpak`
 automatically. See [CI/CD integration](#cicd-integration) for full usage.
 
 ```yaml
-- uses: o-murphy/flutpak/.github/actions/setup-flutpak@v0.4.0
+- uses: o-murphy/flutpak/.github/actions/setup-flutpak@v
 ```
 
 ### From source
@@ -603,11 +641,11 @@ template is never modified. `flatpak-builder` consumes
 ### `setup-flutpak` action
 
 ```yaml
-- uses: o-murphy/flutpak/.github/actions/setup-flutpak@v0.4.0
+- uses: o-murphy/flutpak/.github/actions/setup-flutpak@v
   # Builds from the same ref as the 'uses:' directive by default.
   # Pin to a specific release:
   # with:
-  #   version: v0.4.0
+  #   version: v
 ```
 
 | Input | Description | Default |
@@ -620,7 +658,7 @@ The repository also ships a `flutter` composite action with
 (x86_64) and `ubuntu-24.04-arm` (aarch64) runners:
 
 ```yaml
-- uses: o-murphy/flutpak/.github/actions/flutter@v0.4.0
+- uses: o-murphy/flutpak/.github/actions/flutter@v
   with:
     flutter-version: stable   # or read from flatpak/flutter.version
     cache: true
@@ -646,7 +684,7 @@ and sources as a workflow artifact. Requires Flutter to be installed beforehand
 (e.g. via the `flutter` action above).
 
 ```yaml
-- uses: o-murphy/flutpak/.github/actions/generate@v0.4.0
+- uses: o-murphy/flutpak/.github/actions/generate@v
   with:
     tag: ${{ inputs.tag }}      # or pass 'commit:' for non-tag builds
     # commit: ${{ github.sha }} # used when 'tag' is empty
@@ -670,7 +708,7 @@ Installs `org.flatpak.Builder`, lints the manifest, builds via `flathub-build`,
 lints the repo, exports a `.flatpak` bundle, and optionally uploads it.
 
 ```yaml
-- uses: o-murphy/flutpak/.github/actions/build-flatpak@v0.4.0
+- uses: o-murphy/flutpak/.github/actions/build-flatpak@v
   id: build
   with:
     manifest: flatpak/generated/<app-id>.yml
@@ -720,7 +758,7 @@ jobs:
         with:
           fetch-depth: 0          # required for --tag to resolve the commit
 
-      - uses: o-murphy/flutpak/.github/actions/flutter@v0.4.0
+      - uses: o-murphy/flutpak/.github/actions/flutter@v
         id: flutter
         with:
           flutter-version: stable
@@ -728,7 +766,7 @@ jobs:
 
       - run: flutter pub get
 
-      - uses: o-murphy/flutpak/.github/actions/generate@v0.4.0
+      - uses: o-murphy/flutpak/.github/actions/generate@v
         with:
           tag: ${{ github.ref_name }}
           metainfo-path: app/share/metainfo/<app-id>.metainfo.xml
@@ -746,7 +784,7 @@ jobs:
           name: flatpak-generated
           path: flatpak/generated
 
-      - uses: o-murphy/flutpak/.github/actions/build-flatpak@v0.4.0
+      - uses: o-murphy/flutpak/.github/actions/build-flatpak@v
         id: build
         with:
           manifest: flatpak/generated/<app-id>.yml
@@ -776,9 +814,9 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: o-murphy/flutpak/.github/actions/setup-flutpak@v0.4.0
+      - uses: o-murphy/flutpak/.github/actions/setup-flutpak@v
 
-      - uses: o-murphy/flutpak/.github/actions/flutter@v0.4.0
+      - uses: o-murphy/flutpak/.github/actions/flutter@v
         with:
           flutter-version: stable
           cache: true
@@ -1062,7 +1100,7 @@ MIT
 [Pub]: https://pub.dev/packages/flutpak
 [Repo]: https://github.com/o-murphy/flutpak
 [Pub Version]: https://img.shields.io/pub/v/flutpak?logo=dart
-[Development Status]: https://img.shields.io/badge/status-alpha-orange
+[Development Status]: https://img.shields.io/badge/status-beta-orange
 [Platform]: https://img.shields.io/badge/platform-linux-9c59b6?logo=linux&logoColor=white
 [Flatpak Runtime]: https://img.shields.io/badge/Flatpak--Runtime-25.08-blue?logo=flatpak&logoColor=white
 [Flatpak Org]: https://flatpak.org/
