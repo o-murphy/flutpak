@@ -38,6 +38,18 @@ inputs:
       as setup-flutpak's version input.
     required: false
     default: ""
+  config:
+    description: "Path to flutpak config file. Passed as --config to init and generate."
+    required: false
+    default: ""
+  init:
+    description: "Run 'flutpak init --force' before generate."
+    required: false
+    default: "false"
+  artifact-path:
+    description: "Path uploaded as the submission artifact."
+    required: false
+    default: "flatpak/generated/"
 
 runs:
   using: composite
@@ -119,13 +131,28 @@ runs:
           echo "value=${INPUT_COMMIT:-$GITHUB_SHA}" >> "$GITHUB_OUTPUT"
         fi
 
+    - name: Flutpak init
+      if: inputs.init == 'true'
+      shell: bash
+      env:
+        INPUT_CONFIG: ${{ inputs.config }}
+        SDK_PATH: ${{ steps.sdk.outputs.path }}
+      run: |
+        CONFIG_FLAG=""
+        [ -n "$INPUT_CONFIG" ] && CONFIG_FLAG="--config $INPUT_CONFIG"
+        flutpak init --force $CONFIG_FLAG --sdk "$SDK_PATH"
+
     - name: Flutpak generate
       shell: bash
       env:
         REF_FLAG: ${{ steps.ref.outputs.flag }}
         REF_VALUE: ${{ steps.ref.outputs.value }}
         SDK_PATH: ${{ steps.sdk.outputs.path }}
-      run: flutpak generate "$REF_FLAG" "$REF_VALUE" --sdk "$SDK_PATH"
+        INPUT_CONFIG: ${{ inputs.config }}
+      run: |
+        CONFIG_FLAG=""
+        [ -n "$INPUT_CONFIG" ] && CONFIG_FLAG="--config $INPUT_CONFIG"
+        flutpak generate "$REF_FLAG" "$REF_VALUE" --sdk "$SDK_PATH" $CONFIG_FLAG
 
     - name: Install appstream
       if: inputs.metainfo-path != ''
@@ -147,5 +174,5 @@ runs:
       uses: actions/upload-artifact@v7
       with:
         name: ${{ inputs.artifact-name }}
-        path: flatpak/generated/
+        path: ${{ inputs.artifact-path }}
         retention-days: ${{ inputs.retention-days }}

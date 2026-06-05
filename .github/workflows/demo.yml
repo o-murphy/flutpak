@@ -1,0 +1,73 @@
+name: Demo — Flatpak
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  generate:
+    name: Generate manifest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: ./.github/actions/flutter
+        with:
+          flutter-version: stable
+          cache: true
+
+      - name: flutter pub get
+        run: flutter pub get
+        working-directory: examples/demo_app
+
+      - uses: ./.github/actions/generate
+        with:
+          config: examples/demo_app/flutpak.yaml
+          commit: ${{ github.sha }}
+          metainfo-path: examples/demo_app/app/share/metainfo/io.github.o_murphy.flutpak.demo.metainfo.xml
+          artifact-path: examples/demo_app/flatpak/generated/
+          artifact-name: flatpak-generated
+
+  build:
+    name: Build Flatpak
+    needs: generate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/download-artifact@v7
+        with:
+          name: flatpak-generated
+          path: flatpak/generated
+
+      - uses: ./.github/actions/build-flatpak
+        with:
+          manifest: flatpak/generated/io.github.o_murphy.flutpak.demo.yml
+          app-id: io.github.o_murphy.flutpak.demo
+          artifact-name: demo-flatpak
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install app from local repo
+        run: |
+          flatpak remote-add --user --no-gpg-verify local-demo repo
+          flatpak install --user --noninteractive local-demo io.github.o_murphy.flutpak.demo
+
+      - name: Smoke test — app starts
+        run: |
+          sudo apt-get install -y xvfb
+          xvfb-run --auto-servernum flatpak run io.github.o_murphy.flutpak.demo &
+          PID=$!
+          sleep 5
+          if kill -0 $PID 2>/dev/null; then
+            echo "✓ app is running"
+            kill $PID
+          else
+            echo "✗ app exited unexpectedly"
+            exit 1
+          fi

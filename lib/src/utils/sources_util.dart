@@ -34,7 +34,8 @@ Future<void> generateSourcesJson({
     Future<List<FlatpakSource>> flutterFuture;
     if (pubOnly || sdkPath == null) {
       if (!pubOnly && sdkPath == null) {
-        logWarn('Flutter SDK not found — skipping (set --sdk or \$FLUTTER_ROOT)');
+        logWarn(
+            'Flutter SDK not found — skipping (set --sdk or \$FLUTTER_ROOT)');
       }
       flutterFuture = Future.value(const []);
     } else {

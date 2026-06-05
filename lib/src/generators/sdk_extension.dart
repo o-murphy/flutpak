@@ -76,7 +76,7 @@ class SdkExtensionGenerator {
       ];
 
   static String _majorMinor(String tag) {
-    // '3.41.9' → '3', just use major version for the extension ID
+    // '3.44.1' → '3', just use major version for the extension ID
     return tag.split('.').first;
   }
 }

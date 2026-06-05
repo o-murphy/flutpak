@@ -31,7 +31,7 @@ void main() {
       final git = sources.whereType<GitSource>().first;
 
       expect(git.url, 'https://github.com/flutter/flutter.git');
-      expect(git.tag, '3.41.9');
+      expect(git.tag, '3.44.1');
       expect(git.dest, 'flutter');
     });
 
@@ -96,10 +96,8 @@ void main() {
 
     test('sky_engine/pubspec.yaml is an InlineSource', () async {
       final sources = await gen.generate();
-      final inline = sources.whereType<InlineSource>().firstWhere(
-          (s) =>
-              s.destFilename == 'pubspec.yaml' &&
-              s.dest.contains('sky_engine'));
+      final inline = sources.whereType<InlineSource>().firstWhere((s) =>
+          s.destFilename == 'pubspec.yaml' && s.dest.contains('sky_engine'));
       expect(inline.contents, contains('name: sky_engine'));
       expect(inline.contents, contains('version: 0.0.99'));
       expect(inline.contents, contains('sdk:'));
@@ -137,14 +135,15 @@ void main() {
       // patchPath = tmpDir/flatpak/patches/flutter/shared.sh.patch
       // Expected path in sources: patches/flutter/shared.sh.patch
       final outputDir = p.join(tmpDir.path, 'flatpak');
-      final patchFile = File(
-          p.join(outputDir, 'patches', 'flutter', 'shared.sh.patch'))
-        ..createSync(recursive: true)
-        ..writeAsStringSync('# dummy patch');
+      final patchFile =
+          File(p.join(outputDir, 'patches', 'flutter', 'shared.sh.patch'))
+            ..createSync(recursive: true)
+            ..writeAsStringSync('# dummy patch');
 
       final gen = FlutterSdkGenerator(
         sdkPath: sdkFixture,
-        patchPath: patchFile.path,  // absolute path as given by cfg.patchPath after resolution
+        patchPath: patchFile
+            .path, // absolute path as given by cfg.patchPath after resolution
         outputDir: outputDir,
         cache: _FakeCache(),
       );
@@ -164,8 +163,8 @@ void main() {
         ..createSync(recursive: true)
         ..writeAsStringSync('# dummy patch');
 
-      final projectRelativePath =
-          p.relative(p.join(outputDir, 'patches', 'flutter', 'shared.sh.patch'));
+      final projectRelativePath = p
+          .relative(p.join(outputDir, 'patches', 'flutter', 'shared.sh.patch'));
 
       final gen = FlutterSdkGenerator(
         sdkPath: sdkFixture,
@@ -191,15 +190,14 @@ void main() {
     tearDown(() => tmpDir.deleteSync(recursive: true));
 
     test('reads version from version file when present', () {
-      File(p.join(tmpDir.path, 'version')).writeAsStringSync('3.41.9\n');
-      expect(FlutterSdkGenerator.readFlutterVersion(tmpDir.path), '3.41.9');
+      File(p.join(tmpDir.path, 'version')).writeAsStringSync('3.44.1\n');
+      expect(FlutterSdkGenerator.readFlutterVersion(tmpDir.path), '3.44.1');
     });
 
     test('falls back to packages/flutter/pubspec.yaml when version file absent',
         () {
-      final pubspecDir =
-          Directory(p.join(tmpDir.path, 'packages', 'flutter'))
-            ..createSync(recursive: true);
+      final pubspecDir = Directory(p.join(tmpDir.path, 'packages', 'flutter'))
+        ..createSync(recursive: true);
       File(p.join(pubspecDir.path, 'pubspec.yaml')).writeAsStringSync(
         'name: flutter\nversion: 3.27.1\nenvironment:\n  sdk: ">=3.3.0"\n',
       );
