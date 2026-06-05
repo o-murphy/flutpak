@@ -47,8 +47,9 @@ class GenerateCommand extends Command<void> {
   @override
   Future<void> run() async {
     final configPath = argResults!['config'] as String;
-    final configDir = p.dirname(p.absolute(configPath));
-    final cfg = FlatpakGenConfig.load(configPath, configDir);
+    final configAbsPath = p.absolute(configPath);
+    final configDir = p.dirname(configAbsPath);
+    final cfg = FlatpakGenConfig.load(p.basename(configAbsPath), configDir);
 
     final tagArg = argResults!['tag'] as String?;
     final commitArg = argResults!['commit'] as String?;

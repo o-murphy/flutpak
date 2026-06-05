@@ -144,7 +144,7 @@ runs:
       run: appstreamcli validate --explain --no-net "$INPUT_METAINFO_PATH"
 
     - name: Upload submission artifacts
-      uses: actions/upload-artifact@v7
+      uses: actions/upload-artifact@v4
       with:
         name: ${{ inputs.artifact-name }}
         path: flatpak/generated/

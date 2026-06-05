@@ -115,7 +115,7 @@ runs:
     - name: Upload bundle artifact
       id: upload
       if: inputs.artifact-name != ''
-      uses: actions/upload-artifact@v7
+      uses: actions/upload-artifact@v4
       with:
         name: ${{ inputs.artifact-name }}
         path: ${{ steps.meta.outputs.bundle }}

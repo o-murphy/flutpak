@@ -23,10 +23,10 @@ modules:
       arch:
         x86_64:
           env:
-            BUNDLE_PATH: build/linux/x64/release/bundle
+            BUNDLE_PATH: example/build/linux/x64/release/bundle
         aarch64:
           env:
-            BUNDLE_PATH: build/linux/arm64/release/bundle
+            BUNDLE_PATH: example/build/linux/arm64/release/bundle
       append-path: /run/build/Example/flutter/bin
       env:
         PUB_CACHE: /run/build/Example/.pub-cache
@@ -40,12 +40,13 @@ modules:
       - cp flutter/bin/internal/engine.version flutter/bin/cache/font-subset.stamp
       - cp flutter/bin/internal/engine.version flutter/bin/cache/linux-sdk.stamp
       - setup-flutter.sh
-      - flutter build linux --release --no-pub
+      - sh -c 'cd example && flutter pub get --offline && flutter build linux --release --no-pub'
       - mkdir -p /app/Example
       - cp -r "$BUNDLE_PATH"/. /app/Example/
-      - install -Dm755 flatpak/Example-wrapper.sh /app/bin/Example
-      - install -Dm644 share/metainfo/io.github.flutpak.Example.metainfo.xml /app/share/metainfo/io.github.flutpak.Example.metainfo.xml
-      - install -Dm644 share/applications/io.github.flutpak.Example.desktop /app/share/applications/io.github.flutpak.Example.desktop
+      - install -Dm755 example/flatpak/Example-wrapper.sh /app/bin/Example
+      - install -Dm644 example/share/metainfo/io.github.flutpak.Example.metainfo.xml /app/share/metainfo/io.github.flutpak.Example.metainfo.xml
+      - install -Dm644 example/share/applications/io.github.flutpak.Example.desktop /app/share/applications/io.github.flutpak.Example.desktop
+      - install -Dm644 example/share/icons/hicolor/256x256/apps/io.github.flutpak.Example.png /app/share/icons/hicolor/256x256/apps/io.github.flutpak.Example.png
     sources:
       - type: git
         url: https://github.com/o-murphy/flutpak
