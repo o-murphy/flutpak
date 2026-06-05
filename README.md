@@ -242,17 +242,15 @@ immediately runs `generate` to populate `flatpak/generated/`:
 flatpak/
 ├── <app-id>.yml          # editable template manifest — commit this
 ├── <name>-wrapper.sh     # Flutter launcher wrapper — commit this
-├── flathub.json          # Flathub submission config — commit this
 ├── .gitignore            # contains: generated/
 └── generated/            # gitignored, ready for flatpak-builder
     ├── <app-id>.yml
-    ├── flathub.json
     ├── generated-sources.json
     └── patches/
 ```
 
 **Commit** `flatpak/<app-id>.yml`, `flatpak/<name>-wrapper.sh`,
-`flatpak/flathub.json`, and `flatpak/.gitignore`. Do not commit
+and `flatpak/.gitignore`. Do not commit
 `flatpak/generated/` — it is gitignored by design.
 
 `flutpak init` errors if the template already exists. Use `--force` to
@@ -322,7 +320,6 @@ Open a PR to your app's Flathub repository. Copy the contents of
 <flathub-repo>/
 ├── <app-id>.yml               # flatpak/generated/<app-id>.yml
 ├── generated-sources.json     # flatpak/generated/generated-sources.json
-├── flathub.json               # flatpak/generated/flathub.json
 └── patches/                   # flatpak/generated/patches/ (if any)
 ```
 
@@ -449,7 +446,7 @@ flutpak init [--config <path>] [--sdk <path>] [--force]
 ```
 
 One-time setup. Generates the editable template manifest, wrapper script,
-`flathub.json`, and `flatpak/.gitignore`, then immediately runs `generate`.
+and `flatpak/.gitignore`, then immediately runs `generate`.
 
 - Errors if the template (`flatpak/<app-id>.yml`) already exists — use
   `--force` to overwrite.
@@ -562,12 +559,10 @@ generated output (gitignored):
 flatpak/
 ├── <app-id>.yml          <- editable template — committed to git
 ├── <name>-wrapper.sh     <- committed to git
-├── flathub.json          <- committed to git
 ├── patches/              <- patch files — committed to git
 ├── .gitignore            <- contains: generated/
 └── generated/            <- gitignored, never commit this
     ├── <app-id>.yml      <- final manifest (tag/commit set, sources injected)
-    ├── flathub.json      <- copy
     ├── generated-sources.json
     └── patches/          <- copy
 ```

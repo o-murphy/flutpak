@@ -224,14 +224,6 @@ class GenerateCommand extends Command<void> {
       );
     }
 
-    // ── Copy flathub.json ─────────────────────────────────────────────────
-    final flathubSrc = File(p.join(outputDir, 'flathub.json'));
-    if (flathubSrc.existsSync()) {
-      File(p.join(generatedDir, 'flathub.json'))
-        ..createSync(recursive: true)
-        ..writeAsStringSync(flathubSrc.readAsStringSync());
-    }
-
     final ref = tag ?? commit?.substring(0, 12) ?? '(no ref)';
     logInfo('✓  generate complete  ref=$ref');
   }

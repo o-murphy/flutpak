@@ -8,14 +8,13 @@ import 'command_utils.dart';
 import 'generate_command.dart';
 
 /// One-time initialisation: generates the template manifest, wrapper script,
-/// `flathub.json`, and `.gitignore`, then immediately runs `generate` to
-/// populate `generated/`.
+/// and `.gitignore`, then immediately runs `generate` to populate `generated/`.
 class InitCommand extends Command<void> {
   @override
   final name = 'init';
   @override
   final description = 'Generate the Flatpak template manifest, wrapper script, '
-      'flathub.json, and .gitignore on first run. '
+      'and .gitignore on first run. '
       'Runs generate immediately after to populate generated/.';
 
   InitCommand() {
@@ -100,14 +99,6 @@ class InitCommand extends Command<void> {
           );
         logInfo('✓  wrapper created: $wrapperPath');
       }
-    }
-
-    final flathubPath = p.join(outputDir, 'flathub.json');
-    if (!File(flathubPath).existsSync() || force) {
-      File(flathubPath)
-        ..createSync(recursive: true)
-        ..writeAsStringSync('{\n  "skip-appstream-check": false\n}\n');
-      logInfo('✓  flathub.json created: $flathubPath');
     }
 
     final gitignorePath = p.join(outputDir, '.gitignore');
