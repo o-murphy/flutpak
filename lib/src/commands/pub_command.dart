@@ -4,6 +4,7 @@ import 'package:args/command_runner.dart';
 import 'package:path/path.dart' as p;
 import '../config.dart';
 import '../generators/pub_sources.dart';
+import '../utils/log.dart';
 
 class PubCommand extends Command<void> {
   @override
@@ -43,6 +44,6 @@ class PubCommand extends Command<void> {
       ..createSync(recursive: true)
       ..writeAsStringSync('$json\n');
 
-    stderr.writeln('✓  ${sources.length} pub sources → $outputFile');
+    logInfo('✓  ${sources.length} pub sources → $outputFile');
   }
 }

@@ -4,6 +4,7 @@ import 'package:args/command_runner.dart';
 import '../config.dart';
 import '../generators/sdk_extension.dart';
 import '../utils/download_cache.dart';
+import '../utils/log.dart';
 
 class SdkExtCommand extends Command<void> {
   @override
@@ -64,8 +65,8 @@ class SdkExtCommand extends Command<void> {
         ..createSync(recursive: true)
         ..writeAsStringSync('$json\n');
 
-      stderr.writeln('✓  SDK Extension manifest → $output');
-      stderr.writeln('   App ID: ${manifest['id']}  runtime: $runtimeVersion');
+      logInfo('✓  SDK Extension manifest → $output');
+      logInfo('   App ID: ${manifest['id']}  runtime: $runtimeVersion');
     } finally {
       cache.dispose();
     }

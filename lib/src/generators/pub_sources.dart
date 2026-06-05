@@ -6,6 +6,7 @@ import 'package:glob/list_local_fs.dart';
 import 'package:http/http.dart' as http;
 import 'package:yaml/yaml.dart';
 import '../models/flatpak_source.dart';
+import '../utils/log.dart';
 
 class PubSourcesGenerator {
   final List<String> lockFilePaths;
@@ -32,12 +33,12 @@ class PubSourcesGenerator {
         if (f.existsSync()) {
           _parseLock(pattern, packages);
         } else {
-          stderr.writeln('⚠  lock file not found: $pattern');
+          logWarn('lock file not found: $pattern');
         }
       }
     }
 
-    stderr.writeln('pub: ${packages.length} unique hosted package versions');
+    logInfo('pub: ${packages.length} unique hosted package versions');
 
     final entries = <FlatpakSource>[];
     var done = 0;
@@ -69,7 +70,7 @@ class PubSourcesGenerator {
         entries.addAll(pair);
       }
       done += batch.length;
-      stderr.writeln('  pub: $done / ${pkgList.length}');
+      logDebug('pub: $done / ${pkgList.length}');
     }
 
     return entries;
@@ -136,8 +137,7 @@ class PubSourcesGenerator {
       final response = await _client.get(uri, headers: headers);
       if (!_retryStatuses.contains(response.statusCode)) return response;
       if (attempt == 4) return response;
-      stderr.writeln(
-          '  ⚠  $tag ${response.statusCode} — retry $attempt/3 in ${delay.inSeconds}s');
+      logWarn('$tag ${response.statusCode} — retry $attempt/3 in ${delay.inSeconds}s');
       await Future.delayed(delay);
       delay *= 2;
     }

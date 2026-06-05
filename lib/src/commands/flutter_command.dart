@@ -5,6 +5,7 @@ import 'package:path/path.dart' as p;
 import '../config.dart';
 import '../generators/flutter_sdk.dart';
 import '../utils/download_cache.dart';
+import '../utils/log.dart';
 
 class FlutterCommand extends Command<void> {
   @override
@@ -61,7 +62,7 @@ class FlutterCommand extends Command<void> {
         ..createSync(recursive: true)
         ..writeAsStringSync('$json\n');
 
-      stderr.writeln('✓  ${sources.length} flutter SDK sources → $outputFile');
+      logInfo('✓  ${sources.length} flutter SDK sources → $outputFile');
     } finally {
       cache.dispose();
     }

@@ -300,4 +300,137 @@ void main() {
       );
     });
   });
+
+  _patchSourceMapsTests();
+  _crlfHelpersTests();
 }
+
+// ── buildPatchSourceMaps ─────────────────────────────────────────────────────
+
+void _patchSourceMapsTests() {
+  group('buildPatchSourceMaps', () {
+    test('emits a single type:patch entry per patch', () {
+      final patches = [
+        PatchEntry(
+          package: 'foo',
+          version: '1.0.0',
+          path: '/patches/foo.patch',
+        ),
+      ];
+      final maps = buildPatchSourceMaps(patches, '/patches');
+
+      expect(maps, hasLength(1));
+      expect(maps.first['type'], 'patch');
+    });
+
+    test('always includes --binary option in every patch entry', () {
+      final patches = [
+        PatchEntry(
+          package: 'foo',
+          version: '1.0.0',
+          path: '/patches/foo.patch',
+        ),
+      ];
+      final maps = buildPatchSourceMaps(patches, '/patches');
+
+      expect(maps.first['options'], contains('--binary'));
+    });
+
+    test('crlf: true patch gets --binary (no type:shell emitted)', () {
+      final patches = [
+        PatchEntry(
+          package: 'foo',
+          version: '1.0.0',
+          path: '/patches/foo.patch',
+          crlf: true,
+        ),
+      ];
+      final maps = buildPatchSourceMaps(patches, '/patches');
+
+      expect(maps, hasLength(1));
+      expect(maps.first['type'], 'patch');
+      expect(maps.first['options'], contains('--binary'));
+      expect(maps.any((m) => m['type'] == 'shell'), isFalse);
+    });
+
+    test('sets dest when version is provided', () {
+      final patches = [
+        PatchEntry(
+          package: 'bar',
+          version: '2.3.4',
+          path: '/patches/bar.patch',
+        ),
+      ];
+      final maps = buildPatchSourceMaps(patches, '/patches');
+
+      expect(maps.first['dest'],
+          '.pub-cache/hosted/pub.dev/bar-2.3.4');
+    });
+
+    test('omits dest when version is null', () {
+      final patches = [
+        PatchEntry(package: 'baz', path: '/patches/baz.patch'),
+      ];
+      final maps = buildPatchSourceMaps(patches, '/patches');
+
+      expect(maps.first.containsKey('dest'), isFalse);
+    });
+
+    test('includes user options appended after --binary', () {
+      final patches = [
+        PatchEntry(
+          package: 'qux',
+          version: '1.0.0',
+          path: '/patches/qux.patch',
+          options: ['--ignore-whitespace'],
+        ),
+      ];
+      final maps = buildPatchSourceMaps(patches, '/patches');
+
+      expect(maps.first['options'], ['--binary', '--ignore-whitespace']);
+    });
+  });
+}
+
+// ── convertPatchToCrlf / patchHasLfLineEndings ───────────────────────────────
+
+void _crlfHelpersTests() {
+  group('convertPatchToCrlf', () {
+    test('converts LF to CRLF', () {
+      const input = 'line1\nline2\nline3\n';
+      final result = convertPatchToCrlf(input);
+      expect(result, 'line1\r\nline2\r\nline3\r\n');
+    });
+
+    test('does not double-convert existing CRLF', () {
+      const input = 'line1\r\nline2\r\n';
+      final result = convertPatchToCrlf(input);
+      expect(result, 'line1\r\nline2\r\n');
+    });
+
+    test('handles mixed line endings', () {
+      const input = 'line1\r\nline2\nline3\r\n';
+      final result = convertPatchToCrlf(input);
+      expect(result, 'line1\r\nline2\r\nline3\r\n');
+    });
+  });
+
+  group('patchHasLfLineEndings', () {
+    test('returns true for LF content', () {
+      expect(patchHasLfLineEndings('a\nb\n'), isTrue);
+    });
+
+    test('returns false for pure CRLF content', () {
+      expect(patchHasLfLineEndings('a\r\nb\r\n'), isFalse);
+    });
+
+    test('returns true for mixed content', () {
+      expect(patchHasLfLineEndings('a\r\nb\n'), isTrue);
+    });
+
+    test('returns false for empty string', () {
+      expect(patchHasLfLineEndings(''), isFalse);
+    });
+  });
+}
+

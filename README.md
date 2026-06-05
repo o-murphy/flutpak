@@ -359,7 +359,7 @@ patches:                           # optional project-level patches
   - package: objectbox_flutter_libs
     path: flatpak/patches/objectbox.patch
     dest-subpath: linux            # optional: subdirectory inside package root
-    strip-trailing-cr: true        # optional: strip \r before patching (CRLF sources)
+    crlf: true                     # optional: target file has CRLF (e.g. objectbox_flutter_libs ≥ 5.3.2)
     options:                       # optional: extra flags passed to patch(1)
       - --some-flag
 
@@ -412,7 +412,7 @@ flutter-version-file: flatpak/flutter.version  # default when flutter configured
 | `flutter-version-file` | string | `<output>/flutter.version` | Written when Flutter is configured |
 | `patches` | list | `[]` | Project-level package patches |
 | `patches[].options` | list | `[]` | Extra flags forwarded to `patch(1)` |
-| `patches[].strip-trailing-cr` | bool | `false` | Inject a `sed -i 's/\r//'` shell step before patching; use when the upstream pub.dev archive has CRLF line endings |
+| `patches[].crlf` | bool | `false` | When `true`, normalise the patch to CRLF in `generated/patches/`; when `false` (default), normalise to LF. `--binary` is always added to patch options. Use `crlf: true` when the upstream pub.dev archive ships CRLF sources (e.g. `objectbox_flutter_libs` ≥ 5.3.2). |
 | `repo-url` | string | `git remote get-url origin` | Source git URL written into template |
 | `metainfo-path` | string | `app/share/metainfo/<id>.metainfo.xml` | Validated on `init` and `generate` |
 | `desktop-entry-path` | string | `app/share/applications/<id>.desktop` | Validated on `init` and `generate` |
@@ -966,16 +966,24 @@ copy it to `generated/patches/` and inject it into the manifest automatically.
 
 Some upstream packages ship sources with CRLF line endings (e.g.
 `objectbox_flutter_libs` ≥ 5.3.2). GNU `patch(1)` fails with "different line
-endings" in this case even with `--ignore-whitespace`. Use `strip-trailing-cr:
-true` instead — flutpak injects a `type: shell` source that runs
-`sed -i 's/\r//'` on the target file before the patch is applied:
+endings" in this case. Use `crlf: true` — `flutpak generate` normalises the
+patch file to CRLF line endings when writing to `generated/patches/`, and
+always adds `--binary` to the patch source options so that `patch(1)` preserves
+line endings exactly as written. Patches without `crlf: true` are normalised to
+LF, making the output deterministic on any host OS:
 
 ```yaml
 patches:
   - package: objectbox_flutter_libs
     path: flatpak/patches/objectbox_flutter_libs/CMakeLists.txt.patch
-    strip-trailing-cr: true
+    crlf: true
 ```
+
+> [!NOTE]
+> Add `*.patch -text` to your project's `.gitattributes` to prevent git from
+> re-normalising line endings in patch files on Windows checkouts.
+> Without this, the CRLF conversion performed by `flutpak generate` would be
+> undone on the next checkout.
 
 ### Wrapper script
 

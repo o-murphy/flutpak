@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
+import 'log.dart';
 
 /// Interface for SHA-256 resolution — injectable for testing.
 abstract interface class DownloadCache {
@@ -37,7 +38,7 @@ class LocalDownloadCache implements DownloadCache {
       return cacheFile.readAsStringSync().trim();
     }
 
-    stderr.writeln('  downloading $url ...');
+    logDebug('downloading $url ...');
     final response = await _retryGet(Uri.parse(url), tag: url);
     if (response.statusCode != 200) {
       throw Exception('HTTP ${response.statusCode} for $url');
@@ -54,8 +55,7 @@ class LocalDownloadCache implements DownloadCache {
       final response = await _client.get(uri);
       if (!_retryStatuses.contains(response.statusCode)) return response;
       if (attempt == 4) return response;
-      stderr.writeln(
-          '  ⚠  $tag ${response.statusCode} — retry $attempt/3 in ${delay.inSeconds}s');
+      logWarn('$tag ${response.statusCode} — retry $attempt/3 in ${delay.inSeconds}s');
       await Future.delayed(delay);
       delay *= 2;
     }

@@ -1,5 +1,6 @@
 import 'dart:io';
 import '../config.dart';
+import '../utils/log.dart';
 
 void validateManifestAssets(FlatpakGenConfig cfg, String appId) {
   final checks = [
@@ -10,7 +11,7 @@ void validateManifestAssets(FlatpakGenConfig cfg, String appId) {
   final missing = checks.where((path) => !File(path).existsSync()).toList();
   if (missing.isNotEmpty) {
     for (final m in missing) {
-      stderr.writeln('error: asset file not found: $m');
+      logError('asset file not found: $m');
     }
     exit(1);
   }
