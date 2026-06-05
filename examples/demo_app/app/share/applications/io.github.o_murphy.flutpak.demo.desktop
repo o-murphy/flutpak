@@ -1,0 +1,7 @@
+[Desktop Entry]
+Name=Flutpak Demo
+Comment=A minimal Flutter hello-world app demonstrating flutpak packaging
+Exec=demo_app
+Icon=io.github.o_murphy.flutpak.demo
+Type=Application
+Categories=Utility;

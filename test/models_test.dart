@@ -46,7 +46,7 @@ void main() {
     test('toJson with all fields', () {
       final s = GitSource(
         url: 'https://github.com/flutter/flutter.git',
-        tag: '3.41.9',
+        tag: '3.44.1',
         commit: 'abc123def456',
         dest: 'flutter',
         disableSubmodules: true,
@@ -54,7 +54,7 @@ void main() {
       expect(s.toJson(), {
         'type': 'git',
         'url': 'https://github.com/flutter/flutter.git',
-        'tag': '3.41.9',
+        'tag': '3.44.1',
         'commit': 'abc123def456',
         'dest': 'flutter',
         'disable-submodules': true,

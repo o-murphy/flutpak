@@ -1,0 +1,16 @@
+output: flatpak
+
+pub:
+  locks:
+    - pubspec.lock
+    - $FLUTTER_ROOT/packages/flutter_tools/pubspec.lock
+
+flutter:
+  sdk: $FLUTTER_ROOT
+
+repo-url: https://github.com/o-murphy/flutpak.git
+
+manifest:
+  app-id: io.github.o_murphy.flutpak.demo
+  runtime-version: '25.08'
+  command: demo_app

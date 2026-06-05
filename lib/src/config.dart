@@ -50,7 +50,8 @@ class PatchEntry {
       path: yaml['path'] as String,
       destSubpath: yaml['dest-subpath'] as String?,
       options: options,
-      crlf: yaml['crlf'] as bool? ?? yaml['strip-trailing-cr'] as bool? ?? false,
+      crlf:
+          yaml['crlf'] as bool? ?? yaml['strip-trailing-cr'] as bool? ?? false,
     );
   }
 }
@@ -243,6 +244,10 @@ class FlatpakGenConfig {
   /// Git repository URL for the app source entry.
   final String? repoUrl;
 
+  /// When true (default), `disable-submodules: true` is written into the git
+  /// source entry of the generated template manifest.
+  final bool disableSubmodules;
+
   /// Override for the metainfo XML path. When null, [effectiveMetainfoPath()]
   /// computes the default.
   final String? metainfoPath;
@@ -264,6 +269,7 @@ class FlatpakGenConfig {
     this.icons = const [],
     this.extraModules = const [],
     this.repoUrl,
+    this.disableSubmodules = false,
     this.metainfoPath,
     this.desktopEntryPath,
     this.manifest,
@@ -363,6 +369,7 @@ class FlatpakGenConfig {
       icons: iconsList,
       extraModules: extraModules,
       repoUrl: yaml['repo-url'] as String?,
+      disableSubmodules: yaml['disable-submodules'] as bool? ?? false,
       metainfoPath: yaml['metainfo-path'] as String?,
       desktopEntryPath: yaml['desktop-entry-path'] as String?,
       manifest: yaml['manifest'] != null

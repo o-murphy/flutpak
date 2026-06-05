@@ -46,8 +46,8 @@ class GenerateCommand extends Command<void> {
 
   @override
   Future<void> run() async {
-    final configPath = argResults!['config'] as String;
-    final configDir = p.dirname(p.absolute(configPath));
+    final configPath = p.absolute(argResults!['config'] as String);
+    final configDir = p.dirname(configPath);
     final cfg = FlatpakGenConfig.load(configPath, configDir);
 
     final tagArg = argResults!['tag'] as String?;
@@ -68,10 +68,11 @@ class GenerateCommand extends Command<void> {
       return;
     }
 
-    final outputDir = p.absolute(cfg.output);
+    final outputDir = p.absolute(p.join(configDir, cfg.output));
 
     await runWithArgs(
       cfg: cfg,
+      baseDir: configDir,
       sdkPath: sdkPath,
       tagArg: tagArg,
       commitArg: commitArg,
@@ -83,8 +84,12 @@ class GenerateCommand extends Command<void> {
   }
 
   /// Core generate logic, callable from [InitCommand] as well.
+  ///
+  /// [baseDir] is the directory of the config file; relative paths from the
+  /// config (lock files, asset files) are resolved against it.
   Future<void> runWithArgs({
     required FlatpakGenConfig cfg,
+    required String baseDir,
     required String? sdkPath,
     required String? tagArg,
     required String? commitArg,
@@ -116,7 +121,7 @@ class GenerateCommand extends Command<void> {
     _validateTemplate(templateContent, manifestCfg, templatePath);
 
     // ── Validate asset files exist ────────────────────────────────────────
-    validateManifestAssets(cfg, manifestCfg.appId);
+    validateManifestAssets(cfg, manifestCfg.appId, baseDir: baseDir);
 
     // ── Output paths ──────────────────────────────────────────────────────
     final generatedDir = p.join(outputDir, 'generated');
@@ -126,8 +131,11 @@ class GenerateCommand extends Command<void> {
     final patchesDir = p.join(outputDir, 'patches');
     final generatedPatchesDir = p.join(generatedDir, 'patches');
 
-    // Lock paths with $FLUTTER_ROOT substituted from the effective SDK path.
-    final effectiveLocks = cfg.effectivePubLocks(sdkPath);
+    // Lock paths with $FLUTTER_ROOT substituted, then resolved against baseDir.
+    final effectiveLocks = cfg.effectivePubLocks(sdkPath).map((l) {
+      if (p.isAbsolute(l)) return l;
+      return p.absolute(p.join(baseDir, l));
+    }).toList();
 
     // ── Resolve patch entries ─────────────────────────────────────────────
     final List<PatchEntry> patchEntries;
@@ -224,14 +232,6 @@ class GenerateCommand extends Command<void> {
       );
     }
 
-    // ── Copy flathub.json ─────────────────────────────────────────────────
-    final flathubSrc = File(p.join(outputDir, 'flathub.json'));
-    if (flathubSrc.existsSync()) {
-      File(p.join(generatedDir, 'flathub.json'))
-        ..createSync(recursive: true)
-        ..writeAsStringSync(flathubSrc.readAsStringSync());
-    }
-
     final ref = tag ?? commit?.substring(0, 12) ?? '(no ref)';
     logInfo('✓  generate complete  ref=$ref');
   }
@@ -266,19 +266,22 @@ class GenerateCommand extends Command<void> {
 
     final appId = extractField('app-id');
     if (appId != null && appId != cfg.appId) {
-      logError('template app-id "$appId" does not match config "${cfg.appId}": $templatePath');
+      logError(
+          'template app-id "$appId" does not match config "${cfg.appId}": $templatePath');
       exit(1);
     }
 
     final command = extractField('command');
     if (command != null && command != cfg.command) {
-      logError('template command "$command" does not match config "${cfg.command}": $templatePath');
+      logError(
+          'template command "$command" does not match config "${cfg.command}": $templatePath');
       exit(1);
     }
 
     final runtimeVersion = extractField('runtime-version');
     if (runtimeVersion != null && runtimeVersion != cfg.runtimeVersion) {
-      logError('template runtime-version "$runtimeVersion" does not match config "${cfg.runtimeVersion}": $templatePath');
+      logError(
+          'template runtime-version "$runtimeVersion" does not match config "${cfg.runtimeVersion}": $templatePath');
       exit(1);
     }
   }
@@ -349,7 +352,8 @@ class GenerateCommand extends Command<void> {
 
     final modules = yamlTree['modules'];
     if (modules is! List) {
-      logWarn('modules key not found or not a list in template — skipping injection');
+      logWarn(
+          'modules key not found or not a list in template — skipping injection');
       return content;
     }
 
@@ -357,13 +361,15 @@ class GenerateCommand extends Command<void> {
     final appModuleIdx =
         modules.toList().indexWhere((m) => m is Map && m['name'] == appName);
     if (appModuleIdx < 0) {
-      logWarn('app module "$appName" not found in template — skipping injection');
+      logWarn(
+          'app module "$appName" not found in template — skipping injection');
       return content;
     }
 
     final appModule = modules.toList()[appModuleIdx];
     if (appModule is! Map || appModule['sources'] is! List) {
-      logWarn('sources key not found or not a list in app module "$appName" — skipping injection');
+      logWarn(
+          'sources key not found or not a list in app module "$appName" — skipping injection');
       return content;
     }
 
@@ -371,6 +377,12 @@ class GenerateCommand extends Command<void> {
     // Both fields are always written (when commit is available). When no
     // --tag is given, _resolveRefs returns (sha, sha) so both fields get the
     // same SHA value.
+    //
+    // We replace the whole git source map in one editor.update() call rather
+    // than updating individual keys.  yaml_edit 2.x crashes when asked to
+    // CREATE a new key inside a map that is an element of a block sequence
+    // (the tag/commit keys are absent from fresh templates).  Replacing the
+    // entire list element avoids that code path.
     final sourcesBase = ['modules', appModuleIdx, 'sources'];
     final appSources = modules.toList()[appModuleIdx]['sources'];
     if (appSources is List && (tag != null || commit != null)) {
@@ -378,9 +390,11 @@ class GenerateCommand extends Command<void> {
             (s) => s is Map && s['type'] == 'git',
           );
       if (gitSrcIdx >= 0) {
-        final gitBase = [...sourcesBase, gitSrcIdx];
-        if (tag != null) editor.update([...gitBase, 'tag'], tag);
-        if (commit != null) editor.update([...gitBase, 'commit'], commit);
+        final existing =
+            Map<String, dynamic>.from(appSources.toList()[gitSrcIdx] as Map);
+        if (tag != null) existing['tag'] = tag;
+        if (commit != null) existing['commit'] = commit;
+        editor.update([...sourcesBase, gitSrcIdx], existing);
       }
     }
 

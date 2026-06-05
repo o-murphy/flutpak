@@ -242,17 +242,15 @@ immediately runs `generate` to populate `flatpak/generated/`:
 flatpak/
 ├── <app-id>.yml          # editable template manifest — commit this
 ├── <name>-wrapper.sh     # Flutter launcher wrapper — commit this
-├── flathub.json          # Flathub submission config — commit this
 ├── .gitignore            # contains: generated/
 └── generated/            # gitignored, ready for flatpak-builder
     ├── <app-id>.yml
-    ├── flathub.json
     ├── generated-sources.json
     └── patches/
 ```
 
 **Commit** `flatpak/<app-id>.yml`, `flatpak/<name>-wrapper.sh`,
-`flatpak/flathub.json`, and `flatpak/.gitignore`. Do not commit
+and `flatpak/.gitignore`. Do not commit
 `flatpak/generated/` — it is gitignored by design.
 
 `flutpak init` errors if the template already exists. Use `--force` to
@@ -278,7 +276,15 @@ which sections are safe to edit. Key rules:
 | `modules:` | Safe to edit — add extra modules |
 | `sources:` — extra archives | Safe to add/remove |
 | `tag:` / `commit:` in git source | Set automatically by `generate` via `yaml_edit` — you can leave them absent or set them manually; `generate` will overwrite them |
+| Flutter `cp` stamp commands | Use `$FLATPAK_BUILDER_BUILDDIR/flutter/…` — always the module build root, works with or without `subdir:` |
 | Patch sources (`type: patch`) | **Do not add manually** — injected automatically by `generate` from your `patches:` config; adding them to the template causes duplicates |
+
+> [!TIP]
+> If your Flutter project lives in a **subdirectory** of the git repo (e.g. `apps/myapp/`),
+> add `subdir: apps/myapp` to the module in the template. The generated `cp` stamp commands
+> already use `$FLATPAK_BUILDER_BUILDDIR` (always the module root, not the `subdir`), so
+> they resolve correctly. Other paths in `build-commands` that reference files inside
+> the Flutter project (assets, desktop entry, etc.) remain relative to the `subdir`.
 
 ---
 
@@ -322,7 +328,6 @@ Open a PR to your app's Flathub repository. Copy the contents of
 <flathub-repo>/
 ├── <app-id>.yml               # flatpak/generated/<app-id>.yml
 ├── generated-sources.json     # flatpak/generated/generated-sources.json
-├── flathub.json               # flatpak/generated/flathub.json
 └── patches/                   # flatpak/generated/patches/ (if any)
 ```
 
@@ -365,6 +370,7 @@ patches:                           # optional project-level patches
 
 # flutpak-specific overrides (not part of the Flatpak manifest schema):
 repo-url: https://github.com/...   # default: git remote get-url origin
+disable-submodules: false          # default: false (matches flatpak-builder default)
 metainfo-path: app/share/metainfo/<app-id>.metainfo.xml   # default
 desktop-entry-path: app/share/applications/<app-id>.desktop  # default
 
@@ -383,8 +389,12 @@ modules:
 manifest:
   app-id: io.github.YourOrg.YourApp  # required
   runtime-version: '25.08'           # default: '25.08'
+
+  # For Flutter projects, org.freedesktop.Sdk.Extension.llvmXX is auto-injected
+  # based on runtime-version (25.08→llvm20, 24.08→llvm19, 23.08→llvm17).
+  # Add extra extensions manually if needed:
   sdk-extensions:
-    - org.freedesktop.Sdk.Extension.llvm20
+    - org.freedesktop.Sdk.Extension.rust-stable
 
   # Auto-detected if omitted (info printed on init):
   command: yourapp                   # default: last segment of app-id
@@ -414,6 +424,7 @@ flutter-version-file: flatpak/flutter.version  # default when flutter configured
 | `patches[].options` | list | `[]` | Extra flags forwarded to `patch(1)` |
 | `patches[].crlf` | bool | `false` | When `true`, normalise the patch to CRLF in `generated/patches/`; when `false` (default), normalise to LF. `--binary` is always added to patch options. Use `crlf: true` when the upstream pub.dev archive ships CRLF sources (e.g. `objectbox_flutter_libs` ≥ 5.3.2). |
 | `repo-url` | string | `git remote get-url origin` | Source git URL written into template |
+| `disable-submodules` | bool | `false` | When `true`, adds `disable-submodules: true` to the git source in the generated template, preventing flatpak-builder from cloning git submodules |
 | `metainfo-path` | string | `app/share/metainfo/<id>.metainfo.xml` | Validated on `init` and `generate` |
 | `desktop-entry-path` | string | `app/share/applications/<id>.desktop` | Validated on `init` and `generate` |
 | `icons` | list | `[{size: 256x256, path: app/share/icons/…}]` | Must include 256x256 if key is present |
@@ -421,7 +432,7 @@ flutter-version-file: flatpak/flutter.version  # default when flutter configured
 | `manifest.app-id` | string | **required** | Reverse-DNS app ID |
 | `manifest.runtime-version` | string | `25.08` | Freedesktop runtime version |
 | `manifest.command` | string | last segment of `app-id` | Executable name inside `/app/bin/` |
-| `manifest.sdk-extensions` | list | `[]` | e.g. `llvm20`, `rust` |
+| `manifest.sdk-extensions` | list | `[]` | For Flutter projects, `llvmXX` is **auto-injected** based on `runtime-version` (25.08 → llvm20, 24.08 → llvm19, 23.08 → llvm17). Add here only extensions beyond llvm (e.g. `rust-stable`). |
 | `manifest.sources` | list | `[]` | Verbatim flatpak source entries appended to the app module |
 | `manifest.env` | map | `{}` | Build-time env vars (shorthand) |
 | `manifest.build-options.append-path` | string | — | Appended to `PATH` during build |
@@ -449,7 +460,7 @@ flutpak init [--config <path>] [--sdk <path>] [--force]
 ```
 
 One-time setup. Generates the editable template manifest, wrapper script,
-`flathub.json`, and `flatpak/.gitignore`, then immediately runs `generate`.
+and `flatpak/.gitignore`, then immediately runs `generate`.
 
 - Errors if the template (`flatpak/<app-id>.yml`) already exists — use
   `--force` to overwrite.
@@ -562,12 +573,10 @@ generated output (gitignored):
 flatpak/
 ├── <app-id>.yml          <- editable template — committed to git
 ├── <name>-wrapper.sh     <- committed to git
-├── flathub.json          <- committed to git
 ├── patches/              <- patch files — committed to git
 ├── .gitignore            <- contains: generated/
 └── generated/            <- gitignored, never commit this
     ├── <app-id>.yml      <- final manifest (tag/commit set, sources injected)
-    ├── flathub.json      <- copy
     ├── generated-sources.json
     └── patches/          <- copy
 ```

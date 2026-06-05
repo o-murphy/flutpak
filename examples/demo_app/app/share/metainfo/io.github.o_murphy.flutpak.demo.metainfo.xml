@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.o_murphy.flutpak.demo</id>
+  <name>Flutpak Demo</name>
+  <summary>A minimal Flutter hello-world app demonstrating flutpak packaging</summary>
+  <metadata_license>MIT</metadata_license>
+  <project_license>MIT</project_license>
+  <description>
+    <p>
+      A simple hello-world Flutter application used as an example for the
+      flutpak Flatpak packaging tool.
+    </p>
+  </description>
+  <developer id="io.github.o_murphy">
+    <name>o-murphy</name>
+  </developer>
+  <categories>
+    <category>Utility</category>
+  </categories>
+  <url type="homepage">https://github.com/o-murphy/flutpak</url>
+  <url type="bugtracker">https://github.com/o-murphy/flutpak/issues</url>
+  <url type="vcs-browser">https://github.com/o-murphy/flutpak</url>
+  <update_contact>thehelixpg@gmail.com</update_contact>
+  <launchable type="desktop-id">io.github.o_murphy.flutpak.demo.desktop</launchable>
+  <branding>
+    <color type="primary" scheme_preference="light">#1565c0</color>
+    <color type="primary" scheme_preference="dark">#0d1228</color>
+  </branding>
+  <screenshots>
+    <screenshot type="default">
+      <image>
+        https://raw.githubusercontent.com/o-murphy/flutpak/c1c95cb48ea244ce79c9d8a918afbc0cffbd634b/examples/demo_app/screenshots/home.png</image>
+      <caption>Home screen</caption>
+    </screenshot>
+  </screenshots>
+  <supports>
+    <control>pointing</control>
+    <control>keyboard</control>
+    <control>touch</control>
+  </supports>
+  <releases>
+    <release version="0.1.0" date="2026-06-05" />
+  </releases>
+  <content_rating type="oars-1.1" />
+</component>
