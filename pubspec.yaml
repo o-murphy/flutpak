@@ -35,3 +35,7 @@ dev_dependencies:
 
 executables:
   flutpak: flutpak
+
+# Explicitly declare an empty workspace so Dart pub does not auto-discover
+# example/ (which requires Flutter and cannot be resolved with dart pub get).
+workspace: []
