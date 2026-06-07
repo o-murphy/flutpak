@@ -29,6 +29,77 @@ into the generated manifest automatically.
 
 ---
 
+## `objectbox_sync_flutter_libs/5.3.1/CMakeLists.txt.patch`
+
+**Package:** `objectbox_sync_flutter_libs`  
+**Version:** `5.3.1`  
+**What it does:** Replaces the unconditional `FetchContent_Populate(objectbox-download)`
+call with a check for `OBJECTBOX_PREBUILT_DIR` (CMake variable or env var).
+When set and pointing to a directory that contains `lib/libobjectbox.so`, the
+prebuilt sync archive is used instead of downloading at build time — required for
+Flatpak sandbox builds where network access is not available.
+
+**Usage:**
+
+1. Copy `objectbox_sync_flutter_libs/5.3.1/objectbox-sync-c.yml` to `flatpak/modules/objectbox-sync-c.yml`
+
+2. Copy `objectbox_sync_flutter_libs/5.3.1/CMakeLists.txt.patch` to `flatpak/patches/objectbox_sync_flutter_libs/CMakeLists.txt.patch`
+
+3. Add to your `flutpak.yaml`:
+
+```yaml
+modules:
+  - flatpak/modules/objectbox-sync-c.yml
+
+manifest:
+  env:
+    OBJECTBOX_PREBUILT_DIR: /app
+
+patches:
+  - package: objectbox_sync_flutter_libs
+    path: flatpak/patches/objectbox_sync_flutter_libs/CMakeLists.txt.patch
+```
+
+---
+
+## `objectbox_sync_flutter_libs/5.3.2/CMakeLists.txt.patch`
+
+**Package:** `objectbox_sync_flutter_libs`  
+**Version:** `5.3.2`  
+**What it does:** Same as the 5.3.1 patch — adds `OBJECTBOX_PREBUILT_DIR` support
+for offline/sandboxed Flatpak builds.
+
+> **Note on line endings:** `objectbox_sync_flutter_libs` 5.3.2 ships
+> `linux/CMakeLists.txt` with CRLF line endings in the pub.dev archive. Use
+> `crlf: true` so `flutpak generate` normalises the patch to CRLF in
+> `generated/patches/` and adds `--binary` to the patch options, allowing
+> `patch(1)` to apply it directly to the CRLF target without line-ending
+> mismatches.
+
+**Usage:**
+
+1. Copy `objectbox_sync_flutter_libs/5.3.2/objectbox-sync-c.yml` to `flatpak/modules/objectbox-sync-c.yml`
+
+2. Copy `objectbox_sync_flutter_libs/5.3.2/CMakeLists.txt.patch` to `flatpak/patches/objectbox_sync_flutter_libs/CMakeLists.txt.patch`
+
+3. Add to your `flutpak.yaml`:
+
+```yaml
+modules:
+  - flatpak/modules/objectbox-sync-c.yml
+
+manifest:
+  env:
+    OBJECTBOX_PREBUILT_DIR: /app
+
+patches:
+  - package: objectbox_sync_flutter_libs
+    path: flatpak/patches/objectbox_sync_flutter_libs/CMakeLists.txt.patch
+    crlf: true
+```
+
+---
+
 ## `objectbox_flutter_libs/5.3.1/CMakeLists.txt.patch`
 
 **Package:** `objectbox_flutter_libs`  

@@ -1,0 +1,15 @@
+- name: objectbox-sync-c
+  buildsystem: simple
+  build-commands:
+    - install -Dm755 lib/libobjectbox.so /app/lib/libobjectbox.so
+  sources:
+    - type: archive
+      only-arches: [x86_64]
+      url: https://github.com/objectbox/objectbox-c/releases/download/v5.3.2/objectbox-sync-linux-x64.tar.gz
+      sha256: dd18c0c8c809290a0dc052047971297202c60f4455e8d470749555e1da750fa8
+      strip-components: 0
+    - type: archive
+      only-arches: [aarch64]
+      url: https://github.com/objectbox/objectbox-c/releases/download/v5.3.2/objectbox-sync-linux-aarch64.tar.gz
+      sha256: bacd88e26fde7f5ab07bf62a0643d70bc1da53ee291c70207b2e4b996ac68934
+      strip-components: 0
