@@ -513,6 +513,36 @@ void _patchSourceMapsTests() {
 
       expect(maps.first['options'], ['--binary', '--ignore-whitespace']);
     });
+
+    test('use-git: true emits use-git key and omits options', () {
+      final patches = [
+        PatchEntry(
+          package: 'foo',
+          version: '1.0.0',
+          path: '/patches/foo.patch',
+          useGit: true,
+        ),
+      ];
+      final maps = buildPatchSourceMaps(patches, '/patches');
+
+      expect(maps.first['use-git'], isTrue);
+      expect(maps.first.containsKey('options'), isFalse);
+    });
+
+    test('use-git: true preserves type and dest', () {
+      final patches = [
+        PatchEntry(
+          package: 'foo',
+          version: '2.0.0',
+          path: '/patches/foo.patch',
+          useGit: true,
+        ),
+      ];
+      final maps = buildPatchSourceMaps(patches, '/patches');
+
+      expect(maps.first['type'], 'patch');
+      expect(maps.first['dest'], '.pub-cache/hosted/pub.dev/foo-2.0.0');
+    });
   });
 }
 

@@ -382,6 +382,23 @@ flutpak:
         });
         expect(entry.options, ['--ignore-whitespace']);
       });
+
+      test('parses use-git: true', () {
+        final entry = PatchEntry.fromYaml({
+          'package': 'foo',
+          'path': 'patches/foo.patch',
+          'use-git': true,
+        });
+        expect(entry.useGit, isTrue);
+      });
+
+      test('use-git defaults to false when absent', () {
+        final entry = PatchEntry.fromYaml({
+          'package': 'foo',
+          'path': 'patches/foo.patch',
+        });
+        expect(entry.useGit, isFalse);
+      });
     });
   });
 

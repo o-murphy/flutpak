@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`patches[].use-git` option** in `flutpak.yaml`. When set to `true`, the
+  generated flatpak-builder patch source includes `use-git: true`, which causes
+  flatpak-builder to apply the patch via `git apply` instead of `patch -p1`.
+  This is more robust for patches in git extended format (e.g. produced by
+  `git diff`). Compatible with `crlf` (patch is normalised to CRLF before
+  `git apply` runs). Mutually exclusive with `options` only.
+  ```yaml
+  patches:
+    - package: objectbox_flutter_libs
+      path: flatpak/patches/objectbox_flutter_libs/CMakeLists.txt.patch
+      use-git: true
+  ```
+- **Known patches for `sqlite3`** (versions 3.0.0 and 3.3.0) added to
+  `known-patches/`. Patches `lib/src/hook/assets.dart` and `hook/build.dart`
+  to use a predictable download directory (`download-static`) and skip the
+  network fetch when the prebuilt library is already present. Requires
+  `manifest.sources` entries for the architecture-specific `libsqlite3.so`
+  prebuilts — see `known-patches/PATCHES.md` for the full usage snippet.
+
+### Changed
+
+- **Known patch files renamed** from `VERSION/FILENAME.patch` directory layout
+  to `VERSION-FILENAME.patch` flat naming (e.g.
+  `objectbox_flutter_libs/5.3.1-CMakeLists.txt.patch`), consistent with the
+  `flatpak-flutter` `foreign_deps/` naming convention.
+- **`objectbox_flutter_libs` and `objectbox_sync_flutter_libs` known patches**
+  simplified: dropped the separate `objectbox-c.yml` / `objectbox-sync-c.yml`
+  module files and the `OBJECTBOX_PREBUILT_DIR` env var. Patches now use
+  `CMAKE_CURRENT_SOURCE_DIR/../objectbox-c` (or `../objectbox-sync-c`) to
+  locate the prebuilt archive placed via `manifest.sources` — the same
+  self-contained approach as `flatpak-flutter`. No extra module or env var
+  needed.
 
 ## [0.5.0] — 2026-06-05
 

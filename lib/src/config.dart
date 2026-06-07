@@ -20,7 +20,21 @@ class PatchEntry {
   /// ≥ 5.3.2). When false (default) the patch is normalised to LF. In both
   /// cases `--binary` is added to the flatpak-builder patch source options so
   /// that `patch(1)` preserves line endings exactly as written.
+  ///
+  /// Ignored when [useGit] is true.
   final bool crlf;
+
+  /// When true, the generated flatpak-builder patch source includes
+  /// `use-git: true`, which causes flatpak-builder to apply the patch via
+  /// `git apply` instead of `patch -p1`. More robust for patches in git
+  /// extended format (e.g. produced by `git diff`).
+  ///
+  /// Compatible with [crlf]: when both are set, the patch file is normalised
+  /// to CRLF before `git apply` runs — useful when the patch is stored with
+  /// LF in the repo but the target file has CRLF line endings.
+  /// Mutually exclusive with [options] (options are forwarded to `patch -p1`
+  /// only and are ignored when `git apply` is used instead).
+  final bool useGit;
 
   const PatchEntry({
     required this.package,
@@ -29,6 +43,7 @@ class PatchEntry {
     this.destSubpath,
     this.options = const [],
     this.crlf = false,
+    this.useGit = false,
   });
 
   /// Resolves the dest path for this patch given the package version.
@@ -52,6 +67,7 @@ class PatchEntry {
       options: options,
       crlf:
           yaml['crlf'] as bool? ?? yaml['strip-trailing-cr'] as bool? ?? false,
+      useGit: yaml['use-git'] as bool? ?? false,
     );
   }
 }

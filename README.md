@@ -403,8 +403,9 @@ patches:                           # optional project-level patches
     path: flatpak/patches/objectbox.patch
     dest-subpath: linux            # optional: subdirectory inside package root
     crlf: true                     # optional: target file has CRLF (e.g. objectbox_flutter_libs ≥ 5.3.2)
-    options:                       # optional: extra flags passed to patch(1)
+    options:                       # optional: extra flags forwarded to patch(1)
       - --some-flag
+    use-git: true                  # optional: use git apply instead of patch(1); mutually exclusive with options only
 
 # flutpak-specific overrides (not part of the Flatpak manifest schema):
 repo-url: https://github.com/...   # default: git remote get-url origin
@@ -459,8 +460,9 @@ flutter-version-file: flatpak/flutter.version  # default when flutter configured
 | `flutter.patch` | string | — | Custom patch for `setup-flutter.sh` |
 | `flutter-version-file` | string | `<output>/flutter.version` | Written when Flutter is configured |
 | `patches` | list | `[]` | Project-level package patches |
-| `patches[].options` | list | `[]` | Extra flags forwarded to `patch(1)` |
-| `patches[].crlf` | bool | `false` | When `true`, normalise the patch to CRLF in `generated/patches/`; when `false` (default), normalise to LF. `--binary` is always added to patch options. Use `crlf: true` when the upstream pub.dev archive ships CRLF sources (e.g. `objectbox_flutter_libs` ≥ 5.3.2). |
+| `patches[].options` | list | `[]` | Extra flags forwarded to `patch(1)`. Ignored when `use-git: true`. |
+| `patches[].crlf` | bool | `false` | When `true`, normalise the patch to CRLF in `generated/patches/`; when `false` (default), normalise to LF. `--binary` is always added to patch options. Use `crlf: true` when the upstream pub.dev archive ships CRLF sources (e.g. `objectbox_flutter_libs` ≥ 5.3.2). Compatible with `use-git: true`. |
+| `patches[].use-git` | bool | `false` | When `true`, the generated patch source includes `use-git: true`, causing flatpak-builder to apply the patch via `git apply` instead of `patch -p1`. More robust for patches in git extended format. Compatible with `crlf` (patch is normalised to CRLF before `git apply` runs). Mutually exclusive with `options` only. |
 | `repo-url` | string | `git remote get-url origin` | Source git URL written into template |
 | `disable-submodules` | bool | `false` | When `true`, adds `disable-submodules: true` to the git source in the generated template, preventing flatpak-builder from cloning git submodules |
 | `metainfo-path` | string | `app/share/metainfo/<id>.metainfo.xml` | Validated on `init` and `generate` |
@@ -1017,13 +1019,17 @@ endings" in this case. Use `crlf: true` — `flutpak generate` normalises the
 patch file to CRLF line endings when writing to `generated/patches/`, and
 always adds `--binary` to the patch source options so that `patch(1)` preserves
 line endings exactly as written. Patches without `crlf: true` are normalised to
-LF, making the output deterministic on any host OS:
+LF, making the output deterministic on any host OS.
+
+For patches in git extended format (produced by `git diff`), combine with
+`use-git: true` to apply via `git apply` instead of `patch(1)`:
 
 ```yaml
 patches:
   - package: objectbox_flutter_libs
     path: flatpak/patches/objectbox_flutter_libs/CMakeLists.txt.patch
     crlf: true
+    use-git: true
 ```
 
 > [!NOTE]
