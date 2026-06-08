@@ -70,8 +70,7 @@ void main() {
         'my_pkg',
         '1.0.0',
       );
-      expect(result['dest'],
-          '.pub-cache/hosted/pub.dev/my_pkg-1.0.0/sub');
+      expect(result['dest'], '.pub-cache/hosted/pub.dev/my_pkg-1.0.0/sub');
     });
 
     test('leaves \$APP as-is', () {
@@ -123,14 +122,14 @@ void main() {
       expect(r.baseUrl, contains('/main/'));
     });
 
-    test('ref=v0.5.0 builds URLs with v0.5.0', () {
+    test('ref=v0.6.0 builds URLs with v0.6.0', () {
       final r = ForeignDepsRegistry(
-        ref: 'v0.5.0',
+        ref: 'v0.6.0',
         client: MockClient((_) async => http.Response('', 200)),
         cacheDir: cacheDir,
       );
-      expect(r.registryUrl, contains('/v0.5.0/'));
-      expect(r.baseUrl, contains('/v0.5.0/'));
+      expect(r.registryUrl, contains('/v0.6.0/'));
+      expect(r.baseUrl, contains('/v0.6.0/'));
     });
   });
 
@@ -249,8 +248,7 @@ void main() {
         overriddenPackages: {},
         generatedPatchesDir: patchesDir,
       );
-      final patch =
-          result.firstWhere((s) => s['type'] == 'patch');
+      final patch = result.firstWhere((s) => s['type'] == 'patch');
       expect(patch['path'], 'patches/some_package/fix.patch');
     });
 
@@ -344,8 +342,8 @@ void main() {
         overriddenPackages: {},
         generatedPatchesDir: patchesDir,
       );
-      final written =
-          File(p.join(patchesDir, 'some_package', 'fix.patch')).readAsBytesSync();
+      final written = File(p.join(patchesDir, 'some_package', 'fix.patch'))
+          .readAsBytesSync();
       expect(written, patchBytes);
     });
   });

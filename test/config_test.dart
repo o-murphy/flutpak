@@ -186,18 +186,17 @@ void main() {
     });
 
     test('parses foreign-deps-ref: main', () {
-      final cfg =
-          FlatpakGenConfig.fromYaml({'foreign-deps-ref': 'main'});
+      final cfg = FlatpakGenConfig.fromYaml({'foreign-deps-ref': 'main'});
       expect(cfg.foreignDepsRef, 'main');
     });
 
-    test('parses foreign-deps-ref: v0.5.0', () {
-      final cfg =
-          FlatpakGenConfig.fromYaml({'foreign-deps-ref': 'v0.5.0'});
-      expect(cfg.foreignDepsRef, 'v0.5.0');
+    test('parses foreign-deps-ref: v0.6.0', () {
+      final cfg = FlatpakGenConfig.fromYaml({'foreign-deps-ref': 'v0.6.0'});
+      expect(cfg.foreignDepsRef, 'v0.6.0');
     });
 
-    test('parses repo-url, metainfo-path, desktop-entry-path from root config', () {
+    test('parses repo-url, metainfo-path, desktop-entry-path from root config',
+        () {
       final cfg = FlatpakGenConfig.fromYaml({
         'repo-url': 'https://github.com/example/app.git',
         'metainfo-path': 'custom/path.metainfo.xml',
@@ -437,7 +436,8 @@ flutpak:
     });
 
     test('commandInferred is true when command not set', () {
-      final cfg = ManifestConfig.fromYaml({'app-id': 'io.github.example.myapp'});
+      final cfg =
+          ManifestConfig.fromYaml({'app-id': 'io.github.example.myapp'});
       expect(cfg.commandInferred, isTrue);
       expect(cfg.command, 'myapp');
     });

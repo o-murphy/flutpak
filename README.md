@@ -41,7 +41,7 @@ The CI pipeline runs the full cycle:
 The demo is intentionally built from the **same git repository** it lives in
 (`repo-url: https://github.com/o-murphy/flutpak.git`), with
 `subdir: examples/demo_app` in the Flatpak module. This exercises several
-features added in v0.5.0:
+features added in v0.6.0:
 
 - **Subdirectory project support** — the Flutter project lives inside a larger
   git repo; the generated `cp` stamp commands use `$FLATPAK_BUILDER_BUILDDIR`
@@ -80,6 +80,12 @@ The template manifest: [`examples/demo_app/flatpak/io.github.o_murphy.flutpak.de
     - [Step 5 — Build locally](#step-5--build-locally)
     - [Step 6 — CI: generate on each release](#step-6--ci-generate-on-each-release)
     - [Step 7 — Submit to Flathub](#step-7--submit-to-flathub)
+  - [Foreign deps registry](#foreign-deps-registry)
+    - [How it works](#how-it-works)
+    - [Priority](#priority)
+    - [Currently supported packages](#currently-supported-packages)
+    - [Offline / air-gapped use](#offline--air-gapped-use)
+    - [Pinning the registry version](#pinning-the-registry-version)
   - [Full config reference](#full-config-reference)
     - [Complete YAML with all options](#complete-yaml-with-all-options)
     - [Field reference table](#field-reference-table)
@@ -105,7 +111,7 @@ The template manifest: [`examples/demo_app/flatpak/io.github.o_murphy.flutpak.de
     - [4. Lint the built repo](#4-lint-the-built-repo)
     - [5. Export a single-file bundle (optional)](#5-export-a-single-file-bundle-optional)
   - [Why include `flutter_tools/pubspec.lock`?](#why-include-flutter_toolspubspeclock)
-  - [How it works](#how-it-works)
+  - [How it works](#how-it-works-1)
     - [Pub sources](#pub-sources)
     - [Flutter SDK sources](#flutter-sdk-sources)
     - [Patches registry](#patches-registry)
@@ -149,7 +155,7 @@ The repository ships a composite action that compiles and installs `flutpak`
 automatically. See [CI/CD integration](#cicd-integration) for full usage.
 
 ```yaml
-- uses: o-murphy/flutpak/.github/actions/setup-flutpak@v
+- uses: o-murphy/flutpak/.github/actions/setup-flutpak@v0.6.0
 ```
 
 ### From source
@@ -432,7 +438,7 @@ flutpak generate --no-foreign-deps
 
 ```yaml
 # flutpak.yaml
-foreign-deps-ref: v0.5.0   # tag, branch, or SHA; default: main
+foreign-deps-ref: v0.6.0   # tag, branch, or SHA; default: main
 ```
 
 ---
@@ -713,7 +719,7 @@ template is never modified. `flatpak-builder` consumes
 ### `setup-flutpak` action
 
 ```yaml
-- uses: o-murphy/flutpak/.github/actions/setup-flutpak@v
+- uses: o-murphy/flutpak/.github/actions/setup-flutpak@v0.6.0
   # Builds from the same ref as the 'uses:' directive by default.
   # Pin to a specific release:
   # with:
@@ -730,7 +736,7 @@ The repository also ships a `flutter` composite action with
 (x86_64) and `ubuntu-24.04-arm` (aarch64) runners:
 
 ```yaml
-- uses: o-murphy/flutpak/.github/actions/flutter@v
+- uses: o-murphy/flutpak/.github/actions/flutter@v0.6.0
   with:
     flutter-version: stable   # or read from flatpak/flutter.version
     cache: true
@@ -756,7 +762,7 @@ and sources as a workflow artifact. Requires Flutter to be installed beforehand
 (e.g. via the `flutter` action above).
 
 ```yaml
-- uses: o-murphy/flutpak/.github/actions/generate@v
+- uses: o-murphy/flutpak/.github/actions/generate@v0.6.0
   with:
     tag: ${{ inputs.tag }}      # or pass 'commit:' for non-tag builds
     # commit: ${{ github.sha }} # used when 'tag' is empty
@@ -780,7 +786,7 @@ Installs `org.flatpak.Builder`, lints the manifest, builds via `flathub-build`,
 lints the repo, exports a `.flatpak` bundle, and optionally uploads it.
 
 ```yaml
-- uses: o-murphy/flutpak/.github/actions/build-flatpak@v
+- uses: o-murphy/flutpak/.github/actions/build-flatpak@v0.6.0
   id: build
   with:
     manifest: flatpak/generated/<app-id>.yml
@@ -830,7 +836,7 @@ jobs:
         with:
           fetch-depth: 0          # required for --tag to resolve the commit
 
-      - uses: o-murphy/flutpak/.github/actions/flutter@v
+      - uses: o-murphy/flutpak/.github/actions/flutter@v0.6.0
         id: flutter
         with:
           flutter-version: stable
@@ -838,7 +844,7 @@ jobs:
 
       - run: flutter pub get
 
-      - uses: o-murphy/flutpak/.github/actions/generate@v
+      - uses: o-murphy/flutpak/.github/actions/generate@v0.6.0
         with:
           tag: ${{ github.ref_name }}
           metainfo-path: app/share/metainfo/<app-id>.metainfo.xml
@@ -856,7 +862,7 @@ jobs:
           name: flatpak-generated
           path: flatpak/generated
 
-      - uses: o-murphy/flutpak/.github/actions/build-flatpak@v
+      - uses: o-murphy/flutpak/.github/actions/build-flatpak@v0.6.0
         id: build
         with:
           manifest: flatpak/generated/<app-id>.yml
@@ -886,9 +892,9 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: o-murphy/flutpak/.github/actions/setup-flutpak@v
+      - uses: o-murphy/flutpak/.github/actions/setup-flutpak@v0.6.0
 
-      - uses: o-murphy/flutpak/.github/actions/flutter@v
+      - uses: o-murphy/flutpak/.github/actions/flutter@v0.6.0
         with:
           flutter-version: stable
           cache: true
