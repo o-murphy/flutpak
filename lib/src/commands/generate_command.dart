@@ -175,19 +175,9 @@ class GenerateCommand extends Command<void> {
       }
     }
 
-    // ── Resolve Flutter patch (write built-in if needed) ─────────────────
-    // The Flutter patch is injected into the generated manifest (not the JSON)
-    // so it is visible alongside package patches and is not lost when the JSON
-    // is regenerated independently.
-    String? flutterPatchAbsPath;
-    if (!pubOnly && sdkPath != null) {
-      flutterPatchAbsPath = FlutterSdkGenerator.resolveAndWritePatch(
-        configPatchPath: cfg.patchPath,
-        outputDir: outputDir,
-      );
-    }
-
     // ── Generate sources ──────────────────────────────────────────────────
+    // The Flutter shared.sh patch is emitted into generated-sources.json
+    // alongside the pub and SDK archives (emitFlutterPatch: true).
     if (!noSources) {
       await generateSourcesJson(
         lockPaths: effectiveLocks,
@@ -197,7 +187,8 @@ class GenerateCommand extends Command<void> {
         outputPath: sourcesPath,
         pubOnly: pubOnly,
         flutterOnly: flutterOnly,
-        emitFlutterPatch: false,
+        emitFlutterPatch: true,
+        patchDestDir: generatedDir,
         foreignDepSources: foreignDepSources,
       );
     }
@@ -226,7 +217,6 @@ class GenerateCommand extends Command<void> {
       extraModules: cfg.extraModules,
       sourcesPath: sourcesPath,
       patchesDir: patchesDir,
-      flutterPatchAbsPath: flutterPatchAbsPath,
       patchEntries: patchEntries,
       tag: tag,
       commit: commit,
@@ -365,7 +355,6 @@ class GenerateCommand extends Command<void> {
     required List<String> extraModules,
     required String sourcesPath,
     required String patchesDir,
-    required String? flutterPatchAbsPath,
     required List<PatchEntry> patchEntries,
     required String? tag,
     required String? commit,
@@ -430,12 +419,7 @@ class GenerateCommand extends Command<void> {
       editor.appendToList(sourcesBase, Map<String, dynamic>.from(src));
     }
 
-    final allPatches = [
-      if (flutterPatchAbsPath != null)
-        PatchEntry(package: 'flutter', path: flutterPatchAbsPath, useGit: true),
-      ...patchEntries,
-    ];
-    for (final patchMap in buildPatchSourceMaps(allPatches, patchesDir)) {
+    for (final patchMap in buildPatchSourceMaps(patchEntries, patchesDir)) {
       editor.appendToList(sourcesBase, patchMap);
     }
 

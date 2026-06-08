@@ -21,6 +21,7 @@ Future<void> generateSourcesJson({
   required bool pubOnly,
   required bool flutterOnly,
   bool emitFlutterPatch = true,
+  String? patchDestDir,
   List<Map<String, dynamic>> foreignDepSources = const [],
 }) async {
   final allSources = <Map<String, dynamic>>[];
@@ -45,6 +46,7 @@ Future<void> generateSourcesJson({
         sdkPath: sdkPath,
         patchPath: patchPath,
         outputDir: outputDir,
+        patchDestDir: patchDestDir,
         includePatchInSources: emitFlutterPatch,
         cache: cache,
       ).generate();
