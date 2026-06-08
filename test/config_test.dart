@@ -457,6 +457,23 @@ flutpak:
         throwsArgumentError,
       );
     });
+
+    test('finishArgs defaults to empty list when not specified', () {
+      final cfg = ManifestConfig.fromYaml({'app-id': 'io.example.app'});
+      expect(cfg.finishArgs, isEmpty);
+    });
+
+    test('parses finish-args list from yaml', () {
+      final cfg = ManifestConfig.fromYaml({
+        'app-id': 'io.example.app',
+        'finish-args': [
+          '--filesystem=xdg-documents',
+          '--share=network',
+        ],
+      });
+      expect(cfg.finishArgs,
+          containsAll(['--filesystem=xdg-documents', '--share=network']));
+    });
   });
 
   group('FlatpakGenConfig flutter-version-file defaults', () {

@@ -177,6 +177,10 @@ class ManifestConfig {
   /// pub package equivalent.
   final List<Map<String, dynamic>> sources;
 
+  /// Additional finish-args to merge with the mandatory defaults.
+  /// Duplicates are silently dropped; mandatory args always appear first.
+  final List<String> finishArgs;
+
   const ManifestConfig({
     required this.appId,
     required this.runtimeVersion,
@@ -187,6 +191,7 @@ class ManifestConfig {
     this.prependLdLibraryPath,
     this.env = const {},
     this.sources = const [],
+    this.finishArgs = const [],
   });
 
   factory ManifestConfig.fromYaml(Map yaml) {
@@ -211,6 +216,7 @@ class ManifestConfig {
     final envMap = {...envTop, ...envOpts};
 
     final sourcesRaw = yaml['sources'] as List? ?? [];
+    final finishArgsRaw = (yaml['finish-args'] as List?)?.cast<String>() ?? [];
 
     return ManifestConfig(
       appId: appId as String,
@@ -224,6 +230,7 @@ class ManifestConfig {
       sources: sourcesRaw
           .map((e) => _deepConvertYaml(e) as Map<String, dynamic>)
           .toList(),
+      finishArgs: finishArgsRaw,
     );
   }
 }

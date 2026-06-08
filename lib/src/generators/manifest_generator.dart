@@ -79,10 +79,16 @@ class ManifestGenerator {
 
     _line(buf, '# Sandbox permissions — review and adjust for your app.');
     _line(buf, 'finish-args:');
-    _line(buf, '  - --share=ipc');
-    _line(buf, '  - --socket=fallback-x11');
-    _line(buf, '  - --socket=wayland');
-    _line(buf, '  - --device=dri');
+    const mandatoryFinishArgs = [
+      '--share=ipc',
+      '--socket=fallback-x11',
+      '--socket=wayland',
+      '--device=dri',
+    ];
+    final seen = <String>{};
+    for (final arg in [...mandatoryFinishArgs, ...cfg.finishArgs]) {
+      if (seen.add(arg)) _line(buf, '  - $arg');
+    }
 
     _line(buf, 'modules:');
 

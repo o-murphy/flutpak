@@ -8,6 +8,7 @@ ManifestConfig _baseConfig({
   String? command,
   List<String> sdkExtensions = const [],
   String runtimeVersion = '25.08',
+  List<String> finishArgs = const [],
 }) =>
     ManifestConfig(
       appId: appId,
@@ -15,6 +16,7 @@ ManifestConfig _baseConfig({
       sdkExtensions: sdkExtensions,
       command: command ?? appId.split('.').last,
       commandInferred: command == null,
+      finishArgs: finishArgs,
     );
 
 
@@ -62,6 +64,35 @@ void main() {
       expect(yaml, contains('- --socket=fallback-x11'));
       expect(yaml, contains('- --socket=wayland'));
       expect(yaml, contains('- --device=dri'));
+    });
+
+    test('appends extra finish-args from config after mandatory ones', () {
+      final yaml = _generator(
+        cfg: _baseConfig(
+          command: 'myapp',
+          finishArgs: ['--filesystem=xdg-documents', '--share=network'],
+        ),
+      ).generate();
+
+      expect(yaml, contains('- --filesystem=xdg-documents'));
+      expect(yaml, contains('- --share=network'));
+      // mandatory args still present
+      expect(yaml, contains('- --share=ipc'));
+      expect(yaml, contains('- --socket=wayland'));
+    });
+
+    test('deduplicates finish-args when user repeats a mandatory arg', () {
+      final yaml = _generator(
+        cfg: _baseConfig(
+          command: 'myapp',
+          finishArgs: ['--socket=wayland', '--filesystem=xdg-download'],
+        ),
+      ).generate();
+
+      // --socket=wayland must appear exactly once
+      final count = '--socket=wayland'.allMatches(yaml).length;
+      expect(count, equals(1));
+      expect(yaml, contains('- --filesystem=xdg-download'));
     });
 
     test('includes sdk-extensions when provided', () {
