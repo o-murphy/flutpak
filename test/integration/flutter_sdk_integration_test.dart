@@ -52,11 +52,6 @@ void main() {
         expect(stamp.dest, 'flutter/bin/cache');
       });
 
-      test('setup-flutter.sh ScriptSource is present', () {
-        final script = sources.whereType<ScriptSource>().first;
-        expect(script.destFilename, 'setup-flutter.sh');
-        expect(script.commands.any((c) => c.contains('--offline')), isTrue);
-      });
     },
   );
 }

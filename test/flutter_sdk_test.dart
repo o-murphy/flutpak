@@ -103,14 +103,6 @@ void main() {
       expect(inline.contents, contains('sdk:'));
     });
 
-    test('setup-flutter.sh is a ScriptSource', () async {
-      final sources = await gen.generate();
-      final script = sources.whereType<ScriptSource>().first;
-
-      expect(script.destFilename, 'setup-flutter.sh');
-      expect(script.commands.any((c) => c.contains('--offline')), isTrue);
-    });
-
     test('pub archive URLs use pub.dev (not pub.dartlang.org)', () async {
       // This test ensures the deprecated pub.dartlang.org domain is not used.
       // FlutterSdkGenerator itself doesn't generate pub URLs, but verify the

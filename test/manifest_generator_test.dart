@@ -236,7 +236,7 @@ void main() {
 
       expect(yaml, contains('engine-dart-sdk.stamp'));
       expect(yaml, contains('material_fonts.stamp'));
-      expect(yaml, contains('setup-flutter.sh'));
+      expect(yaml, contains('flutter pub get --offline'));
       expect(yaml, contains('flutter build linux --release --no-pub'));
     });
 
@@ -247,7 +247,7 @@ void main() {
       ).generate();
 
       expect(yaml, isNot(contains('engine-dart-sdk.stamp')));
-      expect(yaml, isNot(contains('setup-flutter.sh')));
+      expect(yaml, isNot(contains('flutter pub get --offline')));
       expect(yaml, isNot(contains('flutter build linux')));
       expect(yaml, contains('# TODO: add your build commands here'));
     });
