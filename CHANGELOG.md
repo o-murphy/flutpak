@@ -7,6 +7,131 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] — 2026-06-08
+
+### Added
+
+- **`manifest.finish-args`** config key — list of extra `finish-args` entries
+  appended to the mandatory Flutter desktop defaults (`--share=ipc`,
+  `--socket=fallback-x11`, `--socket=wayland`, `--device=dri`). Duplicates are
+  silently dropped, so repeating a mandatory arg is safe.
+  ```yaml
+  manifest:
+    app-id: io.github.YourOrg.YourApp
+    finish-args:
+      - --filesystem=xdg-documents
+      - --filesystem=xdg-download
+      - --share=network
+  ```
+
+- **Foreign deps registry** — `flutpak generate` now automatically resolves
+  known pub packages (e.g. `objectbox_flutter_libs`) from a remote registry
+  at `foreign_deps/foreign_deps.json`, compatible with the `flatpak-flutter`
+  `foreign_deps.json` format. For each package found in the project's lock
+  files the registry provides the full set of flatpak sources (archives and
+  patches) needed for an offline Flatpak build. Sources are appended to
+  `generated-sources.json`; patch files are downloaded to
+  `generated/patches/<path>`.
+  - Local `patches:` entries always override the registry for the same package.
+  - `--no-foreign-deps` flag skips the registry fetch for offline/air-gapped
+    use.
+  - `foreign-deps-ref` config key pins the registry fetch to a specific git
+    ref (tag, branch, SHA). Defaults to `main`.
+  - Uses `~/.cache/flutpak/` as offline fallback when the network is
+    unavailable; prints a warning and continues.
+  - `foreign_deps/` directory added to the flutpak repository with the
+    initial registry (`objectbox_flutter_libs` 5.3.1/5.3.2 and
+    `objectbox_sync_flutter_libs` 5.3.1/5.3.2), matching the
+    `flatpak-flutter` entries exactly.
+  ```yaml
+  # Optional — override the git ref used to fetch the registry:
+  foreign-deps-ref: v0.5.0
+  ```
+
+- **`patches[].use-git` option** in `flutpak.yaml`. When set to `true`, the
+  generated flatpak-builder patch source includes `use-git: true`, which causes
+  flatpak-builder to apply the patch via `git apply` instead of `patch -p1`.
+  This is more robust for patches in git extended format (e.g. produced by
+  `git diff`). Compatible with `crlf` (patch is normalised to CRLF before
+  `git apply` runs). Mutually exclusive with `options` only.
+  ```yaml
+  patches:
+    - package: objectbox_flutter_libs
+      path: flatpak/patches/objectbox_flutter_libs/CMakeLists.txt.patch
+      use-git: true
+  ```
+- **Known patches for `sqlite3`** (versions 3.0.0 and 3.3.0) added to
+  `known-patches/`. Patches `lib/src/hook/assets.dart` and `hook/build.dart`
+  to use a predictable download directory (`download-static`) and skip the
+  network fetch when the prebuilt library is already present. Requires
+  `manifest.sources` entries for the architecture-specific `libsqlite3.so`
+  prebuilts — see `known-patches/PATCHES.md` for the full usage snippet.
+
+- **Foreign deps registry expanded** — 12 packages added, mirroring the
+  `flatpak-flutter` registry exactly:
+  - **`sqlite3`** (2.9.4 empty, 3.0.0, 3.3.0) — prebuilt `libsqlite3.so`
+    archives + `assets.dart.patch` / `build.dart.patch` to redirect the hook
+    to a predictable offline path.
+  - **`sqlite3_flutter_libs`** (0.5.30, 0.5.32, 0.5.34, 0.5.39, 0.5.41,
+    0.5.42, 0.6.0 empty) — SQLite source tarballs pre-placed for CMake
+    `FetchContent`, one per upstream SQLite release; `CMakeLists.txt.patch`
+    disables the network fetch.
+  - **`simple_secure_storage_linux`** (0.2.5) — pre-placed `json.tar.xz`
+    for the nlohmann/json `FetchContent` dependency; `CMakeLists.txt.patch`
+    adds an explicit `URL_HASH` so CMake accepts the cached archive offline.
+  - **`audiotags`** (1.4.5), **`flutter_new_pipe_extractor`** (0.1.0),
+    **`flutter_webrtc`** (1.3.0), **`fvp`** (0.35.0),
+    **`media_kit_libs_linux`** (1.2.1), **`pdfium_flutter`** (0.1.7),
+    **`powersync`** (2.1.0), **`printing`** (5.14.2),
+    **`sqlcipher_flutter_libs`** (0.6.8) — pre-placed native library
+    archives/files; `printing` additionally patches `CMakeLists.txt` to
+    disable the pdfium network fetch. All entries copied verbatim from
+    `flatpak-flutter`.
+
+### Fixed
+
+- **Foreign deps patch entries** — changed `"use-git": true` to
+  `"options": ["--binary"]` in all four `objectbox_flutter_libs` /
+  `objectbox_sync_flutter_libs` entries in `foreign_deps/foreign_deps.json`.
+  When `use-git: true` is set, flatpak-builder applies the patch via
+  `git apply`, which resolves file paths relative to the **git worktree root**
+  rather than the `dest` directory. Because the app build directory is itself a
+  git checkout, `git apply` looked for `linux/CMakeLists.txt` at the repo root
+  (where it does not exist) and failed silently, leaving the patch unapplied and
+  causing objectbox to attempt a network download at CMake time. Using
+  `"options": ["--binary"]` runs `patch -p1 --binary` instead, which always
+  applies relative to `dest` and handles CRLF patches correctly.
+
+### Changed
+
+- **Flutter `shared.sh.patch` moved to `generated-sources.json`** — the
+  built-in flutter patch is now emitted into `generated-sources.json` alongside
+  pub/SDK archives instead of being injected directly into the generated
+  manifest's `sources:` list. Behaviour is identical at build time; the change
+  makes the sources file self-contained and consistent with all other source
+  entries.
+
+- **Built-in flutter patch written to gitignored `generated/` directory** —
+  when no explicit `flutter.patch` path is set in config, `flutpak generate`
+  writes the built-in `shared.sh.patch` to
+  `<output>/generated/patches/flutter/shared.sh.patch` (inside the gitignored
+  `generated/` tree) rather than `<output>/patches/flutter/shared.sh.patch`
+  (committed). The committed `patches/` directory is now reserved exclusively
+  for user-supplied patch files. `flutpak sources` retains the previous
+  behaviour (writes to `<output>/patches/` so the path survives outside a
+  `generate` run).
+
+- **Known patch files renamed** from `VERSION/FILENAME.patch` directory layout
+  to `VERSION-FILENAME.patch` flat naming (e.g.
+  `objectbox_flutter_libs/5.3.1-CMakeLists.txt.patch`), consistent with the
+  `flatpak-flutter` `foreign_deps/` naming convention.
+- **`objectbox_flutter_libs` and `objectbox_sync_flutter_libs` known patches**
+  simplified: dropped the separate `objectbox-c.yml` / `objectbox-sync-c.yml`
+  module files and the `OBJECTBOX_PREBUILT_DIR` env var. Patches now use
+  `CMAKE_CURRENT_SOURCE_DIR/../objectbox-c` (or `../objectbox-sync-c`) to
+  locate the prebuilt archive placed via `manifest.sources` — the same
+  self-contained approach as `flatpak-flutter`. No extra module or env var
+  needed.
 
 ## [0.5.0] — 2026-06-05
 
@@ -665,7 +790,8 @@ git remote.
   output files
 - MIT License
 
-[Unreleased]: https://github.com/o-murphy/flutpak/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/o-murphy/flutpak/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/o-murphy/flutpak/compare/v0.6.0
 [0.5.0]: https://github.com/o-murphy/flutpak/compare/v0.5.0
 [0.4.0]: https://github.com/o-murphy/flutpak/compare/v0.4.0
 [0.4.0-rc.2]: https://github.com/o-murphy/flutpak/compare/v0.4.0-rc.2

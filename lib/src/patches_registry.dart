@@ -77,6 +77,7 @@ List<PatchEntry> resolvePatchEntries({
         destSubpath: p.destSubpath,
         options: p.options,
         crlf: p.crlf,
+        useGit: p.useGit,
       ));
     }
   }

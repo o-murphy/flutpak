@@ -41,7 +41,7 @@ The CI pipeline runs the full cycle:
 The demo is intentionally built from the **same git repository** it lives in
 (`repo-url: https://github.com/o-murphy/flutpak.git`), with
 `subdir: examples/demo_app` in the Flatpak module. This exercises several
-features added in v0.5.0:
+features added in v0.6.0:
 
 - **Subdirectory project support** — the Flutter project lives inside a larger
   git repo; the generated `cp` stamp commands use `$FLATPAK_BUILDER_BUILDDIR`
@@ -80,6 +80,12 @@ The template manifest: [`examples/demo_app/flatpak/io.github.o_murphy.flutpak.de
     - [Step 5 — Build locally](#step-5--build-locally)
     - [Step 6 — CI: generate on each release](#step-6--ci-generate-on-each-release)
     - [Step 7 — Submit to Flathub](#step-7--submit-to-flathub)
+  - [Foreign deps registry](#foreign-deps-registry)
+    - [How it works](#how-it-works)
+    - [Priority](#priority)
+    - [Currently supported packages](#currently-supported-packages)
+    - [Offline / air-gapped use](#offline--air-gapped-use)
+    - [Pinning the registry version](#pinning-the-registry-version)
   - [Full config reference](#full-config-reference)
     - [Complete YAML with all options](#complete-yaml-with-all-options)
     - [Field reference table](#field-reference-table)
@@ -105,7 +111,7 @@ The template manifest: [`examples/demo_app/flatpak/io.github.o_murphy.flutpak.de
     - [4. Lint the built repo](#4-lint-the-built-repo)
     - [5. Export a single-file bundle (optional)](#5-export-a-single-file-bundle-optional)
   - [Why include `flutter_tools/pubspec.lock`?](#why-include-flutter_toolspubspeclock)
-  - [How it works](#how-it-works)
+  - [How it works](#how-it-works-1)
     - [Pub sources](#pub-sources)
     - [Flutter SDK sources](#flutter-sdk-sources)
     - [Patches registry](#patches-registry)
@@ -149,7 +155,7 @@ The repository ships a composite action that compiles and installs `flutpak`
 automatically. See [CI/CD integration](#cicd-integration) for full usage.
 
 ```yaml
-- uses: o-murphy/flutpak/.github/actions/setup-flutpak@v
+- uses: o-murphy/flutpak/.github/actions/setup-flutpak@v0.6.0
 ```
 
 ### From source
@@ -205,9 +211,11 @@ manifest:
 ```
 
 > [!TIP]
-> **Sandbox permissions (`finish-args`)** are written into the template by
-> `flutpak init` with sensible Flutter desktop defaults. Edit them directly
-> in `flatpak/<app-id>.yml` — no config change needed.
+> **Sandbox permissions (`finish-args`)** — `flutpak init` writes sensible
+> Flutter desktop defaults into the template. To add extras (e.g.
+> `--filesystem=xdg-documents`), list them under `manifest.finish-args:` in
+> your config — they are merged after the mandatory args with duplicates
+> removed. You can also edit the template directly.
 
 See [Full config reference](#full-config-reference) for all options.
 
@@ -374,6 +382,67 @@ For complete submission requirements see the
 
 ---
 
+## Foreign deps registry
+
+`flutpak generate` automatically resolves known pub packages from a remote
+registry at
+[`foreign_deps/foreign_deps.json`](foreign_deps/foreign_deps.json), using
+the same format as `flatpak-flutter`. For each package found in your lock
+files the registry provides the complete set of flatpak sources — prebuilt
+archives and patches — needed for an offline Flatpak build.
+
+### How it works
+
+1. The registry is fetched from GitHub on every `generate` run (network
+   required; cached in `~/.cache/flutpak/` as offline fallback).
+2. For every package in your `pubspec.lock` that appears in the registry at
+   the exact locked version, its sources are appended to
+   `generated-sources.json`.
+3. Patch files from the registry are downloaded to
+   `generated/patches/<path>` and referenced with a relative `path:` so
+   flatpak-builder can find them alongside the manifest.
+
+### Priority
+
+Local `patches:` entries always override the registry. If a package has a
+`patches:` entry in `flutpak.yaml`, the registry is skipped for that package.
+
+### Currently supported packages
+
+| Package | Versions |
+|---|---|
+| `audiotags` | 1.4.5 |
+| `flutter_new_pipe_extractor` | 0.1.0 |
+| `flutter_webrtc` | 1.3.0 |
+| `fvp` | 0.35.0 |
+| `media_kit_libs_linux` | 1.2.1 |
+| `pdfium_flutter` | 0.1.7 |
+| `powersync` | 2.1.0 |
+| `printing` | 5.14.2 |
+| `simple_secure_storage_linux` | 0.2.5 |
+| `sqlcipher_flutter_libs` | 0.6.8 |
+| `sqlite3` | 2.9.4, 3.0.0, 3.3.0 |
+| `sqlite3_flutter_libs` | 0.5.30, 0.5.32, 0.5.34, 0.5.39, 0.5.41, 0.5.42, 0.6.0 |
+| `objectbox_flutter_libs` | 5.3.1, 5.3.2 |
+| `objectbox_sync_flutter_libs` | 5.3.1, 5.3.2 |
+
+For the full list see [`foreign_deps/foreign_deps.json`](foreign_deps/foreign_deps.json).
+
+### Offline / air-gapped use
+
+```bash
+flutpak generate --no-foreign-deps
+```
+
+### Pinning the registry version
+
+```yaml
+# flutpak.yaml
+foreign-deps-ref: v0.6.0   # tag, branch, or SHA; default: main
+```
+
+---
+
 ## Full config reference
 
 Config lives in **one** of two places (error if both exist):
@@ -403,8 +472,9 @@ patches:                           # optional project-level patches
     path: flatpak/patches/objectbox.patch
     dest-subpath: linux            # optional: subdirectory inside package root
     crlf: true                     # optional: target file has CRLF (e.g. objectbox_flutter_libs ≥ 5.3.2)
-    options:                       # optional: extra flags passed to patch(1)
+    options:                       # optional: extra flags forwarded to patch(1)
       - --some-flag
+    use-git: true                  # optional: use git apply instead of patch(1); mutually exclusive with options only
 
 # flutpak-specific overrides (not part of the Flatpak manifest schema):
 repo-url: https://github.com/...   # default: git remote get-url origin
@@ -437,6 +507,11 @@ manifest:
   # Auto-detected if omitted (info printed on init):
   command: yourapp                   # default: last segment of app-id
 
+  # Extra finish-args merged after the mandatory Flutter defaults:
+  finish-args:
+    - --filesystem=xdg-documents
+    - --share=network
+
   # Verbatim flatpak source entries appended to the app module:
   sources: []
   env: {}
@@ -459,8 +534,10 @@ flutter-version-file: flatpak/flutter.version  # default when flutter configured
 | `flutter.patch` | string | — | Custom patch for `setup-flutter.sh` |
 | `flutter-version-file` | string | `<output>/flutter.version` | Written when Flutter is configured |
 | `patches` | list | `[]` | Project-level package patches |
-| `patches[].options` | list | `[]` | Extra flags forwarded to `patch(1)` |
-| `patches[].crlf` | bool | `false` | When `true`, normalise the patch to CRLF in `generated/patches/`; when `false` (default), normalise to LF. `--binary` is always added to patch options. Use `crlf: true` when the upstream pub.dev archive ships CRLF sources (e.g. `objectbox_flutter_libs` ≥ 5.3.2). |
+| `patches[].options` | list | `[]` | Extra flags forwarded to `patch(1)`. Ignored when `use-git: true`. |
+| `patches[].crlf` | bool | `false` | When `true`, normalise the patch to CRLF in `generated/patches/`; when `false` (default), normalise to LF. `--binary` is always added to patch options. Use `crlf: true` when the upstream pub.dev archive ships CRLF sources (e.g. `objectbox_flutter_libs` ≥ 5.3.2). Compatible with `use-git: true`. |
+| `patches[].use-git` | bool | `false` | When `true`, the generated patch source includes `use-git: true`, causing flatpak-builder to apply the patch via `git apply` instead of `patch -p1`. More robust for patches in git extended format. Compatible with `crlf`. **Caution:** `git apply` resolves paths relative to the git worktree root, not `dest`. Only use this for patches targeting files at or below the app git root. For patches that target pub package subdirectories (e.g. `objectbox_flutter_libs`), use `--binary` via `options:` instead. |
+| `foreign-deps-ref` | string | `main` | Git ref used to fetch the foreign deps registry. Pin to a tag or SHA for reproducible builds. |
 | `repo-url` | string | `git remote get-url origin` | Source git URL written into template |
 | `disable-submodules` | bool | `false` | When `true`, adds `disable-submodules: true` to the git source in the generated template, preventing flatpak-builder from cloning git submodules |
 | `metainfo-path` | string | `app/share/metainfo/<id>.metainfo.xml` | Validated on `init` and `generate` |
@@ -471,6 +548,7 @@ flutter-version-file: flatpak/flutter.version  # default when flutter configured
 | `manifest.runtime-version` | string | `25.08` | Freedesktop runtime version |
 | `manifest.command` | string | last segment of `app-id` | Executable name inside `/app/bin/` |
 | `manifest.sdk-extensions` | list | `[]` | For Flutter projects, `llvmXX` is **auto-injected** based on `runtime-version` (25.08 → llvm20, 24.08 → llvm19, 23.08 → llvm17). Add here only extensions beyond llvm (e.g. `rust-stable`). |
+| `manifest.finish-args` | list | `[]` | Extra sandbox permission flags appended after the mandatory Flutter defaults (`--share=ipc`, `--socket=fallback-x11`, `--socket=wayland`, `--device=dri`). Duplicates are silently removed. |
 | `manifest.sources` | list | `[]` | Verbatim flatpak source entries appended to the app module |
 | `manifest.env` | map | `{}` | Build-time env vars (shorthand) |
 | `manifest.build-options.append-path` | string | — | Appended to `PATH` during build |
@@ -478,10 +556,10 @@ flutter-version-file: flatpak/flutter.version  # default when flutter configured
 | `manifest.build-options.env` | map | `{}` | Merged with top-level `env:` |
 
 > [!NOTE]
-> The `manifest:` section currently supports only the fields listed
-> above. It is **not** a full Flatpak manifest — fields like `finish-args`,
-> `build-commands`, and `modules` are not read from config. Edit the template
-> file (`flatpak/<app-id>.yml`) directly to change those.
+> The `manifest:` section currently supports only the fields listed above. It is
+> **not** a full Flatpak manifest — fields like `build-commands` and `modules`
+> are not read from config. Edit the template file (`flatpak/<app-id>.yml`)
+> directly to change those.
 >
 > Future versions plan to treat `manifest:` as a full Flatpak manifest fragment,
 > with flutpak injecting sources, patches, and modules in merge mode (adding
@@ -641,7 +719,7 @@ template is never modified. `flatpak-builder` consumes
 ### `setup-flutpak` action
 
 ```yaml
-- uses: o-murphy/flutpak/.github/actions/setup-flutpak@v
+- uses: o-murphy/flutpak/.github/actions/setup-flutpak@v0.6.0
   # Builds from the same ref as the 'uses:' directive by default.
   # Pin to a specific release:
   # with:
@@ -658,7 +736,7 @@ The repository also ships a `flutter` composite action with
 (x86_64) and `ubuntu-24.04-arm` (aarch64) runners:
 
 ```yaml
-- uses: o-murphy/flutpak/.github/actions/flutter@v
+- uses: o-murphy/flutpak/.github/actions/flutter@v0.6.0
   with:
     flutter-version: stable   # or read from flatpak/flutter.version
     cache: true
@@ -684,7 +762,7 @@ and sources as a workflow artifact. Requires Flutter to be installed beforehand
 (e.g. via the `flutter` action above).
 
 ```yaml
-- uses: o-murphy/flutpak/.github/actions/generate@v
+- uses: o-murphy/flutpak/.github/actions/generate@v0.6.0
   with:
     tag: ${{ inputs.tag }}      # or pass 'commit:' for non-tag builds
     # commit: ${{ github.sha }} # used when 'tag' is empty
@@ -708,7 +786,7 @@ Installs `org.flatpak.Builder`, lints the manifest, builds via `flathub-build`,
 lints the repo, exports a `.flatpak` bundle, and optionally uploads it.
 
 ```yaml
-- uses: o-murphy/flutpak/.github/actions/build-flatpak@v
+- uses: o-murphy/flutpak/.github/actions/build-flatpak@v0.6.0
   id: build
   with:
     manifest: flatpak/generated/<app-id>.yml
@@ -758,7 +836,7 @@ jobs:
         with:
           fetch-depth: 0          # required for --tag to resolve the commit
 
-      - uses: o-murphy/flutpak/.github/actions/flutter@v
+      - uses: o-murphy/flutpak/.github/actions/flutter@v0.6.0
         id: flutter
         with:
           flutter-version: stable
@@ -766,7 +844,7 @@ jobs:
 
       - run: flutter pub get
 
-      - uses: o-murphy/flutpak/.github/actions/generate@v
+      - uses: o-murphy/flutpak/.github/actions/generate@v0.6.0
         with:
           tag: ${{ github.ref_name }}
           metainfo-path: app/share/metainfo/<app-id>.metainfo.xml
@@ -784,7 +862,7 @@ jobs:
           name: flatpak-generated
           path: flatpak/generated
 
-      - uses: o-murphy/flutpak/.github/actions/build-flatpak@v
+      - uses: o-murphy/flutpak/.github/actions/build-flatpak@v0.6.0
         id: build
         with:
           manifest: flatpak/generated/<app-id>.yml
@@ -814,9 +892,9 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: o-murphy/flutpak/.github/actions/setup-flutpak@v
+      - uses: o-murphy/flutpak/.github/actions/setup-flutpak@v0.6.0
 
-      - uses: o-murphy/flutpak/.github/actions/flutter@v
+      - uses: o-murphy/flutpak/.github/actions/flutter@v0.6.0
         with:
           flutter-version: stable
           cache: true
@@ -1017,14 +1095,25 @@ endings" in this case. Use `crlf: true` — `flutpak generate` normalises the
 patch file to CRLF line endings when writing to `generated/patches/`, and
 always adds `--binary` to the patch source options so that `patch(1)` preserves
 line endings exactly as written. Patches without `crlf: true` are normalised to
-LF, making the output deterministic on any host OS:
+LF, making the output deterministic on any host OS.
 
-```yaml
-patches:
-  - package: objectbox_flutter_libs
-    path: flatpak/patches/objectbox_flutter_libs/CMakeLists.txt.patch
-    crlf: true
-```
+> [!CAUTION]
+> `use-git: true` causes `git apply`, which resolves paths relative to the **git
+> worktree root**, not the `dest` directory. Avoid it for patches targeting pub
+> package subdirectories (e.g. `objectbox_flutter_libs`) — use `--binary` via
+> `options:` instead:
+>
+> ```yaml
+> patches:
+>   - package: objectbox_flutter_libs
+>     path: flatpak/patches/objectbox_flutter_libs/CMakeLists.txt.patch
+>     crlf: true
+>     options:
+>       - --binary
+> ```
+>
+> `use-git: true` is appropriate only for patches that target files within the
+> app's own git checkout (at or below the module root).
 
 > [!NOTE]
 > Add `*.patch -text` to your project's `.gitattributes` to prevent git from

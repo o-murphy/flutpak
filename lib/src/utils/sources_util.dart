@@ -11,6 +11,7 @@ import 'log.dart';
 /// Flutter SDK, writing the result to [outputPath].
 ///
 /// Pub and Flutter SDK sources are fetched concurrently.
+/// [foreignDepSources] are appended after pub and Flutter SDK sources.
 Future<void> generateSourcesJson({
   required List<String> lockPaths,
   required String? sdkPath,
@@ -20,6 +21,8 @@ Future<void> generateSourcesJson({
   required bool pubOnly,
   required bool flutterOnly,
   bool emitFlutterPatch = true,
+  String? patchDestDir,
+  List<Map<String, dynamic>> foreignDepSources = const [],
 }) async {
   final allSources = <Map<String, dynamic>>[];
   final cache = LocalDownloadCache();
@@ -43,6 +46,7 @@ Future<void> generateSourcesJson({
         sdkPath: sdkPath,
         patchPath: patchPath,
         outputDir: outputDir,
+        patchDestDir: patchDestDir,
         includePatchInSources: emitFlutterPatch,
         cache: cache,
       ).generate();
@@ -63,6 +67,11 @@ Future<void> generateSourcesJson({
   } finally {
     pubClient.close();
     cache.dispose();
+  }
+
+  allSources.addAll(foreignDepSources);
+  if (foreignDepSources.isNotEmpty) {
+    logInfo('foreign-deps: ${foreignDepSources.length} entries');
   }
 
   final json = const JsonEncoder.withIndent('    ').convert(allSources);

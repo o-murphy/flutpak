@@ -1,0 +1,24 @@
+--- a/hook/build.dart
++++ b/hook/build.dart
+@@ -28,13 +28,15 @@
+         }
+ 
+         final target = File(p.join(dir.path, library.filename));
+-        final tmp = File('${target.path}.tmp');
++        if (!await File(target.path).exists()) {
++          final tmp = File('${target.path}.tmp');
+ 
+-        await sqlite
+-            .fetch(input, output, library)
+-            .cast<List<int>>()
+-            .pipe(tmp.openWrite());
+-        tmp.renameSync(target.path);
++          await sqlite
++              .fetch(input, output, library)
++              .cast<List<int>>()
++              .pipe(tmp.openWrite());
++          tmp.renameSync(target.path);
++        }
+ 
+         output.assets.code.add(
+           CodeAsset(

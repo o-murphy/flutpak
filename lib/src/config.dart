@@ -20,7 +20,21 @@ class PatchEntry {
   /// ≥ 5.3.2). When false (default) the patch is normalised to LF. In both
   /// cases `--binary` is added to the flatpak-builder patch source options so
   /// that `patch(1)` preserves line endings exactly as written.
+  ///
+  /// Ignored when [useGit] is true.
   final bool crlf;
+
+  /// When true, the generated flatpak-builder patch source includes
+  /// `use-git: true`, which causes flatpak-builder to apply the patch via
+  /// `git apply` instead of `patch -p1`. More robust for patches in git
+  /// extended format (e.g. produced by `git diff`).
+  ///
+  /// Compatible with [crlf]: when both are set, the patch file is normalised
+  /// to CRLF before `git apply` runs — useful when the patch is stored with
+  /// LF in the repo but the target file has CRLF line endings.
+  /// Mutually exclusive with [options] (options are forwarded to `patch -p1`
+  /// only and are ignored when `git apply` is used instead).
+  final bool useGit;
 
   const PatchEntry({
     required this.package,
@@ -29,6 +43,7 @@ class PatchEntry {
     this.destSubpath,
     this.options = const [],
     this.crlf = false,
+    this.useGit = false,
   });
 
   /// Resolves the dest path for this patch given the package version.
@@ -52,6 +67,7 @@ class PatchEntry {
       options: options,
       crlf:
           yaml['crlf'] as bool? ?? yaml['strip-trailing-cr'] as bool? ?? false,
+      useGit: yaml['use-git'] as bool? ?? false,
     );
   }
 }
@@ -161,6 +177,10 @@ class ManifestConfig {
   /// pub package equivalent.
   final List<Map<String, dynamic>> sources;
 
+  /// Additional finish-args to merge with the mandatory defaults.
+  /// Duplicates are silently dropped; mandatory args always appear first.
+  final List<String> finishArgs;
+
   const ManifestConfig({
     required this.appId,
     required this.runtimeVersion,
@@ -171,6 +191,7 @@ class ManifestConfig {
     this.prependLdLibraryPath,
     this.env = const {},
     this.sources = const [],
+    this.finishArgs = const [],
   });
 
   factory ManifestConfig.fromYaml(Map yaml) {
@@ -195,6 +216,7 @@ class ManifestConfig {
     final envMap = {...envTop, ...envOpts};
 
     final sourcesRaw = yaml['sources'] as List? ?? [];
+    final finishArgsRaw = (yaml['finish-args'] as List?)?.cast<String>() ?? [];
 
     return ManifestConfig(
       appId: appId as String,
@@ -205,8 +227,10 @@ class ManifestConfig {
       appendPath: buildOpts['append-path'] as String?,
       prependLdLibraryPath: buildOpts['prepend-ld-library-path'] as String?,
       env: envMap,
-      sources:
-          sourcesRaw.map((e) => Map<String, dynamic>.from(e as Map)).toList(),
+      sources: sourcesRaw
+          .map((e) => _deepConvertYaml(e) as Map<String, dynamic>)
+          .toList(),
+      finishArgs: finishArgsRaw,
     );
   }
 }
@@ -259,6 +283,10 @@ class FlatpakGenConfig {
   /// Optional manifest generation config.
   final ManifestConfig? manifest;
 
+  /// Git ref used to fetch the foreign_deps registry and patch files.
+  /// Defaults to 'main' when null.
+  final String? foreignDepsRef;
+
   const FlatpakGenConfig({
     required this.output,
     required this.pubLocks,
@@ -273,6 +301,7 @@ class FlatpakGenConfig {
     this.metainfoPath,
     this.desktopEntryPath,
     this.manifest,
+    this.foreignDepsRef,
   });
 
   /// Effective metainfo XML path (config override or default).
@@ -375,6 +404,7 @@ class FlatpakGenConfig {
       manifest: yaml['manifest'] != null
           ? ManifestConfig.fromYaml(yaml['manifest'] as Map)
           : null,
+      foreignDepsRef: yaml['foreign-deps-ref'] as String?,
     );
   }
 
@@ -427,4 +457,18 @@ class FlatpakGenConfig {
     final yaml = loadYaml(pubspecFile.readAsStringSync());
     return yaml is Map && yaml.containsKey('flutpak');
   }
+}
+
+/// Recursively converts [YamlMap] and [YamlList] to plain Dart [Map] and
+/// [List] so that yaml_edit can serialize them without producing invalid YAML.
+dynamic _deepConvertYaml(dynamic value) {
+  if (value is Map) {
+    return <String, dynamic>{
+      for (final e in value.entries) e.key as String: _deepConvertYaml(e.value),
+    };
+  }
+  if (value is List) {
+    return value.map(_deepConvertYaml).toList();
+  }
+  return value;
 }

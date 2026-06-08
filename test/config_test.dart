@@ -180,7 +180,23 @@ void main() {
       expect(cfg.disableSubmodules, isFalse);
     });
 
-    test('parses repo-url, metainfo-path, desktop-entry-path from root config', () {
+    test('foreignDepsRef is null when foreign-deps-ref absent', () {
+      final cfg = FlatpakGenConfig.fromYaml({});
+      expect(cfg.foreignDepsRef, isNull);
+    });
+
+    test('parses foreign-deps-ref: main', () {
+      final cfg = FlatpakGenConfig.fromYaml({'foreign-deps-ref': 'main'});
+      expect(cfg.foreignDepsRef, 'main');
+    });
+
+    test('parses foreign-deps-ref: v0.6.0', () {
+      final cfg = FlatpakGenConfig.fromYaml({'foreign-deps-ref': 'v0.6.0'});
+      expect(cfg.foreignDepsRef, 'v0.6.0');
+    });
+
+    test('parses repo-url, metainfo-path, desktop-entry-path from root config',
+        () {
       final cfg = FlatpakGenConfig.fromYaml({
         'repo-url': 'https://github.com/example/app.git',
         'metainfo-path': 'custom/path.metainfo.xml',
@@ -382,6 +398,23 @@ flutpak:
         });
         expect(entry.options, ['--ignore-whitespace']);
       });
+
+      test('parses use-git: true', () {
+        final entry = PatchEntry.fromYaml({
+          'package': 'foo',
+          'path': 'patches/foo.patch',
+          'use-git': true,
+        });
+        expect(entry.useGit, isTrue);
+      });
+
+      test('use-git defaults to false when absent', () {
+        final entry = PatchEntry.fromYaml({
+          'package': 'foo',
+          'path': 'patches/foo.patch',
+        });
+        expect(entry.useGit, isFalse);
+      });
     });
   });
 
@@ -403,7 +436,8 @@ flutpak:
     });
 
     test('commandInferred is true when command not set', () {
-      final cfg = ManifestConfig.fromYaml({'app-id': 'io.github.example.myapp'});
+      final cfg =
+          ManifestConfig.fromYaml({'app-id': 'io.github.example.myapp'});
       expect(cfg.commandInferred, isTrue);
       expect(cfg.command, 'myapp');
     });
@@ -422,6 +456,23 @@ flutpak:
         () => ManifestConfig.fromYaml({}),
         throwsArgumentError,
       );
+    });
+
+    test('finishArgs defaults to empty list when not specified', () {
+      final cfg = ManifestConfig.fromYaml({'app-id': 'io.example.app'});
+      expect(cfg.finishArgs, isEmpty);
+    });
+
+    test('parses finish-args list from yaml', () {
+      final cfg = ManifestConfig.fromYaml({
+        'app-id': 'io.example.app',
+        'finish-args': [
+          '--filesystem=xdg-documents',
+          '--share=network',
+        ],
+      });
+      expect(cfg.finishArgs,
+          containsAll(['--filesystem=xdg-documents', '--share=network']));
     });
   });
 

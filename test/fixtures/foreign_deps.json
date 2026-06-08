@@ -1,0 +1,38 @@
+{
+    "some_package": {
+        "1.2.3": {
+            "manifest": {
+                "sources": [
+                    {
+                        "type": "patch",
+                        "path": "some_package/fix.patch",
+                        "dest": "$PUB_DEV",
+                        "use-git": true
+                    }
+                ]
+            }
+        }
+    },
+    "another_package": {
+        "2.0.0": {
+            "manifest": {
+                "sources": [
+                    {
+                        "type": "file",
+                        "url": "https://example.com/lib.so",
+                        "sha256": "abc123",
+                        "dest": "$APP/build/libs"
+                    },
+                    {
+                        "type": "archive",
+                        "only-arches": ["x86_64"],
+                        "url": "https://example.com/lib-x64.tar.gz",
+                        "sha256": "def456",
+                        "dest": "$PUB_DEV/prebuilt",
+                        "strip-components": 0
+                    }
+                ]
+            }
+        }
+    }
+}

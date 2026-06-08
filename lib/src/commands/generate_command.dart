@@ -4,7 +4,7 @@ import 'package:path/path.dart' as p;
 import 'package:yaml/yaml.dart';
 import 'package:yaml_edit/yaml_edit.dart';
 import '../config.dart';
-import '../generators/flutter_sdk.dart';
+import '../foreign_deps_registry.dart';
 import '../generators/manifest_generator.dart';
 import '../patches_registry.dart';
 import '../utils/log.dart';
@@ -39,6 +39,8 @@ class GenerateCommand extends Command<void> {
           help: 'Skip source regeneration (placeholder substitution only).')
       ..addFlag('pub-only', help: 'Skip Flutter SDK sources.')
       ..addFlag('flutter-only', help: 'Skip pub sources.')
+      ..addFlag('no-foreign-deps',
+          help: 'Skip foreign deps registry fetch (offline/air-gapped use).')
       ..addFlag('dry-run',
           abbr: 'n',
           help: 'Print what would be done without writing any files.');
@@ -58,6 +60,7 @@ class GenerateCommand extends Command<void> {
     final noSources = argResults!['no-sources'] as bool;
     final pubOnly = argResults!['pub-only'] as bool;
     final flutterOnly = argResults!['flutter-only'] as bool;
+    final noForeignDeps = argResults!['no-foreign-deps'] as bool;
     final dryRun = argResults!['dry-run'] as bool;
 
     if (dryRun) {
@@ -79,6 +82,7 @@ class GenerateCommand extends Command<void> {
       noSources: noSources,
       pubOnly: pubOnly,
       flutterOnly: flutterOnly,
+      noForeignDeps: noForeignDeps,
       outputDir: outputDir,
     );
   }
@@ -97,6 +101,7 @@ class GenerateCommand extends Command<void> {
     required bool pubOnly,
     required bool flutterOnly,
     required String outputDir,
+    bool noForeignDeps = false,
   }) async {
     final manifestCfg = cfg.manifest;
     if (manifestCfg == null) {
@@ -153,19 +158,25 @@ class GenerateCommand extends Command<void> {
       logInfo('patches: ${patchEntries.length} entries resolved');
     }
 
-    // ── Resolve Flutter patch (write built-in if needed) ─────────────────
-    // The Flutter patch is injected into the generated manifest (not the JSON)
-    // so it is visible alongside package patches and is not lost when the JSON
-    // is regenerated independently.
-    String? flutterPatchAbsPath;
-    if (!pubOnly && sdkPath != null) {
-      flutterPatchAbsPath = FlutterSdkGenerator.resolveAndWritePatch(
-        configPatchPath: cfg.patchPath,
-        outputDir: outputDir,
-      );
+    // ── Resolve foreign deps from registry ───────────────────────────────
+    List<Map<String, dynamic>> foreignDepSources = const [];
+    if (!noForeignDeps && !noSources) {
+      final overriddenPackages = patchEntries.map((e) => e.package).toSet();
+      final registry = ForeignDepsRegistry(ref: cfg.foreignDepsRef);
+      try {
+        foreignDepSources = await registry.resolve(
+          lockPaths: effectiveLocks,
+          overriddenPackages: overriddenPackages,
+          generatedPatchesDir: generatedPatchesDir,
+        );
+      } finally {
+        registry.dispose();
+      }
     }
 
     // ── Generate sources ──────────────────────────────────────────────────
+    // The Flutter shared.sh patch is emitted into generated-sources.json
+    // alongside the pub and SDK archives (emitFlutterPatch: true).
     if (!noSources) {
       await generateSourcesJson(
         lockPaths: effectiveLocks,
@@ -175,7 +186,9 @@ class GenerateCommand extends Command<void> {
         outputPath: sourcesPath,
         pubOnly: pubOnly,
         flutterOnly: flutterOnly,
-        emitFlutterPatch: false,
+        emitFlutterPatch: true,
+        patchDestDir: generatedDir,
+        foreignDepSources: foreignDepSources,
       );
     }
 
@@ -203,7 +216,6 @@ class GenerateCommand extends Command<void> {
       extraModules: cfg.extraModules,
       sourcesPath: sourcesPath,
       patchesDir: patchesDir,
-      flutterPatchAbsPath: flutterPatchAbsPath,
       patchEntries: patchEntries,
       tag: tag,
       commit: commit,
@@ -342,7 +354,6 @@ class GenerateCommand extends Command<void> {
     required List<String> extraModules,
     required String sourcesPath,
     required String patchesDir,
-    required String? flutterPatchAbsPath,
     required List<PatchEntry> patchEntries,
     required String? tag,
     required String? commit,
@@ -407,12 +418,7 @@ class GenerateCommand extends Command<void> {
       editor.appendToList(sourcesBase, Map<String, dynamic>.from(src));
     }
 
-    final allPatches = [
-      if (flutterPatchAbsPath != null)
-        PatchEntry(package: 'flutter', path: flutterPatchAbsPath),
-      ...patchEntries,
-    ];
-    for (final patchMap in buildPatchSourceMaps(allPatches, patchesDir)) {
+    for (final patchMap in buildPatchSourceMaps(patchEntries, patchesDir)) {
       editor.appendToList(sourcesBase, patchMap);
     }
 

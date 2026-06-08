@@ -23,7 +23,9 @@ class InitCommand extends Command<void> {
           abbr: 'c', help: 'Config file path.', defaultsTo: 'flutpak.yaml')
       ..addOption('sdk',
           abbr: 's', help: 'Flutter SDK path. Defaults to \$FLUTTER_ROOT.')
-      ..addFlag('force', abbr: 'f', help: 'Overwrite existing template files.');
+      ..addFlag('force', abbr: 'f', help: 'Overwrite existing template files.')
+      ..addFlag('no-foreign-deps',
+          help: 'Skip foreign deps registry fetch (offline/air-gapped use).');
   }
 
   @override
@@ -35,6 +37,7 @@ class InitCommand extends Command<void> {
         cfg.flutterSdk ??
         Platform.environment['FLUTTER_ROOT'];
     final force = argResults!['force'] as bool;
+    final noForeignDeps = argResults!['no-foreign-deps'] as bool;
 
     final manifestCfg = cfg.manifest;
     if (manifestCfg == null) {
@@ -125,6 +128,7 @@ class InitCommand extends Command<void> {
       noSources: false,
       pubOnly: false,
       flutterOnly: false,
+      noForeignDeps: noForeignDeps,
       outputDir: outputDir,
     );
   }

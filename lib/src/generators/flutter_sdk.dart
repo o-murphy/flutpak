@@ -30,7 +30,7 @@ const String _infraBase =
 const String builtinSharedShPatch = r'''
 --- a/flutter/bin/internal/shared.sh
 +++ b/flutter/bin/internal/shared.sh
-@@ -20,8 +20,8 @@ function pub_upgrade_with_retry {
+@@ -20,7 +20,7 @@ function pub_upgrade_with_retry {
    local total_tries="10"
    local remaining_tries=$((total_tries - 1))
    while [[ "$remaining_tries" -gt 0 ]]; do
@@ -53,13 +53,22 @@ const String defaultSharedShPatchPath = 'patches/flutter/shared.sh.patch';
 /// SHA-256 checksums are fetched by downloading each artifact (cached locally).
 ///
 /// If [patchPath] is null, the built-in [builtinSharedShPatch] is written to
-/// [defaultSharedShPatchPath] relative to [outputDir] and included automatically.
+/// [defaultSharedShPatchPath] relative to [patchDestDir] (or [outputDir] when
+/// [patchDestDir] is omitted) and included automatically.
 /// Pass an explicit [patchPath] to override, or set [outputDir] to null to skip
 /// the patch entirely (not recommended for Flatpak offline builds).
 class FlutterSdkGenerator {
   final String sdkPath;
   final String? patchPath;
   final String? outputDir;
+
+  /// Directory where the built-in patch file is written. Defaults to [outputDir].
+  ///
+  /// Set this to the `generated/` directory so the built-in patch is placed in
+  /// the gitignored output tree and never written to the committed `patches/`
+  /// directory. Custom user patches (via [patchPath]) are unaffected.
+  final String? patchDestDir;
+
   final DownloadCache _cache;
 
   /// When false, the patch source is not added to the returned list even if a
@@ -71,6 +80,7 @@ class FlutterSdkGenerator {
     required this.sdkPath,
     this.patchPath,
     this.outputDir,
+    this.patchDestDir,
     this.includePatchInSources = true,
     DownloadCache? cache,
   }) : _cache = cache ?? LocalDownloadCache();
@@ -185,7 +195,10 @@ class FlutterSdkGenerator {
     }
     if (outputDir == null) return null;
 
-    final target = File(p.join(outputDir!, defaultSharedShPatchPath));
+    // Built-in patch: write to patchDestDir (typically the generated/ dir so
+    // the file is gitignored) rather than the committed patches/ directory.
+    final destDir = patchDestDir ?? outputDir!;
+    final target = File(p.join(destDir, defaultSharedShPatchPath));
     target.createSync(recursive: true);
     target.writeAsStringSync(builtinSharedShPatch);
     logInfo('✓  flutter: wrote built-in shared.sh patch → ${target.path}');
@@ -272,29 +285,6 @@ class FlutterSdkGenerator {
       return '$_infraBase/gradle-wrapper/$gradleHash/gradle-wrapper.tgz';
     }
     return '$_infraBase/flutter/$engineHash/${art.path}';
-  }
-
-  /// Resolves the Flutter patch path and writes the built-in patch if needed.
-  ///
-  /// If [configPatchPath] is provided, returns its absolute path without
-  /// writing any file. Otherwise writes [builtinSharedShPatch] to
-  /// `outputDir/defaultSharedShPatchPath` and returns the absolute path.
-  ///
-  /// Used by `generate` command to obtain the path for manifest injection
-  /// independently of [FlutterSdkGenerator.generate].
-  static String resolveAndWritePatch({
-    String? configPatchPath,
-    required String outputDir,
-  }) {
-    if (configPatchPath != null) {
-      return p.absolute(configPatchPath);
-    }
-    final target =
-        File(p.join(p.absolute(outputDir), defaultSharedShPatchPath));
-    target.createSync(recursive: true);
-    target.writeAsStringSync(builtinSharedShPatch);
-    logInfo('✓  flutter: wrote built-in shared.sh patch → ${target.path}');
-    return target.path;
   }
 
   /// Reads the Flutter SDK version tag.
