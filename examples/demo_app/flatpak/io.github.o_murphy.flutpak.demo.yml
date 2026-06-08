@@ -21,6 +21,7 @@ finish-args:
 modules:
   - name: demo
     buildsystem: simple
+    subdir: examples/demo_app
     build-options:
       arch:
         x86_64:
