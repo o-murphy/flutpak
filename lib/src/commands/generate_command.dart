@@ -409,7 +409,7 @@ class GenerateCommand extends Command<void> {
 
     final allPatches = [
       if (flutterPatchAbsPath != null)
-        PatchEntry(package: 'flutter', path: flutterPatchAbsPath),
+        PatchEntry(package: 'flutter', path: flutterPatchAbsPath, useGit: true),
       ...patchEntries,
     ];
     for (final patchMap in buildPatchSourceMaps(allPatches, patchesDir)) {

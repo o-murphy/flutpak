@@ -221,8 +221,9 @@ class ManifestConfig {
       appendPath: buildOpts['append-path'] as String?,
       prependLdLibraryPath: buildOpts['prepend-ld-library-path'] as String?,
       env: envMap,
-      sources:
-          sourcesRaw.map((e) => Map<String, dynamic>.from(e as Map)).toList(),
+      sources: sourcesRaw
+          .map((e) => _deepConvertYaml(e) as Map<String, dynamic>)
+          .toList(),
     );
   }
 }
@@ -443,4 +444,18 @@ class FlatpakGenConfig {
     final yaml = loadYaml(pubspecFile.readAsStringSync());
     return yaml is Map && yaml.containsKey('flutpak');
   }
+}
+
+/// Recursively converts [YamlMap] and [YamlList] to plain Dart [Map] and
+/// [List] so that yaml_edit can serialize them without producing invalid YAML.
+dynamic _deepConvertYaml(dynamic value) {
+  if (value is Map) {
+    return <String, dynamic>{
+      for (final e in value.entries) e.key as String: _deepConvertYaml(e.value),
+    };
+  }
+  if (value is List) {
+    return value.map(_deepConvertYaml).toList();
+  }
+  return value;
 }
