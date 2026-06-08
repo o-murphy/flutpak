@@ -374,6 +374,55 @@ For complete submission requirements see the
 
 ---
 
+## Foreign deps registry
+
+`flutpak generate` automatically resolves known pub packages from a remote
+registry at
+[`foreign_deps/foreign_deps.json`](foreign_deps/foreign_deps.json), using
+the same format as `flatpak-flutter`. For each package found in your lock
+files the registry provides the complete set of flatpak sources — prebuilt
+archives and patches — needed for an offline Flatpak build.
+
+### How it works
+
+1. The registry is fetched from GitHub on every `generate` run (network
+   required; cached in `~/.cache/flutpak/` as offline fallback).
+2. For every package in your `pubspec.lock` that appears in the registry at
+   the exact locked version, its sources are appended to
+   `generated-sources.json`.
+3. Patch files from the registry are downloaded to
+   `generated/patches/<path>` and referenced with a relative `path:` so
+   flatpak-builder can find them alongside the manifest.
+
+### Priority
+
+Local `patches:` entries always override the registry. If a package has a
+`patches:` entry in `flutpak.yaml`, the registry is skipped for that package.
+
+### Currently supported packages
+
+| Package | Versions |
+|---|---|
+| `objectbox_flutter_libs` | 5.3.1, 5.3.2 |
+| `objectbox_sync_flutter_libs` | 5.3.1, 5.3.2 |
+
+For the full list see [`foreign_deps/foreign_deps.json`](foreign_deps/foreign_deps.json).
+
+### Offline / air-gapped use
+
+```bash
+flutpak generate --no-foreign-deps
+```
+
+### Pinning the registry version
+
+```yaml
+# flutpak.yaml
+foreign-deps-ref: v0.5.0   # tag, branch, or SHA; default: main
+```
+
+---
+
 ## Full config reference
 
 Config lives in **one** of two places (error if both exist):
@@ -463,6 +512,7 @@ flutter-version-file: flatpak/flutter.version  # default when flutter configured
 | `patches[].options` | list | `[]` | Extra flags forwarded to `patch(1)`. Ignored when `use-git: true`. |
 | `patches[].crlf` | bool | `false` | When `true`, normalise the patch to CRLF in `generated/patches/`; when `false` (default), normalise to LF. `--binary` is always added to patch options. Use `crlf: true` when the upstream pub.dev archive ships CRLF sources (e.g. `objectbox_flutter_libs` ≥ 5.3.2). Compatible with `use-git: true`. |
 | `patches[].use-git` | bool | `false` | When `true`, the generated patch source includes `use-git: true`, causing flatpak-builder to apply the patch via `git apply` instead of `patch -p1`. More robust for patches in git extended format. Compatible with `crlf` (patch is normalised to CRLF before `git apply` runs). Mutually exclusive with `options` only. |
+| `foreign-deps-ref` | string | `main` | Git ref used to fetch the foreign deps registry. Pin to a tag or SHA for reproducible builds. |
 | `repo-url` | string | `git remote get-url origin` | Source git URL written into template |
 | `disable-submodules` | bool | `false` | When `true`, adds `disable-submodules: true` to the git source in the generated template, preventing flatpak-builder from cloning git submodules |
 | `metainfo-path` | string | `app/share/metainfo/<id>.metainfo.xml` | Validated on `init` and `generate` |

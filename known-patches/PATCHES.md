@@ -1,5 +1,13 @@
 # Known Patches
 
+> **Note:** The objectbox patches in this directory have been superseded by the
+> [foreign deps registry](../foreign_deps/foreign_deps.json). `flutpak generate`
+> now resolves `objectbox_flutter_libs` and `objectbox_sync_flutter_libs`
+> automatically — no manual copy or `patches:` config needed.
+>
+> The files here are kept as reference copies. For new integrations, prefer
+> the automatic registry approach.
+
 Patches for packages that commonly need modifications for Flatpak offline builds.
 
 Copy the relevant `.patch` file to your project's `flatpak/patches/` directory

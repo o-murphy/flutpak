@@ -9,6 +9,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Foreign deps registry** — `flutpak generate` now automatically resolves
+  known pub packages (e.g. `objectbox_flutter_libs`) from a remote registry
+  at `foreign_deps/foreign_deps.json`, compatible with the `flatpak-flutter`
+  `foreign_deps.json` format. For each package found in the project's lock
+  files the registry provides the full set of flatpak sources (archives and
+  patches) needed for an offline Flatpak build. Sources are appended to
+  `generated-sources.json`; patch files are downloaded to
+  `generated/patches/<path>`.
+  - Local `patches:` entries always override the registry for the same package.
+  - `--no-foreign-deps` flag skips the registry fetch for offline/air-gapped
+    use.
+  - `foreign-deps-ref` config key pins the registry fetch to a specific git
+    ref (tag, branch, SHA). Defaults to `main`.
+  - Uses `~/.cache/flutpak/` as offline fallback when the network is
+    unavailable; prints a warning and continues.
+  - `foreign_deps/` directory added to the flutpak repository with the
+    initial registry (`objectbox_flutter_libs` 5.3.1/5.3.2 and
+    `objectbox_sync_flutter_libs` 5.3.1/5.3.2), matching the
+    `flatpak-flutter` entries exactly.
+  ```yaml
+  # Optional — override the git ref used to fetch the registry:
+  foreign-deps-ref: v0.5.0
+  ```
+
 - **`patches[].use-git` option** in `flutpak.yaml`. When set to `true`, the
   generated flatpak-builder patch source includes `use-git: true`, which causes
   flatpak-builder to apply the patch via `git apply` instead of `patch -p1`.

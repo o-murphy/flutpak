@@ -1,6 +1,7 @@
 export 'src/commands/generate_command.dart';
 export 'src/commands/init_command.dart';
 export 'src/config.dart';
+export 'src/foreign_deps_registry.dart';
 export 'src/generators/flutter_sdk.dart';
 export 'src/generators/manifest_generator.dart';
 export 'src/generators/pub_sources.dart';

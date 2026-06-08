@@ -180,6 +180,23 @@ void main() {
       expect(cfg.disableSubmodules, isFalse);
     });
 
+    test('foreignDepsRef is null when foreign-deps-ref absent', () {
+      final cfg = FlatpakGenConfig.fromYaml({});
+      expect(cfg.foreignDepsRef, isNull);
+    });
+
+    test('parses foreign-deps-ref: main', () {
+      final cfg =
+          FlatpakGenConfig.fromYaml({'foreign-deps-ref': 'main'});
+      expect(cfg.foreignDepsRef, 'main');
+    });
+
+    test('parses foreign-deps-ref: v0.5.0', () {
+      final cfg =
+          FlatpakGenConfig.fromYaml({'foreign-deps-ref': 'v0.5.0'});
+      expect(cfg.foreignDepsRef, 'v0.5.0');
+    });
+
     test('parses repo-url, metainfo-path, desktop-entry-path from root config', () {
       final cfg = FlatpakGenConfig.fromYaml({
         'repo-url': 'https://github.com/example/app.git',

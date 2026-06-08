@@ -276,6 +276,10 @@ class FlatpakGenConfig {
   /// Optional manifest generation config.
   final ManifestConfig? manifest;
 
+  /// Git ref used to fetch the foreign_deps registry and patch files.
+  /// Defaults to 'main' when null.
+  final String? foreignDepsRef;
+
   const FlatpakGenConfig({
     required this.output,
     required this.pubLocks,
@@ -290,6 +294,7 @@ class FlatpakGenConfig {
     this.metainfoPath,
     this.desktopEntryPath,
     this.manifest,
+    this.foreignDepsRef,
   });
 
   /// Effective metainfo XML path (config override or default).
@@ -392,6 +397,7 @@ class FlatpakGenConfig {
       manifest: yaml['manifest'] != null
           ? ManifestConfig.fromYaml(yaml['manifest'] as Map)
           : null,
+      foreignDepsRef: yaml['foreign-deps-ref'] as String?,
     );
   }
 
