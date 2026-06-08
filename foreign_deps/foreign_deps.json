@@ -1,11 +1,503 @@
 {
+    "audiotags": {
+        "1.4.5": {
+            "manifest": {
+                "sources": [
+                    {
+                        "type": "file",
+                        "url": "https://github.com/erikas-taroza/audiotags/releases/download/v1.4.5/linux.tar.gz",
+                        "sha256": "7a3863d55abb696a10d9d23e8b8fe060b56479a619c283d07bf17b35b05d33b3",
+                        "dest": "$PUB_DEV/linux"
+                    }
+                ]
+            }
+        }
+    },
+    "flutter_new_pipe_extractor": {
+        "0.1.0": {
+            "manifest": {
+                "sources": [
+                    {
+                        "type": "file",
+                        "only-arches": [
+                            "x86_64"
+                        ],
+                        "url": "https://github.com/KRTirtho/NewPipeCLI/releases/download/v0.1.0/NewPipeCLI-linux-x64.zip",
+                        "sha256": "af77591ed3b210db20ba88c7f2f47bf5f2ef3c85d1fab7d318108f32ff665654",
+                        "dest": "$PUB_DEV/assets"
+                    },
+                    {
+                        "type": "file",
+                        "only-arches": [
+                            "aarch64"
+                        ],
+                        "url": "https://github.com/KRTirtho/NewPipeCLI/releases/download/v0.1.0/NewPipeCLI-linux-arm64.zip",
+                        "sha256": "bec554ba6c3e32684b5a632d82b9360929d7c4e3284c8bf53809be0d9c4918da",
+                        "dest": "$PUB_DEV/assets"
+                    }
+                ]
+            }
+        }
+    },
+    "flutter_webrtc": {
+        "1.3.0": {
+            "manifest": {
+                "sources": [
+                    {
+                        "type": "file",
+                        "url": "https://github.com/flutter-webrtc/flutter-webrtc/releases/download/v1.3.0/libwebrtc.zip",
+                        "sha256": "ea4de360aac95188b8fb1bb7dcbab86904f5d009446506647f599deb488da137",
+                        "dest": "$PUB_DEV/third_party/downloads"
+                    }
+                ]
+            }
+        }
+    },
+    "fvp": {
+        "0.35.0": {
+            "manifest": {
+                "sources": [
+                    {
+                        "type": "archive",
+                        "url": "https://github.com/wang-bin/mdk-sdk/releases/download/v0.35.0/mdk-sdk-linux.tar.xz",
+                        "sha256": "3ca102c26b3f246258b1822f51653450148bc25b188a4630dc81a57965e56ed8",
+                        "dest": "$PUB_DEV/linux/mdk-sdk"
+                    }
+                ]
+            }
+        }
+    },
+    "media_kit_libs_linux": {
+        "1.2.1": {
+            "manifest": {
+                "sources": [
+                    {
+                        "type": "file",
+                        "only-arches": [
+                            "x86_64"
+                        ],
+                        "url": "https://github.com/microsoft/mimalloc/archive/refs/tags/v2.1.2.tar.gz",
+                        "sha256": "2b1bff6f717f9725c70bf8d79e4786da13de8a270059e4ba0bdd262ae7be46eb",
+                        "dest": "$APP/build/linux/x64/release",
+                        "dest-filename": "mimalloc-2.1.2.tar.gz"
+                    },
+                    {
+                        "type": "file",
+                        "only-arches": [
+                            "aarch64"
+                        ],
+                        "url": "https://github.com/microsoft/mimalloc/archive/refs/tags/v2.1.2.tar.gz",
+                        "sha256": "2b1bff6f717f9725c70bf8d79e4786da13de8a270059e4ba0bdd262ae7be46eb",
+                        "dest": "$APP/build/linux/arm64/release",
+                        "dest-filename": "mimalloc-2.1.2.tar.gz"
+                    }
+                ]
+            }
+        }
+    },
+    "pdfium_flutter": {
+        "0.1.7": {
+            "manifest": {
+                "sources": [
+                    {
+                        "type": "archive",
+                        "only-arches": [
+                            "x86_64"
+                        ],
+                        "url": "https://github.com/bblanchon/pdfium-binaries/releases/download/chromium%2F7520/pdfium-linux-x64.tgz",
+                        "sha256": "e737634cca16ba28b760077b915b469bea076b71f208769c56fb96ee138e876f",
+                        "dest": "$APP/build/linux/x64/release/pdfium/chromium%2F7520/",
+                        "strip-components": 0
+                    },
+                    {
+                        "type": "archive",
+                        "only-arches": [
+                            "aarch64"
+                        ],
+                        "url": "https://github.com/bblanchon/pdfium-binaries/releases/download/chromium%2F7520/pdfium-linux-arm64.tgz",
+                        "sha256": "ee3998f311195bf9cecb3936b2ce3dd621e873277c36f1ca05de36f2646c07d4",
+                        "dest": "$APP/build/linux/arm64/release/pdfium/chromium%2F7520/",
+                        "strip-components": 0
+                    }
+                ]
+            }
+        }
+    },
+    "powersync": {
+        "2.1.0": {
+            "manifest": {
+                "sources": [
+                    {
+                        "type": "file",
+                        "only-arches": [
+                            "x86_64"
+                        ],
+                        "url": "https://github.com/powersync-ja/powersync-sqlite-core/releases/download/v0.4.13/libpowersync_x64.linux.so",
+                        "sha256": "b9885eb188ee827453bd94100b657cda76e23722610abf2e33170ca15d2c0de3",
+                        "dest": "$APP/.dart_tool/hooks_runner/shared/powersync/build/download-b9885eb1",
+                        "dest-filename": "libpowersync_core.so"
+                    },
+                    {
+                        "type": "file",
+                        "only-arches": [
+                            "aarch64"
+                        ],
+                        "url": "https://github.com/powersync-ja/powersync-sqlite-core/releases/download/v0.4.13/libpowersync_aarch64.linux.so",
+                        "sha256": "53a4250821a317705a864e3b4dc2e4cdaacc24ebc1cfe37bdf99148b024c9144",
+                        "dest": "$APP/.dart_tool/hooks_runner/shared/powersync/build/download-53a42508",
+                        "dest-filename": "libpowersync_core.so"
+                    }
+                ]
+            }
+        }
+    },
+    "printing": {
+        "5.14.2": {
+            "manifest": {
+                "sources": [
+                    {
+                        "type": "archive",
+                        "only-arches": [
+                            "x86_64"
+                        ],
+                        "url": "https://github.com/bblanchon/pdfium-binaries/releases/download/chromium%2F7520/pdfium-linux-x64.tgz",
+                        "sha256": "e737634cca16ba28b760077b915b469bea076b71f208769c56fb96ee138e876f",
+                        "dest": "$APP/build/linux/x64/release/pdfium-src/",
+                        "strip-components": 0
+                    },
+                    {
+                        "type": "archive",
+                        "only-arches": [
+                            "aarch64"
+                        ],
+                        "url": "https://github.com/bblanchon/pdfium-binaries/releases/download/chromium%2F7520/pdfium-linux-arm64.tgz",
+                        "sha256": "ee3998f311195bf9cecb3936b2ce3dd621e873277c36f1ca05de36f2646c07d4",
+                        "dest": "$APP/build/linux/arm64/release/pdfium-src/",
+                        "strip-components": 0
+                    },
+                    {
+                        "type": "patch",
+                        "path": "printing/5.14.2-CMakeLists.txt.patch",
+                        "dest": "$PUB_DEV"
+                    }
+                ]
+            }
+        }
+    },
+    "simple_secure_storage_linux": {
+        "0.2.5": {
+            "manifest": {
+                "sources": [
+                    {
+                        "type": "file",
+                        "only-arches": [
+                            "x86_64"
+                        ],
+                        "url": "https://github.com/nlohmann/json/releases/download/v3.12.0/json.tar.xz",
+                        "sha256": "42f6e95cad6ec532fd372391373363b62a14af6d771056dbfc86160e6dfff7aa",
+                        "dest": "$APP/build/linux/x64/release/_deps/json-subbuild/json-populate-prefix/src"
+                    },
+                    {
+                        "type": "file",
+                        "only-arches": [
+                            "aarch64"
+                        ],
+                        "url": "https://github.com/nlohmann/json/releases/download/v3.12.0/json.tar.xz",
+                        "sha256": "42f6e95cad6ec532fd372391373363b62a14af6d771056dbfc86160e6dfff7aa",
+                        "dest": "$APP/build/linux/arm64/release/_deps/json-subbuild/json-populate-prefix/src"
+                    },
+                    {
+                        "type": "patch",
+                        "path": "simple_secure_storage_linux/CMakeLists.txt.patch",
+                        "use-git": true,
+                        "dest": "$PUB_DEV"
+                    }
+                ]
+            }
+        }
+    },
+    "sqlcipher_flutter_libs": {
+        "0.6.8": {
+            "manifest": {
+                "sources": [
+                    {
+                        "type": "file",
+                        "only-arches": [
+                            "x86_64"
+                        ],
+                        "url": "https://fsn1.your-objectstorage.com/simon-public/assets/sqlcipher/v4_10_0.c",
+                        "sha512": "ea4ad61eb636a3b6b0a4d8a1b57b51af187ac8724fe853bd9ce58c7ee4054bd62c4e6d7d11788c8af9ff8e95c6a52eb36a41062172022bc1cbc0567de0aec8c1",
+                        "dest": "$APP/build/linux/x64/release/plugins/sqlcipher_flutter_libs",
+                        "dest-filename": "sqlcipher.c"
+                    },
+                    {
+                        "type": "file",
+                        "only-arches": [
+                            "aarch64"
+                        ],
+                        "url": "https://fsn1.your-objectstorage.com/simon-public/assets/sqlcipher/v4_10_0.c",
+                        "sha512": "ea4ad61eb636a3b6b0a4d8a1b57b51af187ac8724fe853bd9ce58c7ee4054bd62c4e6d7d11788c8af9ff8e95c6a52eb36a41062172022bc1cbc0567de0aec8c1",
+                        "dest": "$APP/build/linux/arm64/release/plugins/sqlcipher_flutter_libs",
+                        "dest-filename": "sqlcipher.c"
+                    }
+                ]
+            }
+        }
+    },
+    "sqlite3": {
+        "2.9.4": {},
+        "3.0.0": {
+            "manifest": {
+                "sources": [
+                    {
+                        "type": "file",
+                        "only-arches": [
+                            "x86_64"
+                        ],
+                        "url": "https://github.com/simolus3/sqlite3.dart/releases/download/sqlite3-3.1.1/libsqlite3.x64.linux.so",
+                        "sha256": "c8a46dcdd4f59cb43aa2502311cfd2ad75a50d9b3a91812a3f634ff5fb3486be",
+                        "dest": "$APP/.dart_tool/hooks_runner/shared/sqlite3/build/download-static"
+                    },
+                    {
+                        "type": "file",
+                        "only-arches": [
+                            "aarch64"
+                        ],
+                        "url": "https://github.com/simolus3/sqlite3.dart/releases/download/sqlite3-3.1.1/libsqlite3.arm64.linux.so",
+                        "sha256": "d581eb8af67a006cdfa5c634af773652df18aa586a02514f8da09129045c4ebb",
+                        "dest": "$APP/.dart_tool/hooks_runner/shared/sqlite3/build/download-static"
+                    },
+                    {
+                        "type": "patch",
+                        "path": "sqlite3/assets.dart.patch",
+                        "dest": "$PUB_DEV"
+                    },
+                    {
+                        "type": "patch",
+                        "path": "sqlite3/build.dart.patch",
+                        "dest": "$PUB_DEV"
+                    }
+                ]
+            }
+        },
+        "3.3.0": {
+            "manifest": {
+                "sources": [
+                    {
+                        "type": "file",
+                        "only-arches": [
+                            "x86_64"
+                        ],
+                        "url": "https://github.com/simolus3/sqlite3.dart/releases/download/sqlite3-3.3.1/libsqlite3.x64.linux.so",
+                        "sha256": "148c51687ac3be3487873845690ddbf3d8ee099a5521a193c856008907fb7361",
+                        "dest": "$APP/.dart_tool/hooks_runner/shared/sqlite3/build/download-static",
+                        "dest-filename": "libsqlite3.so"
+                    },
+                    {
+                        "type": "file",
+                        "only-arches": [
+                            "aarch64"
+                        ],
+                        "url": "https://github.com/simolus3/sqlite3.dart/releases/download/sqlite3-3.3.1/libsqlite3.arm64.linux.so",
+                        "sha256": "0541443d38cd79160f6262e6a59892657d640459fef8acdd1f4f29a4ed0d2612",
+                        "dest": "$APP/.dart_tool/hooks_runner/shared/sqlite3/build/download-static",
+                        "dest-filename": "libsqlite3.so"
+                    },
+                    {
+                        "type": "patch",
+                        "path": "sqlite3/assets.dart.patch",
+                        "dest": "$PUB_DEV"
+                    }
+                ]
+            }
+        }
+    },
+    "sqlite3_flutter_libs": {
+        "0.5.30": {
+            "manifest": {
+                "sources": [
+                    {
+                        "type": "file",
+                        "only-arches": [
+                            "x86_64"
+                        ],
+                        "url": "https://sqlite.org/2025/sqlite-autoconf-3490000.tar.gz",
+                        "sha256": "4d8bfa0b55e36951f6e5a9fb8c99f3b58990ab785c57b4f84f37d163a0672759",
+                        "dest": "$APP/build/linux/x64/release/_deps/sqlite3-subbuild/sqlite3-populate-prefix/src"
+                    },
+                    {
+                        "type": "file",
+                        "only-arches": [
+                            "aarch64"
+                        ],
+                        "url": "https://sqlite.org/2025/sqlite-autoconf-3490000.tar.gz",
+                        "sha256": "4d8bfa0b55e36951f6e5a9fb8c99f3b58990ab785c57b4f84f37d163a0672759",
+                        "dest": "$APP/build/linux/arm64/release/_deps/sqlite3-subbuild/sqlite3-populate-prefix/src"
+                    },
+                    {
+                        "type": "patch",
+                        "path": "sqlite3_flutter_libs/0.5.30-CMakeLists.txt.patch",
+                        "dest": "$PUB_DEV"
+                    }
+                ]
+            }
+        },
+        "0.5.32": {
+            "manifest": {
+                "sources": [
+                    {
+                        "type": "file",
+                        "only-arches": [
+                            "x86_64"
+                        ],
+                        "url": "https://sqlite.org/2025/sqlite-autoconf-3490100.tar.gz",
+                        "sha256": "106642d8ccb36c5f7323b64e4152e9b719f7c0215acf5bfeac3d5e7f97b59254",
+                        "dest": "$APP/build/linux/x64/release/_deps/sqlite3-subbuild/sqlite3-populate-prefix/src"
+                    },
+                    {
+                        "type": "file",
+                        "only-arches": [
+                            "aarch64"
+                        ],
+                        "url": "https://sqlite.org/2025/sqlite-autoconf-3490100.tar.gz",
+                        "sha256": "106642d8ccb36c5f7323b64e4152e9b719f7c0215acf5bfeac3d5e7f97b59254",
+                        "dest": "$APP/build/linux/arm64/release/_deps/sqlite3-subbuild/sqlite3-populate-prefix/src"
+                    },
+                    {
+                        "type": "patch",
+                        "path": "sqlite3_flutter_libs/0.5.32-CMakeLists.txt.patch",
+                        "dest": "$PUB_DEV"
+                    }
+                ]
+            }
+        },
+        "0.5.34": {
+            "manifest": {
+                "sources": [
+                    {
+                        "type": "file",
+                        "only-arches": [
+                            "x86_64"
+                        ],
+                        "url": "https://sqlite.org/2025/sqlite-autoconf-3500100.tar.gz",
+                        "sha256": "00a65114d697cfaa8fe0630281d76fd1b77afcd95cd5e40ec6a02cbbadbfea71",
+                        "dest": "$APP/build/linux/x64/release/_deps/sqlite3-subbuild/sqlite3-populate-prefix/src"
+                    },
+                    {
+                        "type": "file",
+                        "only-arches": [
+                            "aarch64"
+                        ],
+                        "url": "https://sqlite.org/2025/sqlite-autoconf-3500100.tar.gz",
+                        "sha256": "00a65114d697cfaa8fe0630281d76fd1b77afcd95cd5e40ec6a02cbbadbfea71",
+                        "dest": "$APP/build/linux/arm64/release/_deps/sqlite3-subbuild/sqlite3-populate-prefix/src"
+                    },
+                    {
+                        "type": "patch",
+                        "path": "sqlite3_flutter_libs/0.5.34-CMakeLists.txt.patch",
+                        "dest": "$PUB_DEV"
+                    }
+                ]
+            }
+        },
+        "0.5.39": {
+            "manifest": {
+                "sources": [
+                    {
+                        "type": "file",
+                        "only-arches": [
+                            "x86_64"
+                        ],
+                        "url": "https://sqlite.org/2025/sqlite-autoconf-3500400.tar.gz",
+                        "sha256": "a3db587a1b92ee5ddac2f66b3edb41b26f9c867275782d46c3a088977d6a5b18",
+                        "dest": "$APP/build/linux/x64/release/_deps/sqlite3-subbuild/sqlite3-populate-prefix/src"
+                    },
+                    {
+                        "type": "file",
+                        "only-arches": [
+                            "aarch64"
+                        ],
+                        "url": "https://sqlite.org/2025/sqlite-autoconf-3500400.tar.gz",
+                        "sha256": "a3db587a1b92ee5ddac2f66b3edb41b26f9c867275782d46c3a088977d6a5b18",
+                        "dest": "$APP/build/linux/arm64/release/_deps/sqlite3-subbuild/sqlite3-populate-prefix/src"
+                    },
+                    {
+                        "type": "patch",
+                        "path": "sqlite3_flutter_libs/0.5.39-CMakeLists.txt.patch",
+                        "dest": "$PUB_DEV"
+                    }
+                ]
+            }
+        },
+        "0.5.41": {
+            "manifest": {
+                "sources": [
+                    {
+                        "type": "file",
+                        "only-arches": [
+                            "x86_64"
+                        ],
+                        "url": "https://sqlite.org/2025/sqlite-autoconf-3510100.tar.gz",
+                        "sha256": "4f2445cd70479724d32ad015ec7fd37fbb6f6130013bd4bfbc80c32beb42b7e0",
+                        "dest": "$APP/build/linux/x64/release/_deps/sqlite3-subbuild/sqlite3-populate-prefix/src"
+                    },
+                    {
+                        "type": "file",
+                        "only-arches": [
+                            "aarch64"
+                        ],
+                        "url": "https://sqlite.org/2025/sqlite-autoconf-3510100.tar.gz",
+                        "sha256": "4f2445cd70479724d32ad015ec7fd37fbb6f6130013bd4bfbc80c32beb42b7e0",
+                        "dest": "$APP/build/linux/arm64/release/_deps/sqlite3-subbuild/sqlite3-populate-prefix/src"
+                    },
+                    {
+                        "type": "patch",
+                        "path": "sqlite3_flutter_libs/0.5.41-CMakeLists.txt.patch",
+                        "dest": "$PUB_DEV"
+                    }
+                ]
+            }
+        },
+        "0.5.42": {
+            "manifest": {
+                "sources": [
+                    {
+                        "type": "file",
+                        "only-arches": [
+                            "x86_64"
+                        ],
+                        "url": "https://sqlite.org/2026/sqlite-autoconf-3520000.tar.gz",
+                        "sha256": "f6b50b0c103392af32a8be15b2b9d25959de9a00a70c3979128aafeaa5338b3f",
+                        "dest": "$APP/build/linux/x64/release/_deps/sqlite3-subbuild/sqlite3-populate-prefix/src"
+                    },
+                    {
+                        "type": "file",
+                        "only-arches": [
+                            "aarch64"
+                        ],
+                        "url": "https://sqlite.org/2026/sqlite-autoconf-3520000.tar.gz",
+                        "sha256": "f6b50b0c103392af32a8be15b2b9d25959de9a00a70c3979128aafeaa5338b3f",
+                        "dest": "$APP/build/linux/arm64/release/_deps/sqlite3-subbuild/sqlite3-populate-prefix/src"
+                    },
+                    {
+                        "type": "patch",
+                        "path": "sqlite3_flutter_libs/0.5.42-CMakeLists.txt.patch",
+                        "dest": "$PUB_DEV"
+                    }
+                ]
+            }
+        },
+        "0.6.0": {}
+    },
     "objectbox_flutter_libs": {
         "5.3.1": {
             "manifest": {
                 "sources": [
                     {
                         "type": "archive",
-                        "only-arches": ["x86_64"],
+                        "only-arches": [
+                            "x86_64"
+                        ],
                         "url": "https://github.com/objectbox/objectbox-c/releases/download/v5.3.1/objectbox-linux-x64.tar.gz",
                         "sha256": "d1a22f5a43e8aa438c987524c2ef97f5d179acb991b0f63ab03a30c33b882368",
                         "dest": "$PUB_DEV/objectbox-c",
@@ -13,7 +505,9 @@
                     },
                     {
                         "type": "archive",
-                        "only-arches": ["aarch64"],
+                        "only-arches": [
+                            "aarch64"
+                        ],
                         "url": "https://github.com/objectbox/objectbox-c/releases/download/v5.3.1/objectbox-linux-aarch64.tar.gz",
                         "sha256": "948fe456904b8b0ae6b22a26a9f460734dc3c2ec58750df3a329ccae1ebe035d",
                         "dest": "$PUB_DEV/objectbox-c",
@@ -22,7 +516,9 @@
                     {
                         "type": "patch",
                         "path": "objectbox_flutter_libs/5.3.1-CMakeLists.txt.patch",
-                        "options": ["--binary"],
+                        "options": [
+                            "--binary"
+                        ],
                         "dest": "$PUB_DEV"
                     }
                 ]
@@ -33,7 +529,9 @@
                 "sources": [
                     {
                         "type": "archive",
-                        "only-arches": ["x86_64"],
+                        "only-arches": [
+                            "x86_64"
+                        ],
                         "url": "https://github.com/objectbox/objectbox-c/releases/download/v5.3.2/objectbox-linux-x64.tar.gz",
                         "sha256": "6dbb5450c36dd11ee9074f16ecc61e79b45ff43c2082934601f3166b39c8a613",
                         "dest": "$PUB_DEV/objectbox-c",
@@ -41,7 +539,9 @@
                     },
                     {
                         "type": "archive",
-                        "only-arches": ["aarch64"],
+                        "only-arches": [
+                            "aarch64"
+                        ],
                         "url": "https://github.com/objectbox/objectbox-c/releases/download/v5.3.2/objectbox-linux-aarch64.tar.gz",
                         "sha256": "bdfbfbf4971057e11018ca6645697d8a40ebc7df56ccde63397cbb0e0609c0e8",
                         "dest": "$PUB_DEV/objectbox-c",
@@ -50,7 +550,9 @@
                     {
                         "type": "patch",
                         "path": "objectbox_flutter_libs/5.3.2-CMakeLists.txt.patch",
-                        "options": ["--binary"],
+                        "options": [
+                            "--binary"
+                        ],
                         "dest": "$PUB_DEV"
                     }
                 ]
@@ -63,7 +565,9 @@
                 "sources": [
                     {
                         "type": "archive",
-                        "only-arches": ["x86_64"],
+                        "only-arches": [
+                            "x86_64"
+                        ],
                         "url": "https://github.com/objectbox/objectbox-c/releases/download/v5.3.1/objectbox-sync-linux-x64.tar.gz",
                         "sha256": "1d58e094b8cc5f08739748fa4113e983002c24784caa2674d3a0a51467831ea9",
                         "dest": "$PUB_DEV/objectbox-sync-c",
@@ -71,7 +575,9 @@
                     },
                     {
                         "type": "archive",
-                        "only-arches": ["aarch64"],
+                        "only-arches": [
+                            "aarch64"
+                        ],
                         "url": "https://github.com/objectbox/objectbox-c/releases/download/v5.3.1/objectbox-sync-linux-aarch64.tar.gz",
                         "sha256": "3f902002d93d0d26825e033212eeb3fdcbc6e15961b631a6f747b874b191f635",
                         "dest": "$PUB_DEV/objectbox-sync-c",
@@ -80,7 +586,9 @@
                     {
                         "type": "patch",
                         "path": "objectbox_sync_flutter_libs/5.3.1-CMakeLists.txt.patch",
-                        "options": ["--binary"],
+                        "options": [
+                            "--binary"
+                        ],
                         "dest": "$PUB_DEV"
                     }
                 ]
@@ -91,7 +599,9 @@
                 "sources": [
                     {
                         "type": "archive",
-                        "only-arches": ["x86_64"],
+                        "only-arches": [
+                            "x86_64"
+                        ],
                         "url": "https://github.com/objectbox/objectbox-c/releases/download/v5.3.2/objectbox-sync-linux-x64.tar.gz",
                         "sha256": "dd18c0c8c809290a0dc052047971297202c60f4455e8d470749555e1da750fa8",
                         "dest": "$PUB_DEV/objectbox-sync-c",
@@ -99,7 +609,9 @@
                     },
                     {
                         "type": "archive",
-                        "only-arches": ["aarch64"],
+                        "only-arches": [
+                            "aarch64"
+                        ],
                         "url": "https://github.com/objectbox/objectbox-c/releases/download/v5.3.2/objectbox-sync-linux-aarch64.tar.gz",
                         "sha256": "bacd88e26fde7f5ab07bf62a0643d70bc1da53ee291c70207b2e4b996ac68934",
                         "dest": "$PUB_DEV/objectbox-sync-c",
@@ -108,7 +620,9 @@
                     {
                         "type": "patch",
                         "path": "objectbox_sync_flutter_libs/5.3.2-CMakeLists.txt.patch",
-                        "options": ["--binary"],
+                        "options": [
+                            "--binary"
+                        ],
                         "dest": "$PUB_DEV"
                     }
                 ]

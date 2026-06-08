@@ -405,6 +405,18 @@ Local `patches:` entries always override the registry. If a package has a
 
 | Package | Versions |
 |---|---|
+| `audiotags` | 1.4.5 |
+| `flutter_new_pipe_extractor` | 0.1.0 |
+| `flutter_webrtc` | 1.3.0 |
+| `fvp` | 0.35.0 |
+| `media_kit_libs_linux` | 1.2.1 |
+| `pdfium_flutter` | 0.1.7 |
+| `powersync` | 2.1.0 |
+| `printing` | 5.14.2 |
+| `simple_secure_storage_linux` | 0.2.5 |
+| `sqlcipher_flutter_libs` | 0.6.8 |
+| `sqlite3` | 2.9.4, 3.0.0, 3.3.0 |
+| `sqlite3_flutter_libs` | 0.5.30, 0.5.32, 0.5.34, 0.5.39, 0.5.41, 0.5.42, 0.6.0 |
 | `objectbox_flutter_libs` | 5.3.1, 5.3.2 |
 | `objectbox_sync_flutter_libs` | 5.3.1, 5.3.2 |
 

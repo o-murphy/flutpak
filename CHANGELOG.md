@@ -65,6 +65,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `manifest.sources` entries for the architecture-specific `libsqlite3.so`
   prebuilts — see `known-patches/PATCHES.md` for the full usage snippet.
 
+- **Foreign deps registry expanded** — 12 packages added, mirroring the
+  `flatpak-flutter` registry exactly:
+  - **`sqlite3`** (2.9.4 empty, 3.0.0, 3.3.0) — prebuilt `libsqlite3.so`
+    archives + `assets.dart.patch` / `build.dart.patch` to redirect the hook
+    to a predictable offline path.
+  - **`sqlite3_flutter_libs`** (0.5.30, 0.5.32, 0.5.34, 0.5.39, 0.5.41,
+    0.5.42, 0.6.0 empty) — SQLite source tarballs pre-placed for CMake
+    `FetchContent`, one per upstream SQLite release; `CMakeLists.txt.patch`
+    disables the network fetch.
+  - **`simple_secure_storage_linux`** (0.2.5) — pre-placed `json.tar.xz`
+    for the nlohmann/json `FetchContent` dependency; `CMakeLists.txt.patch`
+    adds an explicit `URL_HASH` so CMake accepts the cached archive offline.
+  - **`audiotags`** (1.4.5), **`flutter_new_pipe_extractor`** (0.1.0),
+    **`flutter_webrtc`** (1.3.0), **`fvp`** (0.35.0),
+    **`media_kit_libs_linux`** (1.2.1), **`pdfium_flutter`** (0.1.7),
+    **`powersync`** (2.1.0), **`printing`** (5.14.2),
+    **`sqlcipher_flutter_libs`** (0.6.8) — pre-placed native library
+    archives/files; `printing` additionally patches `CMakeLists.txt` to
+    disable the pdfium network fetch. All entries copied verbatim from
+    `flatpak-flutter`.
+
 ### Fixed
 
 - **Foreign deps patch entries** — changed `"use-git": true` to
