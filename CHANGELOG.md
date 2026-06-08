@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.1] — 2026-06-08
+
+### Changed
+
+- **`setup-flutter.sh` removed** — the generated manifest now calls
+  `flutter pub get --offline` directly instead of going through the
+  `setup-flutter.sh` wrapper script. The script was a one-liner with no
+  added value; removing it eliminates the `ScriptSource` from the Flutter
+  SDK source list and avoids sandbox path issues when the Flutter SDK is
+  included as a separate module.
+
 ## [0.6.0] — 2026-06-08
 
 ### Added
@@ -790,7 +801,8 @@ git remote.
   output files
 - MIT License
 
-[Unreleased]: https://github.com/o-murphy/flutpak/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/o-murphy/flutpak/compare/v0.6.1...HEAD
+[0.6.1]: https://github.com/o-murphy/flutpak/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/o-murphy/flutpak/compare/v0.6.0
 [0.5.0]: https://github.com/o-murphy/flutpak/compare/v0.5.0
 [0.4.0]: https://github.com/o-murphy/flutpak/compare/v0.4.0
