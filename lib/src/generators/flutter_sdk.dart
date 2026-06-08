@@ -156,14 +156,7 @@ class FlutterSdkGenerator {
       destFilename: 'pubspec.yaml',
     ));
 
-    // 5. setup-flutter.sh script helper
-    sources.add(ScriptSource(
-      commands: ['flutter pub get --offline \$@'],
-      dest: 'flutter/bin',
-      destFilename: 'setup-flutter.sh',
-    ));
-
-    // 6. engine_stamp.json (type: file)
+    // 5. engine_stamp.json (type: file)
     final stampUrl = '$_infraBase/flutter/$engineHash/engine_stamp.json';
     final stampSha256 = await _cache.sha256For(stampUrl);
     sources.add(FileSource(

@@ -19,7 +19,7 @@ class ManifestGenerator {
   final String? resolvedRepoUrl;
 
   /// Whether this project uses Flutter. When false, Flutter-specific build
-  /// commands (cache stamps, setup-flutter.sh, flutter build) are omitted and
+  /// commands (cache stamps, flutter pub get, flutter build) are omitted and
   /// replaced with a TODO comment. Defaults to true for backward compatibility.
   final bool hasFlutter;
 
@@ -206,7 +206,7 @@ class ManifestGenerator {
       }
 
       buf
-        ..writeln('      - setup-flutter.sh')
+        ..writeln('      - flutter pub get --offline')
         ..writeln('      - flutter build linux --release --no-pub')
         ..writeln('      - mkdir -p /app/$appName')
         ..writeln('      - cp -r "\$BUNDLE_PATH"/. /app/$appName/')
