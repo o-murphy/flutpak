@@ -205,9 +205,11 @@ manifest:
 ```
 
 > [!TIP]
-> **Sandbox permissions (`finish-args`)** are written into the template by
-> `flutpak init` with sensible Flutter desktop defaults. Edit them directly
-> in `flatpak/<app-id>.yml` — no config change needed.
+> **Sandbox permissions (`finish-args`)** — `flutpak init` writes sensible
+> Flutter desktop defaults into the template. To add extras (e.g.
+> `--filesystem=xdg-documents`), list them under `manifest.finish-args:` in
+> your config — they are merged after the mandatory args with duplicates
+> removed. You can also edit the template directly.
 
 See [Full config reference](#full-config-reference) for all options.
 
@@ -487,6 +489,11 @@ manifest:
   # Auto-detected if omitted (info printed on init):
   command: yourapp                   # default: last segment of app-id
 
+  # Extra finish-args merged after the mandatory Flutter defaults:
+  finish-args:
+    - --filesystem=xdg-documents
+    - --share=network
+
   # Verbatim flatpak source entries appended to the app module:
   sources: []
   env: {}
@@ -511,7 +518,7 @@ flutter-version-file: flatpak/flutter.version  # default when flutter configured
 | `patches` | list | `[]` | Project-level package patches |
 | `patches[].options` | list | `[]` | Extra flags forwarded to `patch(1)`. Ignored when `use-git: true`. |
 | `patches[].crlf` | bool | `false` | When `true`, normalise the patch to CRLF in `generated/patches/`; when `false` (default), normalise to LF. `--binary` is always added to patch options. Use `crlf: true` when the upstream pub.dev archive ships CRLF sources (e.g. `objectbox_flutter_libs` ≥ 5.3.2). Compatible with `use-git: true`. |
-| `patches[].use-git` | bool | `false` | When `true`, the generated patch source includes `use-git: true`, causing flatpak-builder to apply the patch via `git apply` instead of `patch -p1`. More robust for patches in git extended format. Compatible with `crlf` (patch is normalised to CRLF before `git apply` runs). Mutually exclusive with `options` only. |
+| `patches[].use-git` | bool | `false` | When `true`, the generated patch source includes `use-git: true`, causing flatpak-builder to apply the patch via `git apply` instead of `patch -p1`. More robust for patches in git extended format. Compatible with `crlf`. **Caution:** `git apply` resolves paths relative to the git worktree root, not `dest`. Only use this for patches targeting files at or below the app git root. For patches that target pub package subdirectories (e.g. `objectbox_flutter_libs`), use `--binary` via `options:` instead. |
 | `foreign-deps-ref` | string | `main` | Git ref used to fetch the foreign deps registry. Pin to a tag or SHA for reproducible builds. |
 | `repo-url` | string | `git remote get-url origin` | Source git URL written into template |
 | `disable-submodules` | bool | `false` | When `true`, adds `disable-submodules: true` to the git source in the generated template, preventing flatpak-builder from cloning git submodules |
@@ -523,6 +530,7 @@ flutter-version-file: flatpak/flutter.version  # default when flutter configured
 | `manifest.runtime-version` | string | `25.08` | Freedesktop runtime version |
 | `manifest.command` | string | last segment of `app-id` | Executable name inside `/app/bin/` |
 | `manifest.sdk-extensions` | list | `[]` | For Flutter projects, `llvmXX` is **auto-injected** based on `runtime-version` (25.08 → llvm20, 24.08 → llvm19, 23.08 → llvm17). Add here only extensions beyond llvm (e.g. `rust-stable`). |
+| `manifest.finish-args` | list | `[]` | Extra sandbox permission flags appended after the mandatory Flutter defaults (`--share=ipc`, `--socket=fallback-x11`, `--socket=wayland`, `--device=dri`). Duplicates are silently removed. |
 | `manifest.sources` | list | `[]` | Verbatim flatpak source entries appended to the app module |
 | `manifest.env` | map | `{}` | Build-time env vars (shorthand) |
 | `manifest.build-options.append-path` | string | — | Appended to `PATH` during build |
@@ -530,10 +538,10 @@ flutter-version-file: flatpak/flutter.version  # default when flutter configured
 | `manifest.build-options.env` | map | `{}` | Merged with top-level `env:` |
 
 > [!NOTE]
-> The `manifest:` section currently supports only the fields listed
-> above. It is **not** a full Flatpak manifest — fields like `finish-args`,
-> `build-commands`, and `modules` are not read from config. Edit the template
-> file (`flatpak/<app-id>.yml`) directly to change those.
+> The `manifest:` section currently supports only the fields listed above. It is
+> **not** a full Flatpak manifest — fields like `build-commands` and `modules`
+> are not read from config. Edit the template file (`flatpak/<app-id>.yml`)
+> directly to change those.
 >
 > Future versions plan to treat `manifest:` as a full Flatpak manifest fragment,
 > with flutpak injecting sources, patches, and modules in merge mode (adding
@@ -1071,16 +1079,23 @@ always adds `--binary` to the patch source options so that `patch(1)` preserves
 line endings exactly as written. Patches without `crlf: true` are normalised to
 LF, making the output deterministic on any host OS.
 
-For patches in git extended format (produced by `git diff`), combine with
-`use-git: true` to apply via `git apply` instead of `patch(1)`:
-
-```yaml
-patches:
-  - package: objectbox_flutter_libs
-    path: flatpak/patches/objectbox_flutter_libs/CMakeLists.txt.patch
-    crlf: true
-    use-git: true
-```
+> [!CAUTION]
+> `use-git: true` causes `git apply`, which resolves paths relative to the **git
+> worktree root**, not the `dest` directory. Avoid it for patches targeting pub
+> package subdirectories (e.g. `objectbox_flutter_libs`) — use `--binary` via
+> `options:` instead:
+>
+> ```yaml
+> patches:
+>   - package: objectbox_flutter_libs
+>     path: flatpak/patches/objectbox_flutter_libs/CMakeLists.txt.patch
+>     crlf: true
+>     options:
+>       - --binary
+> ```
+>
+> `use-git: true` is appropriate only for patches that target files within the
+> app's own git checkout (at or below the module root).
 
 > [!NOTE]
 > Add `*.patch -text` to your project's `.gitattributes` to prevent git from

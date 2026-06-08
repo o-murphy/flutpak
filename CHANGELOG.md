@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`manifest.finish-args`** config key — list of extra `finish-args` entries
+  appended to the mandatory Flutter desktop defaults (`--share=ipc`,
+  `--socket=fallback-x11`, `--socket=wayland`, `--device=dri`). Duplicates are
+  silently dropped, so repeating a mandatory arg is safe.
+  ```yaml
+  manifest:
+    app-id: io.github.YourOrg.YourApp
+    finish-args:
+      - --filesystem=xdg-documents
+      - --filesystem=xdg-download
+      - --share=network
+  ```
+
 - **Foreign deps registry** — `flutpak generate` now automatically resolves
   known pub packages (e.g. `objectbox_flutter_libs`) from a remote registry
   at `foreign_deps/foreign_deps.json`, compatible with the `flatpak-flutter`
@@ -51,6 +64,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   network fetch when the prebuilt library is already present. Requires
   `manifest.sources` entries for the architecture-specific `libsqlite3.so`
   prebuilts — see `known-patches/PATCHES.md` for the full usage snippet.
+
+### Fixed
+
+- **Foreign deps patch entries** — changed `"use-git": true` to
+  `"options": ["--binary"]` in all four `objectbox_flutter_libs` /
+  `objectbox_sync_flutter_libs` entries in `foreign_deps/foreign_deps.json`.
+  When `use-git: true` is set, flatpak-builder applies the patch via
+  `git apply`, which resolves file paths relative to the **git worktree root**
+  rather than the `dest` directory. Because the app build directory is itself a
+  git checkout, `git apply` looked for `linux/CMakeLists.txt` at the repo root
+  (where it does not exist) and failed silently, leaving the patch unapplied and
+  causing objectbox to attempt a network download at CMake time. Using
+  `"options": ["--binary"]` runs `patch -p1 --binary` instead, which always
+  applies relative to `dest` and handles CRLF patches correctly.
 
 ### Changed
 
