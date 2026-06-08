@@ -81,6 +81,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Flutter `shared.sh.patch` moved to `generated-sources.json`** — the
+  built-in flutter patch is now emitted into `generated-sources.json` alongside
+  pub/SDK archives instead of being injected directly into the generated
+  manifest's `sources:` list. Behaviour is identical at build time; the change
+  makes the sources file self-contained and consistent with all other source
+  entries.
+
+- **Built-in flutter patch written to gitignored `generated/` directory** —
+  when no explicit `flutter.patch` path is set in config, `flutpak generate`
+  writes the built-in `shared.sh.patch` to
+  `<output>/generated/patches/flutter/shared.sh.patch` (inside the gitignored
+  `generated/` tree) rather than `<output>/patches/flutter/shared.sh.patch`
+  (committed). The committed `patches/` directory is now reserved exclusively
+  for user-supplied patch files. `flutpak sources` retains the previous
+  behaviour (writes to `<output>/patches/` so the path survives outside a
+  `generate` run).
+
 - **Known patch files renamed** from `VERSION/FILENAME.patch` directory layout
   to `VERSION-FILENAME.patch` flat naming (e.g.
   `objectbox_flutter_libs/5.3.1-CMakeLists.txt.patch`), consistent with the
