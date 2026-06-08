@@ -5,7 +5,6 @@ import 'package:yaml/yaml.dart';
 import 'package:yaml_edit/yaml_edit.dart';
 import '../config.dart';
 import '../foreign_deps_registry.dart';
-import '../generators/flutter_sdk.dart';
 import '../generators/manifest_generator.dart';
 import '../patches_registry.dart';
 import '../utils/log.dart';
