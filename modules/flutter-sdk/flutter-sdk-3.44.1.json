@@ -172,14 +172,6 @@
             "dest-filename": "pubspec.yaml"
         },
         {
-            "type": "script",
-            "commands": [
-                "flutter pub get --offline $@"
-            ],
-            "dest": "flutter/bin",
-            "dest-filename": "setup-flutter.sh"
-        },
-        {
             "type": "file",
             "url": "https://storage.googleapis.com/flutter_infra_release/flutter/c416acfeb8126e097f758c664aaa3da929e27da0/engine_stamp.json",
             "sha256": "03681b30aa84401342ed79a9429f75e8b6740498064fd445287065544a46e298",
