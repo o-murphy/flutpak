@@ -33,6 +33,7 @@ jobs:
           metainfo-path: examples/demo_app/app/share/metainfo/io.github.o_murphy.flutpak.demo.metainfo.xml
           artifact-path: examples/demo_app/flatpak/generated/
           artifact-name: flatpak-generated
+          pub-only: "true"
 
   build:
     name: Build Flatpak
@@ -44,11 +45,11 @@ jobs:
       - uses: actions/download-artifact@v7
         with:
           name: flatpak-generated
-          path: flatpak/generated
+          path: examples/demo_app/flatpak/generated
 
       - uses: ./.github/actions/build-flatpak
         with:
-          manifest: flatpak/generated/io.github.o_murphy.flutpak.demo.yml
+          manifest: examples/demo_app/flatpak/generated/io.github.o_murphy.flutpak.demo.yml
           app-id: io.github.o_murphy.flutpak.demo
           artifact-name: demo-flatpak
           github-token: ${{ secrets.GITHUB_TOKEN }}

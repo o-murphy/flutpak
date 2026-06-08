@@ -32,6 +32,14 @@ class ManifestGenerator {
   /// Effective icon list passed from [FlatpakGenConfig].
   final List<IconEntry> icons;
 
+  /// Whether Flutter SDK is provided via an external flatpak module (e.g.
+  /// flutter-sdk-X.json) rather than bundled inline in the app module's
+  /// sources. When true:
+  ///   - `append-path` uses `/var/lib/flutter/bin` (where the module installs it)
+  ///   - cache stamp `cp` commands are omitted (they belong in the flutter module)
+  /// Defaults to false for backward compatibility.
+  final bool flutterViaModule;
+
   /// Whether to emit `disable-submodules: true` in the git source entry.
   final bool disableSubmodules;
 
@@ -41,6 +49,7 @@ class ManifestGenerator {
     this.outputRelDir = 'flatpak',
     this.resolvedRepoUrl,
     this.hasFlutter = true,
+    this.flutterViaModule = false,
     required this.metainfoPath,
     required this.desktopEntryPath,
     required this.icons,
@@ -150,8 +159,11 @@ class ManifestGenerator {
       }
     }
     if (hasFlutter) {
-      // Flutter SDK is bundled into the build dir — add its bin to PATH.
-      appendParts.add('/run/build/$appName/flutter/bin');
+      // flutter-sdk module installs Flutter to /var/lib/flutter; inline mode
+      // bundles it into the app module's own build dir.
+      appendParts.add(flutterViaModule
+          ? '/var/lib/flutter/bin'
+          : '/run/build/$appName/flutter/bin');
     }
     if (cfg.appendPath != null) appendParts.add(cfg.appendPath!);
 
@@ -176,33 +188,37 @@ class ManifestGenerator {
     buf.writeln('    build-commands:');
 
     if (hasFlutter) {
-      // Flutter cache stamp copies.
-      final stamps = [
-        'engine-dart-sdk.stamp',
-        'material_fonts.stamp',
-        'gradle_wrapper.stamp',
-        'engine_stamp.stamp',
-        'flutter_sdk.stamp',
-        'font-subset.stamp',
-        'linux-sdk.stamp',
-      ];
-      final versionFiles = {
-        'engine-dart-sdk.stamp': 'engine.version',
-        'material_fonts.stamp': 'material_fonts.version',
-        'gradle_wrapper.stamp': 'gradle_wrapper.version',
-        'engine_stamp.stamp': 'engine.version',
-        'flutter_sdk.stamp': 'engine.version',
-        'font-subset.stamp': 'engine.version',
-        'linux-sdk.stamp': 'engine.version',
-      };
-      for (final stamp in stamps) {
-        final src = versionFiles[stamp]!;
-        // Use $FLATPAK_BUILDER_BUILDDIR (always the module root, regardless of
-        // whether subdir: is set) so these commands work correctly when the
-        // Flutter project lives in a subdirectory of the git repo.
-        buf.writeln(
-            '      - cp \$FLATPAK_BUILDER_BUILDDIR/flutter/bin/internal/$src'
-            ' \$FLATPAK_BUILDER_BUILDDIR/flutter/bin/cache/$stamp');
+      if (!flutterViaModule) {
+        // Cache stamp copies — only needed when Flutter is bundled inline in
+        // the app module's own sources. When using a flutter-sdk module, the
+        // stamps are handled by that module's build-commands.
+        final stamps = [
+          'engine-dart-sdk.stamp',
+          'material_fonts.stamp',
+          'gradle_wrapper.stamp',
+          'engine_stamp.stamp',
+          'flutter_sdk.stamp',
+          'font-subset.stamp',
+          'linux-sdk.stamp',
+        ];
+        final versionFiles = {
+          'engine-dart-sdk.stamp': 'engine.version',
+          'material_fonts.stamp': 'material_fonts.version',
+          'gradle_wrapper.stamp': 'gradle_wrapper.version',
+          'engine_stamp.stamp': 'engine.version',
+          'flutter_sdk.stamp': 'engine.version',
+          'font-subset.stamp': 'engine.version',
+          'linux-sdk.stamp': 'engine.version',
+        };
+        for (final stamp in stamps) {
+          final src = versionFiles[stamp]!;
+          // Use $FLATPAK_BUILDER_BUILDDIR (always the module root, regardless of
+          // whether subdir: is set) so these commands work correctly when the
+          // Flutter project lives in a subdirectory of the git repo.
+          buf.writeln(
+              '      - cp \$FLATPAK_BUILDER_BUILDDIR/flutter/bin/internal/$src'
+              ' \$FLATPAK_BUILDER_BUILDDIR/flutter/bin/cache/$stamp');
+        }
       }
 
       buf

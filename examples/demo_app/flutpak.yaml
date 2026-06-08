@@ -5,8 +5,8 @@ pub:
     - pubspec.lock
     - $FLUTTER_ROOT/packages/flutter_tools/pubspec.lock
 
-flutter:
-  sdk: $FLUTTER_ROOT
+modules:
+  - ../../modules/flutter-sdk/flutter-sdk-3.44.1.json
 
 repo-url: https://github.com/o-murphy/flutpak.git
 

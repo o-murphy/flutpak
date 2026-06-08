@@ -4,7 +4,7 @@ import 'package:flutpak/src/commands/flutter_command.dart';
 import 'package:flutpak/src/commands/generate_command.dart';
 import 'package:flutpak/src/commands/init_command.dart';
 import 'package:flutpak/src/commands/pub_command.dart';
-import 'package:flutpak/src/commands/sdk_ext_command.dart';
+import 'package:flutpak/src/commands/sdk_mod_command.dart';
 import 'package:flutpak/src/commands/sources_command.dart';
 import 'package:flutpak/src/version.dart';
 
@@ -25,7 +25,7 @@ Future<void> main(List<String> args) async {
         '  flutpak sources            # pub + Flutter SDK → generated-sources.json\n'
         '  flutpak pub                # only pub packages\n'
         '  flutpak flutter            # only Flutter SDK artifacts\n'
-        '  flutpak sdk-ext            # Flutter SDK Extension manifest for Flathub\n'
+        '  flutpak sdk-mod            # Flutter SDK module JSON for !include\n'
         '  flutpak generate --dry-run # preview what generate would do',
   )
     ..addCommand(InitCommand())
@@ -33,7 +33,7 @@ Future<void> main(List<String> args) async {
     ..addCommand(SourcesCommand())
     ..addCommand(PubCommand())
     ..addCommand(FlutterCommand())
-    ..addCommand(SdkExtCommand());
+    ..addCommand(SdkModCommand());
 
   // Default to 'sources' when no subcommand given
   final effectiveArgs =

@@ -95,8 +95,8 @@ jobs:
       - name: Smoke test — pub --help
         run: /tmp/flutpak pub --help
 
-      - name: Smoke test — sdk-ext --help
-        run: /tmp/flutpak sdk-ext --help
+      - name: Smoke test — sdk-mod --help
+        run: /tmp/flutpak sdk-mod --help
 
       - name: Smoke test — init --help
         run: /tmp/flutpak init --help

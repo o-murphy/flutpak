@@ -214,6 +214,7 @@ class GenerateCommand extends Command<void> {
       content: generatedContent,
       manifestCfg: manifestCfg,
       extraModules: cfg.extraModules,
+      baseDir: baseDir,
       sourcesPath: sourcesPath,
       patchesDir: patchesDir,
       patchEntries: patchEntries,
@@ -352,6 +353,7 @@ class GenerateCommand extends Command<void> {
     required String content,
     required ManifestConfig manifestCfg,
     required List<String> extraModules,
+    required String baseDir,
     required String sourcesPath,
     required String patchesDir,
     required List<PatchEntry> patchEntries,
@@ -423,23 +425,30 @@ class GenerateCommand extends Command<void> {
     }
 
     // ── Insert modules before app module ────────────────────────────
+    // Write each extra module as a path string rather than inlining its
+    // content.  Flatpak-builder treats a string in the modules list as a
+    // file reference and resolves patch paths inside that file relative to
+    // the file itself — which is the correct behaviour for pre-generated
+    // module files (e.g. modules/flutter/flutter-3.44.1.json).
+    //
     // Iterate in reverse so that sequential insertions at the same index
     // preserve the original order from modules.
+    final generatedDir = p.dirname(sourcesPath);
     var insertIdx = appModuleIdx;
     for (final modPath in extraModules.reversed) {
-      final f = File(modPath);
+      final absoluteModPath = p.isAbsolute(modPath)
+          ? modPath
+          : p.absolute(p.join(baseDir, modPath));
+      final f = File(absoluteModPath);
       if (!f.existsSync()) {
-        logWarn('modules: file not found: $modPath');
+        logWarn('modules: file not found: $absoluteModPath');
         continue;
       }
-      final modYaml = loadYaml(f.readAsStringSync());
-      if (modYaml is List) {
-        for (final mod in modYaml.reversed) {
-          editor.insertIntoList(['modules'], insertIdx, mod);
-        }
-      } else if (modYaml is Map) {
-        editor.insertIntoList(['modules'], insertIdx, modYaml);
-      }
+      // Path written into the manifest must be relative to the generated
+      // manifest's directory so flatpak-builder can resolve it.
+      final relPath =
+          p.relative(absoluteModPath, from: p.absolute(generatedDir));
+      editor.insertIntoList(['modules'], insertIdx, relPath);
     }
 
     return editor.toString();

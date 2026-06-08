@@ -72,6 +72,9 @@ class InitCommand extends Command<void> {
     }
 
     final hasFlutter = sdkPath != null;
+    final flutterViaModule = cfg.extraModules.any((m) =>
+        p.basename(m).startsWith('flutter-sdk') ||
+        p.basename(m).startsWith('flutter-'));
     final sourcesPath =
         p.join(outputDir, 'generated', 'generated-sources.json');
     final generator = ManifestGenerator(
@@ -80,6 +83,7 @@ class InitCommand extends Command<void> {
       outputRelDir: cfg.output,
       resolvedRepoUrl: resolvedRepoUrl,
       hasFlutter: hasFlutter,
+      flutterViaModule: flutterViaModule,
       metainfoPath: cfg.effectiveMetainfoPath(manifestCfg.appId),
       desktopEntryPath: cfg.effectiveDesktopEntryPath(manifestCfg.appId),
       icons: cfg.effectiveIcons(manifestCfg.appId),

@@ -42,6 +42,10 @@ inputs:
     description: "Path to flutpak config file. Passed as --config to init and generate."
     required: false
     default: ""
+  pub-only:
+    description: "Pass --pub-only to flutpak generate (skip Flutter SDK sources, use with flutter module)."
+    required: false
+    default: "false"
   init:
     description: "Run 'flutpak init --force' before generate."
     required: false
@@ -149,10 +153,13 @@ runs:
         REF_VALUE: ${{ steps.ref.outputs.value }}
         SDK_PATH: ${{ steps.sdk.outputs.path }}
         INPUT_CONFIG: ${{ inputs.config }}
+        INPUT_PUB_ONLY: ${{ inputs.pub-only }}
       run: |
         CONFIG_FLAG=""
         [ -n "$INPUT_CONFIG" ] && CONFIG_FLAG="--config $INPUT_CONFIG"
-        flutpak generate "$REF_FLAG" "$REF_VALUE" --sdk "$SDK_PATH" $CONFIG_FLAG
+        PUB_ONLY_FLAG=""
+        [ "$INPUT_PUB_ONLY" = "true" ] && PUB_ONLY_FLAG="--pub-only"
+        flutpak generate "$REF_FLAG" "$REF_VALUE" --sdk "$SDK_PATH" $CONFIG_FLAG $PUB_ONLY_FLAG
 
     - name: Install appstream
       if: inputs.metainfo-path != ''
