@@ -26,6 +26,7 @@ lint_flatpak_manifest() {
   local manifest_path="${1:?Usage: lint_flatpak_manifest <manifest.yml>}"
   _dbus_run flatpak run \
     --filesystem=host \
+    --env=FLATPAK_USER_DIR="$HOME/.local/share/flatpak" \
     --command=flatpak-builder-lint \
     org.flatpak.Builder \
     --exceptions \
@@ -38,10 +39,29 @@ build_flatpak() {
     "$(realpath "$manifest")"
 }
 
+# Local-only variant: calls flatpak-builder directly with --disable-rofiles-fuse.
+# flathub-build doesn't support that flag, causing fusermount to fail on desktops.
+build_flatpak_local() {
+  local manifest="${1:?Usage: build_flatpak_local <manifest.yml>}"
+  _dbus_run flatpak run \
+    --filesystem=host \
+    --env=FLATPAK_USER_DIR="$HOME/.local/share/flatpak" \
+    --command=flatpak-builder \
+    org.flatpak.Builder \
+    --force-clean \
+    --user \
+    --install-deps-from=flathub \
+    --disable-rofiles-fuse \
+    --repo=repo \
+    builddir \
+    "$(realpath "$manifest")"
+}
+
 lint_flatpak_repo() {
   local repo_path="${1:?Usage: lint_flatpak_repo <repo_path>}"
   _dbus_run flatpak run \
     --filesystem=host \
+    --env=FLATPAK_USER_DIR="$HOME/.local/share/flatpak" \
     --command=flatpak-builder-lint \
     org.flatpak.Builder \
     --exceptions \

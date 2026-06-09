@@ -179,7 +179,7 @@ class GenerateCommand extends Command<void> {
 
     // ── Generate sources ──────────────────────────────────────────────────
     String? generatedCargoSourcesPath;
-    Map<String, dynamic>? rustupModule;
+    String? rustupModule;
     final effectiveRustupPath = cfg.rustupPath ?? '/var/lib/rustup';
     File? toolsLockFile;
 
@@ -217,13 +217,14 @@ class GenerateCommand extends Command<void> {
           rustupPath: effectiveRustupPath,
         );
         try {
-          rustupModule = await rustupGen.generateModule();
-          final rustupModulePath =
-              p.join(generatedDir, 'rustup-$effectiveRustVersion.json');
+          final rustupModuleMap = await rustupGen.generateModule();
+          final rustupModuleFilename = 'rustup-$effectiveRustVersion.json';
+          final rustupModulePath = p.join(generatedDir, rustupModuleFilename);
           File(rustupModulePath)
             ..createSync(recursive: true)
-            ..writeAsStringSync(jsonEncode(rustupModule));
-          logInfo('✓  rustup module → rustup-$effectiveRustVersion.json');
+            ..writeAsStringSync(jsonEncode(rustupModuleMap));
+          rustupModule = rustupModuleFilename;
+          logInfo('✓  rustup module → $rustupModuleFilename');
         } finally {
           rustupGen.dispose();
         }
@@ -326,7 +327,7 @@ String injectGeneratedContent({
   required List<Object> extraModules,
   required String sourcesPath,
   String? cargoSourcesPath,
-  Map<String, dynamic>? rustupModule,
+  String? rustupModule,
   String? rustupPath,
   required String? tag,
   required String? commit,
@@ -440,7 +441,7 @@ String injectGeneratedContent({
     }
   }
   if (rustupModule != null) {
-    editor.insertIntoList(['modules'], insertIdx, rustupModule);
+    editor.insertIntoList(['modules'], insertIdx, rustupModule as Object);
   }
 
   return editor.toString();

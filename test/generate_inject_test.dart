@@ -162,26 +162,20 @@ modules:
       expect(env['CARGO_HOME'], '/run/build/App/cargo');
     });
 
-    test('inserts rustup module before app module', () {
-      final rustupMod = <String, dynamic>{
-        'name': 'rustup',
-        'buildsystem': 'simple',
-        'build-commands': ['./rustup-init -y'],
-        'sources': <dynamic>[],
-      };
+    test('inserts rustup module filename reference before app module', () {
       final result = injectGeneratedContent(
         content: _template(),
         manifestCfg: _cfg(),
         extraModules: [],
         sourcesPath: '/out/generated-sources.json',
         cargoSourcesPath: '/out/cargo-sources.json',
-        rustupModule: rustupMod,
+        rustupModule: 'rustup-1.85.0.json',
         rustupPath: '/var/lib/rustup',
         tag: null,
         commit: null,
       );
       final modules = (loadYaml(result) as Map)['modules'] as List;
-      expect(modules[0]['name'], 'rustup');
+      expect(modules[0], 'rustup-1.85.0.json');
       expect(modules[1]['name'], 'App');
     });
 
