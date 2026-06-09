@@ -319,8 +319,7 @@ Map<String, String> _readLockedVersions(List<String> lockPaths) {
   for (final key in packageMap.keys) {
     final parsed = _parseVersion(key as String);
     if (parsed == null) continue;
-    if (_compareVersions(parsed, installed) > 0)
-      continue; // registry > installed
+    if (_compareVersions(parsed, installed) > 0) continue; // registry > installed
     if (bestParsed == null || _compareVersions(parsed, bestParsed) > 0) {
       bestKey = key;
       bestParsed = parsed;
