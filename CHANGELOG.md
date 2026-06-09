@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.1] — 2026-06-09
+
+### Added
+
+- **README: flutpak vs flatpak-flutter** — new section explaining similarities,
+  differences, compatibility, and use cases for both tools.
+
+### Changed
+
+- **Foreign deps version matching changed to `≤`** — the registry now uses
+  "highest entry ≤ installed version" instead of exact match. A registry entry
+  for `1.0.0` also applies to `1.2.3`, `1.5.0`, etc. A new major entry
+  (e.g. `2.0.0`) is only picked when the installed version reaches `2.x`. When
+  the matched registry version differs from the installed version, `generate`
+  logs the matched key for traceability
+  (e.g. `rhttp 0.12.1 (matched registry 0.12.0)`).
+
 ## [0.7.0] — 2026-06-09
 
 ### Breaking Changes
@@ -938,7 +955,8 @@ git remote.
   output files
 - MIT License
 
-[Unreleased]: https://github.com/o-murphy/flutpak/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/o-murphy/flutpak/compare/v0.7.1...HEAD
+[0.7.1]: https://github.com/o-murphy/flutpak/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/o-murphy/flutpak/compare/v0.6.1...v0.7.0
 [0.6.1]: https://github.com/o-murphy/flutpak/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/o-murphy/flutpak/compare/v0.6.0

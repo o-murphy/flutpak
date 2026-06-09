@@ -27,6 +27,61 @@ build to produce a fully-substituted, `flatpak-builder`-ready output.
 - **Retry on transient errors** — pub.dev and Flutter artifact downloads retry on 429/5xx
 - **`sdk-mod` command** — generates a standalone Flutter SDK module JSON for `!include` in any manifest or SDK Extension
 
+## flutpak vs flatpak-flutter
+
+Both tools solve the same core problem: Flutter apps cannot build offline inside
+the Flatpak sandbox, so all dependencies must be pre-downloaded and listed as
+flatpak-builder sources before the build starts.
+[flatpak-flutter](https://github.com/TheAppgineer/flatpak-flutter) (Python) and
+flutpak (Dart) take different approaches to the same goal.
+
+### What they share
+
+- **Same problem domain** — both produce a `generated-sources.json` and an
+  offline-ready Flatpak manifest for Flutter apps.
+- **Compatible `foreign_deps.json` format** — the registry schema is identical;
+  entries from `flatpak-flutter`'s registry can be used in flutpak as-is.
+  flutpak extends the schema with one field (`crlf:` on patch sources);
+  `flatpak-flutter` ignores unknown fields.
+- **Same flatpak-builder output format** — both write standard
+  flatpak-builder `sources` JSON arrays. The generated manifests are
+  consumed by `flatpak-builder` in exactly the same way.
+- **Same Flathub requirements** — manifests from either tool satisfy
+  Flathub's "build from source / no network during build" requirements.
+
+### How they differ
+
+| | **flutpak** | **flatpak-flutter** |
+|---|---|---|
+| **Language / distribution** | Dart, compiled to a single native binary | Python, installed via `pip` or Docker |
+| **Usage model** | App authors packaging their own app | External maintainers / Flathub infra packaging many apps |
+| **Project access** | Works inside your own repo — no clone needed | Clones the app repo and runs `flutter pub get` locally |
+| **Workflow** | `init` once → `generate` on every CI build | Single command regenerates everything each time |
+| **Config** | Structured `flutpak.yaml` (or `pubspec.yaml` section) | CLI flags + the manifest itself |
+| **Template lifecycle** | Template committed to git; generated output gitignored | Input manifest modified in place; output replaces it |
+| **Flutter SDK needed for `generate`?** | No — engine versions fetched from GitHub API via `flutter.ref` | Yes — Flutter SDK must be installed and discoverable |
+| **Foreign dep Cargo.lock discovery** | Planned (downloads pub archives automatically) | Reads from locally cloned source after `flutter pub get` |
+| **Rust / Cargo support** | Planned (see backlog) | Yes |
+| **Version matching in registry** | Highest registry version ≤ installed | Same |
+
+### Which one to use
+
+**Use flutpak** if you are the app author and want a config-driven, CI-native
+workflow where the template manifest lives in your repo alongside your source
+code. flutpak's `generate` step runs without a local Flutter SDK installation
+and produces a gitignored `generated/` directory that CI rebuilds on every push.
+
+**Use flatpak-flutter** if you are a Flathub maintainer packaging an app you
+do not own, or if you need Rust/Cargo support today. Its all-in-one approach
+(clone → pub get → generate → output) is better suited for batch packaging
+workflows and for apps with complex native dependencies.
+
+Both tools are compatible at the registry level — if a package is supported in
+`flatpak-flutter`'s `foreign_deps.json` it can be added to flutpak's registry
+with minimal or no changes.
+
+---
+
 ## Demo application
 
 The repository ships a real Flutter application in [`examples/demo_app/`](examples/demo_app/)
@@ -67,6 +122,7 @@ The template manifest: [`examples/demo_app/flatpak/io.github.o_murphy.flutpak.de
 
 - [flutpak](#flutpak)
   - [Highlights](#highlights)
+  - [flutpak vs flatpak-flutter](#flutpak-vs-flatpak-flutter)
   - [Demo application](#demo-application)
   - [Table of Contents](#table-of-contents)
   - [Prerequisites](#prerequisites)

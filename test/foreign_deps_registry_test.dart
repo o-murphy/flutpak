@@ -345,6 +345,133 @@ void main() {
       expect(written, patchBytes);
     });
 
+    test('uses highest registry version <= installed (patch release upgrade)',
+        () async {
+      final r = ForeignDepsRegistry(
+        client: _mockClient(registryJson: {
+          'mypkg': {
+            '1.0.0': {
+              'manifest': {
+                'sources': [
+                  {
+                    'type': 'file',
+                    'url': 'https://x.com/1.0.0',
+                    'dest': r'$PUB_DEV'
+                  }
+                ]
+              }
+            },
+            '1.2.0': {
+              'manifest': {
+                'sources': [
+                  {
+                    'type': 'file',
+                    'url': 'https://x.com/1.2.0',
+                    'dest': r'$PUB_DEV'
+                  }
+                ]
+              }
+            },
+            '2.0.0': {
+              'manifest': {
+                'sources': [
+                  {
+                    'type': 'file',
+                    'url': 'https://x.com/2.0.0',
+                    'dest': r'$PUB_DEV'
+                  }
+                ]
+              }
+            },
+          }
+        }),
+        cacheDir: cacheDir,
+      );
+      final lockFile = File(p.join(tmpDir.path, 'ver.lock'))
+        ..writeAsStringSync('''
+packages:
+  mypkg:
+    dependency: "direct main"
+    source: hosted
+    version: "1.5.0"
+''');
+      final result = await r.resolve(
+        lockPaths: [lockFile.path],
+        generatedPatchesDir: p.join(tmpDir.path, 'patches'),
+      );
+      expect(result, hasLength(1));
+      expect(result.first['url'], 'https://x.com/1.2.0');
+    });
+
+    test('skips package when all registry versions are > installed', () async {
+      final r = ForeignDepsRegistry(
+        client: _mockClient(registryJson: {
+          'mypkg': {
+            '2.0.0': {
+              'manifest': {
+                'sources': [
+                  {
+                    'type': 'file',
+                    'url': 'https://x.com/2.0.0',
+                    'dest': r'$PUB_DEV'
+                  }
+                ]
+              }
+            },
+          }
+        }),
+        cacheDir: cacheDir,
+      );
+      final lockFile = File(p.join(tmpDir.path, 'ver.lock'))
+        ..writeAsStringSync('''
+packages:
+  mypkg:
+    dependency: "direct main"
+    source: hosted
+    version: "1.0.0"
+''');
+      final result = await r.resolve(
+        lockPaths: [lockFile.path],
+        generatedPatchesDir: p.join(tmpDir.path, 'patches'),
+      );
+      expect(result, isEmpty);
+    });
+
+    test('exact version match still works', () async {
+      final r = ForeignDepsRegistry(
+        client: _mockClient(registryJson: {
+          'mypkg': {
+            '1.0.0': {
+              'manifest': {
+                'sources': [
+                  {
+                    'type': 'file',
+                    'url': 'https://x.com/1.0.0',
+                    'dest': r'$PUB_DEV'
+                  }
+                ]
+              }
+            },
+          }
+        }),
+        cacheDir: cacheDir,
+      );
+      final lockFile = File(p.join(tmpDir.path, 'ver.lock'))
+        ..writeAsStringSync('''
+packages:
+  mypkg:
+    dependency: "direct main"
+    source: hosted
+    version: "1.0.0"
+''');
+      final result = await r.resolve(
+        lockPaths: [lockFile.path],
+        generatedPatchesDir: p.join(tmpDir.path, 'patches'),
+      );
+      expect(result, hasLength(1));
+      expect(result.first['url'], 'https://x.com/1.0.0');
+    });
+
     test('localForeignDeps shorthand overrides remote entry for locked version',
         () async {
       final r = ForeignDepsRegistry(

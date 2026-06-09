@@ -117,8 +117,8 @@ class ForeignDepsRegistry {
 
       final packageMap = merged[package];
       if (packageMap is! Map) continue;
-      final versionEntry = packageMap[version];
-      if (versionEntry is! Map) continue;
+      final (matchedVersion, versionEntry) = _matchVersion(packageMap, version);
+      if (versionEntry == null) continue;
       final manifest = versionEntry['manifest'];
       if (manifest is! Map) continue;
       final sources = manifest['sources'];
@@ -160,7 +160,11 @@ class ForeignDepsRegistry {
         result.add(source);
       }
 
-      logInfo('foreign-deps: $package $version — ${sources.length} source(s)');
+      final versionLabel = matchedVersion == version
+          ? version
+          : '$version (matched registry $matchedVersion)';
+      logInfo(
+          'foreign-deps: $package $versionLabel — ${sources.length} source(s)');
     }
 
     return result;
@@ -297,6 +301,57 @@ Map<String, String> _readLockedVersions(List<String> lockPaths) {
     }
   }
   return versions;
+}
+
+/// Finds the best-matching registry version entry for [installedVersion].
+///
+/// Returns the entry with the highest registry version that is ≤ [installedVersion],
+/// along with the matched version string. Returns `(installedVersion, null)` if no
+/// suitable entry exists.
+(String, Map<String, dynamic>?) _matchVersion(
+    Map packageMap, String installedVersion) {
+  final installed = _parseVersion(installedVersion);
+  if (installed == null) return (installedVersion, null);
+
+  String? bestKey;
+  List<int>? bestParsed;
+
+  for (final key in packageMap.keys) {
+    final parsed = _parseVersion(key as String);
+    if (parsed == null) continue;
+    if (_compareVersions(parsed, installed) > 0)
+      continue; // registry > installed
+    if (bestParsed == null || _compareVersions(parsed, bestParsed) > 0) {
+      bestKey = key;
+      bestParsed = parsed;
+    }
+  }
+
+  if (bestKey == null) return (installedVersion, null);
+  final entry = packageMap[bestKey];
+  return (bestKey, entry is Map ? Map<String, dynamic>.from(entry) : null);
+}
+
+/// Parses a version string into a list of numeric components.
+/// Strips pre-release and build metadata. Returns null on parse failure.
+List<int>? _parseVersion(String version) {
+  final clean = version.split('+').first.split('-').first;
+  final parts = clean.split('.');
+  try {
+    return parts.map(int.parse).toList();
+  } catch (_) {
+    return null;
+  }
+}
+
+/// Compares two parsed version component lists lexicographically.
+/// Returns negative if a < b, zero if equal, positive if a > b.
+int _compareVersions(List<int> a, List<int> b) {
+  final len = a.length < b.length ? a.length : b.length;
+  for (var i = 0; i < len; i++) {
+    if (a[i] != b[i]) return a[i].compareTo(b[i]);
+  }
+  return a.length.compareTo(b.length);
 }
 
 /// Recursively converts YamlMap/YamlList to plain Dart Map/List.
