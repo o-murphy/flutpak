@@ -3,75 +3,6 @@ import 'package:path/path.dart' as p;
 import 'package:yaml/yaml.dart';
 import 'utils/log.dart';
 
-/// A project-level patch entry: applies a patch file to a specific pub package.
-class PatchEntry {
-  final String package;
-  final String? version;
-  final String path;
-  final String? destSubpath;
-
-  /// Extra flags forwarded to the `patch` command via the flatpak-builder
-  /// patch source `options` field (e.g. `["--ignore-whitespace"]`).
-  final List<String> options;
-
-  /// When true, `flutpak generate` normalises the patch file to CRLF line
-  /// endings in `generated/patches/`. Use when the pub.dev archive for the
-  /// package ships sources with CRLF line endings (e.g. `objectbox_flutter_libs`
-  /// ≥ 5.3.2). When false (default) the patch is normalised to LF. In both
-  /// cases `--binary` is added to the flatpak-builder patch source options so
-  /// that `patch(1)` preserves line endings exactly as written.
-  ///
-  /// Ignored when [useGit] is true.
-  final bool crlf;
-
-  /// When true, the generated flatpak-builder patch source includes
-  /// `use-git: true`, which causes flatpak-builder to apply the patch via
-  /// `git apply` instead of `patch -p1`. More robust for patches in git
-  /// extended format (e.g. produced by `git diff`).
-  ///
-  /// Compatible with [crlf]: when both are set, the patch file is normalised
-  /// to CRLF before `git apply` runs — useful when the patch is stored with
-  /// LF in the repo but the target file has CRLF line endings.
-  /// Mutually exclusive with [options] (options are forwarded to `patch -p1`
-  /// only and are ignored when `git apply` is used instead).
-  final bool useGit;
-
-  const PatchEntry({
-    required this.package,
-    this.version,
-    required this.path,
-    this.destSubpath,
-    this.options = const [],
-    this.crlf = false,
-    this.useGit = false,
-  });
-
-  /// Resolves the dest path for this patch given the package version.
-  String dest(String resolvedVersion) {
-    final base = '.pub-cache/hosted/pub.dev/$package-$resolvedVersion';
-    return destSubpath != null ? '$base/$destSubpath' : base;
-  }
-
-  factory PatchEntry.fromYaml(Map yaml) {
-    final options = (yaml['options'] as List?)?.cast<String>() ?? [];
-    final hasLegacyKey = yaml.containsKey('strip-trailing-cr');
-    if (hasLegacyKey) {
-      logWarn('patches[${yaml['package']}]: strip-trailing-cr is deprecated, '
-          'use crlf: true instead.');
-    }
-    return PatchEntry(
-      package: yaml['package'] as String,
-      version: yaml['version'] as String?,
-      path: yaml['path'] as String,
-      destSubpath: yaml['dest-subpath'] as String?,
-      options: options,
-      crlf:
-          yaml['crlf'] as bool? ?? yaml['strip-trailing-cr'] as bool? ?? false,
-      useGit: yaml['use-git'] as bool? ?? false,
-    );
-  }
-}
-
 /// Developer info for metainfo `<developer>` element.
 class DeveloperConfig {
   /// Display name shown in software centres.
@@ -252,8 +183,10 @@ class FlatpakGenConfig {
 
   final String? patchPath;
 
-  /// Project-level patch entries applied to specific pub packages.
-  final List<PatchEntry> patches;
+  /// Local foreign dependency overrides in the same format as the remote
+  /// `foreign_deps.json` registry. Deep-merged on top of the remote registry
+  /// before resolution. See `ForeignDepsRegistry.resolve()`.
+  final Map<String, dynamic> localForeignDeps;
 
   /// Project-level icon entries passed to the manifest generator.
   /// When empty, [effectiveIcons()] returns the default 256x256
@@ -292,7 +225,7 @@ class FlatpakGenConfig {
     required this.pubLocks,
     this.flutterRef,
     this.patchPath,
-    this.patches = const [],
+    this.localForeignDeps = const {},
     this.icons = const [],
     this.extraModules = const [],
     this.repoUrl,
@@ -329,10 +262,6 @@ class FlatpakGenConfig {
     final rawLocks =
         (pub['locks'] as List?)?.cast<String>() ?? ['pubspec.lock'];
 
-    final patchesRaw = yaml['patches'] as List? ?? [];
-    final patchEntries =
-        patchesRaw.map((e) => PatchEntry.fromYaml(e as Map)).toList();
-
     final output = yaml['output'] as String? ?? 'flatpak';
 
     // Parse project-level icons list with 256x256 validation.
@@ -357,12 +286,16 @@ class FlatpakGenConfig {
       logWarn('flutter.sdk is deprecated; use flutter.ref instead.');
     }
 
+    final localForeignDeps =
+        _deepConvertYaml(yaml['foreign-deps'] as Map? ?? {})
+            as Map<String, dynamic>;
+
     return FlatpakGenConfig(
       output: output,
       pubLocks: rawLocks,
       flutterRef: flutter['ref'] as String?,
       patchPath: flutter['patch'] as String?,
-      patches: patchEntries,
+      localForeignDeps: localForeignDeps,
       icons: iconsList,
       extraModules: extraModules,
       repoUrl: yaml['repo-url'] as String?,

@@ -120,7 +120,6 @@ class GenerateCommand extends Command<void> {
     final sourcesPath = p.join(generatedDir, 'generated-sources.json');
     final generatedManifestPath =
         p.join(generatedDir, '${manifestCfg.appId}.yml');
-    final patchesDir = p.join(outputDir, 'patches');
     final generatedPatchesDir = p.join(generatedDir, 'patches');
 
     // Lock paths resolved against baseDir.
@@ -129,31 +128,16 @@ class GenerateCommand extends Command<void> {
       return p.absolute(p.join(baseDir, l));
     }).toList();
 
-    // ── Resolve patch entries ─────────────────────────────────────────────
-    final List<PatchEntry> patchEntries;
-    try {
-      patchEntries = _resolveProjectPatches(
-        lockPaths: effectiveLocks,
-        projectPatches: cfg.patches,
-      );
-    } on Exception catch (e) {
-      logError('$e');
-      exit(1);
-    }
-    if (patchEntries.isNotEmpty) {
-      logInfo('patches: ${patchEntries.length} entries resolved');
-    }
-
     // ── Resolve foreign deps from registry ───────────────────────────────
     List<Map<String, dynamic>> foreignDepSources = const [];
     if (!noForeignDeps) {
-      final overriddenPackages = patchEntries.map((e) => e.package).toSet();
       final registry = ForeignDepsRegistry(ref: cfg.foreignDepsRef);
       try {
         foreignDepSources = await registry.resolve(
           lockPaths: effectiveLocks,
-          overriddenPackages: overriddenPackages,
+          localForeignDeps: cfg.localForeignDeps,
           generatedPatchesDir: generatedPatchesDir,
+          projectPatchesDir: p.join(outputDir, 'patches'),
         );
       } finally {
         registry.dispose();
@@ -207,8 +191,6 @@ class GenerateCommand extends Command<void> {
       manifestCfg: manifestCfg,
       extraModules: cfg.extraModules,
       sourcesPath: sourcesPath,
-      patchesDir: patchesDir,
-      patchEntries: patchEntries,
       tag: tag,
       commit: commit,
     );
@@ -217,24 +199,6 @@ class GenerateCommand extends Command<void> {
       ..createSync(recursive: true)
       ..writeAsStringSync(generatedContent);
     logInfo('✓  generated manifest → $generatedManifestPath');
-
-    // ── Copy patches ──────────────────────────────────────────────────────
-    // Every patch is normalised to a deterministic line-ending on copy:
-    //   crlf: true  → CRLF  (target file in the pub.dev archive uses CRLF)
-    //   crlf: false → LF    (default; most Linux packages)
-    // This guarantees generated/patches/ is portable regardless of the host
-    // OS or git line-ending settings.
-    if (Directory(patchesDir).existsSync()) {
-      final crlfPaths = {
-        for (final e in patchEntries)
-          if (e.crlf) p.canonicalize(e.path),
-      };
-      _copyPatches(
-        Directory(patchesDir),
-        Directory(generatedPatchesDir),
-        crlfPaths: crlfPaths,
-      );
-    }
 
     final ref = tag ?? commit?.substring(0, 12) ?? '(no ref)';
     logInfo('✓  generate complete  ref=$ref');
@@ -290,37 +254,6 @@ class GenerateCommand extends Command<void> {
     }
   }
 
-  /// Copies [source] into [dest] recursively, normalising line endings.
-  ///
-  /// Every patch file is rewritten with deterministic endings:
-  /// - Files whose absolute path is in [crlfPaths] → CRLF.
-  /// - All other files → LF.
-  ///
-  /// This ensures generated/patches/ is portable regardless of host OS or
-  /// git autocrlf settings.
-  void _copyPatches(
-    Directory source,
-    Directory dest, {
-    Set<String> crlfPaths = const {},
-  }) {
-    dest.createSync(recursive: true);
-    for (final entity in source.listSync()) {
-      final destPath = p.join(dest.path, p.basename(entity.path));
-      if (entity is File) {
-        final content = entity.readAsStringSync();
-        final absPath = p.canonicalize(entity.path);
-        if (crlfPaths.contains(absPath)) {
-          File(destPath).writeAsStringSync(convertPatchToCrlf(content));
-          logInfo('✓  patch → CRLF: ${p.relative(entity.path)}');
-        } else {
-          File(destPath).writeAsStringSync(content.replaceAll('\r\n', '\n'));
-        }
-      } else if (entity is Directory) {
-        _copyPatches(entity, Directory(destPath), crlfPaths: crlfPaths);
-      }
-    }
-  }
-
   /// Injects tag/commit, modules, manifest.sources, generated-sources.json,
   /// and patches into the manifest YAML using yaml_edit.
   ///
@@ -333,8 +266,6 @@ class GenerateCommand extends Command<void> {
     required ManifestConfig manifestCfg,
     required List<String> extraModules,
     required String sourcesPath,
-    required String patchesDir,
-    required List<PatchEntry> patchEntries,
     required String? tag,
     required String? commit,
   }) {
@@ -398,10 +329,6 @@ class GenerateCommand extends Command<void> {
       editor.appendToList(sourcesBase, Map<String, dynamic>.from(src));
     }
 
-    for (final patchMap in buildPatchSourceMaps(patchEntries, patchesDir)) {
-      editor.appendToList(sourcesBase, patchMap);
-    }
-
     // ── Insert modules before app module ────────────────────────────
     // Iterate in reverse so that sequential insertions at the same index
     // preserve the original order from modules.
@@ -426,55 +353,3 @@ class GenerateCommand extends Command<void> {
   }
 }
 
-List<PatchEntry> _resolveProjectPatches({
-  required List<String> lockPaths,
-  required List<PatchEntry> projectPatches,
-}) {
-  final lockedVersions = _readLockedVersions(lockPaths);
-  final entries = <PatchEntry>[];
-  for (final patch in projectPatches) {
-    if (patch.version != null) {
-      final lockedVersion = lockedVersions[patch.package];
-      if (lockedVersion != null && lockedVersion != patch.version) {
-        throw Exception(
-          'patch version mismatch for "${patch.package}": '
-          'config pins ${patch.version} but pubspec.lock has $lockedVersion.\n'
-          'Update the version in your flutpak config, fix the patch for the '
-          'new version, or remove the patch entry if it is no longer needed.',
-        );
-      }
-      entries.add(patch);
-    } else {
-      entries.add(PatchEntry(
-        package: patch.package,
-        version: lockedVersions[patch.package],
-        path: patch.path,
-        destSubpath: patch.destSubpath,
-        options: patch.options,
-        crlf: patch.crlf,
-        useGit: patch.useGit,
-      ));
-    }
-  }
-  return entries;
-}
-
-Map<String, String> _readLockedVersions(List<String> lockPaths) {
-  final versions = <String, String>{};
-  for (final path in lockPaths) {
-    final f = File(path);
-    if (!f.existsSync()) continue;
-    final yaml = loadYaml(f.readAsStringSync());
-    if (yaml is! Map) continue;
-    final pkgs = yaml['packages'];
-    if (pkgs is! Map) continue;
-    for (final e in pkgs.entries) {
-      final name = e.key as String;
-      final info = e.value;
-      if (info is! Map || info['source'] != 'hosted') continue;
-      final ver = info['version'] as String?;
-      if (ver != null) versions[name] = ver;
-    }
-  }
-  return versions;
-}

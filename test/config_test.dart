@@ -54,20 +54,26 @@ void main() {
       expect(cfg.patchPath, 'patches/flutter/shared.sh.patch');
     });
 
-    test('parses patches list', () {
+    test('parses foreign-deps into localForeignDeps', () {
       final cfg = FlatpakGenConfig.fromYaml({
-        'patches': [
-          {
-            'package': 'objectbox_flutter_libs',
-            'path': 'flatpak/patches/objectbox.patch',
-            'dest-subpath': 'linux',
-          },
-        ],
+        'foreign-deps': {
+          'sqlite3_flutter_libs': {
+            'manifest': {
+              'sources': [
+                {'type': 'patch', 'path': 'patches/sqlite3.patch', 'crlf': true}
+              ]
+            }
+          }
+        },
       });
-      expect(cfg.patches, hasLength(1));
-      expect(cfg.patches.first.package, 'objectbox_flutter_libs');
-      expect(cfg.patches.first.path, 'flatpak/patches/objectbox.patch');
-      expect(cfg.patches.first.destSubpath, 'linux');
+      expect(cfg.localForeignDeps, contains('sqlite3_flutter_libs'));
+      final entry = cfg.localForeignDeps['sqlite3_flutter_libs'] as Map;
+      expect(entry['manifest'], isNotNull);
+    });
+
+    test('localForeignDeps defaults to empty map', () {
+      final cfg = FlatpakGenConfig.fromYaml({});
+      expect(cfg.localForeignDeps, isEmpty);
     });
 
     test('parses manifest config (kebab-case keys)', () {
@@ -281,93 +287,6 @@ flutpak:
       final cfg = FlatpakGenConfig.load(configPath, configDir);
 
       expect(cfg.output, 'flatpak/gen');
-    });
-  });
-
-  group('PatchEntry', () {
-    test('dest with destSubpath appends subpath', () {
-      final entry = PatchEntry(
-        package: 'objectbox_flutter_libs',
-        version: '5.3.1',
-        path: 'patches/objectbox.patch',
-        destSubpath: 'linux',
-      );
-      expect(entry.dest('5.3.1'),
-          '.pub-cache/hosted/pub.dev/objectbox_flutter_libs-5.3.1/linux');
-    });
-
-    test('dest without destSubpath returns package root', () {
-      final entry = PatchEntry(
-        package: 'objectbox_flutter_libs',
-        version: '5.3.1',
-        path: 'patches/objectbox.patch',
-      );
-      expect(entry.dest('5.3.1'),
-          '.pub-cache/hosted/pub.dev/objectbox_flutter_libs-5.3.1');
-    });
-
-    group('fromYaml', () {
-      test('parses crlf: true', () {
-        final entry = PatchEntry.fromYaml({
-          'package': 'objectbox_flutter_libs',
-          'path': 'patches/objectbox.patch',
-          'crlf': true,
-        });
-        expect(entry.crlf, isTrue);
-      });
-
-      test('crlf defaults to false when absent', () {
-        final entry = PatchEntry.fromYaml({
-          'package': 'foo',
-          'path': 'patches/foo.patch',
-        });
-        expect(entry.crlf, isFalse);
-      });
-
-      test('deprecated strip-trailing-cr sets crlf', () {
-        final entry = PatchEntry.fromYaml({
-          'package': 'objectbox_flutter_libs',
-          'path': 'patches/objectbox.patch',
-          'strip-trailing-cr': true,
-        });
-        expect(entry.crlf, isTrue);
-      });
-
-      test('crlf takes precedence over strip-trailing-cr', () {
-        final entry = PatchEntry.fromYaml({
-          'package': 'foo',
-          'path': 'patches/foo.patch',
-          'crlf': false,
-          'strip-trailing-cr': true,
-        });
-        expect(entry.crlf, isFalse);
-      });
-
-      test('parses options list', () {
-        final entry = PatchEntry.fromYaml({
-          'package': 'foo',
-          'path': 'patches/foo.patch',
-          'options': ['--ignore-whitespace'],
-        });
-        expect(entry.options, ['--ignore-whitespace']);
-      });
-
-      test('parses use-git: true', () {
-        final entry = PatchEntry.fromYaml({
-          'package': 'foo',
-          'path': 'patches/foo.patch',
-          'use-git': true,
-        });
-        expect(entry.useGit, isTrue);
-      });
-
-      test('use-git defaults to false when absent', () {
-        final entry = PatchEntry.fromYaml({
-          'package': 'foo',
-          'path': 'patches/foo.patch',
-        });
-        expect(entry.useGit, isFalse);
-      });
     });
   });
 

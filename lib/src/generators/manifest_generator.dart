@@ -1,4 +1,3 @@
-import 'package:path/path.dart' as p;
 import '../config.dart';
 
 /// Generates a Flatpak application manifest YAML from [ManifestConfig].
@@ -275,53 +274,6 @@ String stripTemplateGuidance(String content) {
     RegExp(r'[ \t]*# Build steps — review[^\n]*\n'),
   ]) {
     result = result.replaceAll(re, '');
-  }
-
-  return result;
-}
-
-/// Builds a list of flatpak source maps for [patches] suitable for passing to
-/// yaml_edit. Each [PatchEntry] produces a single `type: patch` map.
-///
-/// Every entry either uses `use-git: true` (when [PatchEntry.useGit] is set,
-/// delegating to `git apply`) or includes `--binary` in `options` so that
-/// `patch(1)` never converts line endings — required for CRLF patches to apply
-/// cleanly to CRLF target files, and harmless for LF patches.
-///
-/// [patchesDir] is the absolute or relative directory that patch files live in.
-/// Patch paths in the returned maps are written relative to that directory so
-/// the subdirectory structure is preserved (e.g. `patches/subdir/foo.patch`).
-List<Map<String, dynamic>> buildPatchSourceMaps(
-  List<PatchEntry> patches,
-  String patchesDir,
-) {
-  final absPatchesDir = p.absolute(patchesDir);
-  final result = <Map<String, dynamic>>[];
-
-  for (final patch in patches) {
-    final dest = patch.version != null ? patch.dest(patch.version!) : null;
-    final relFromPatchesDir =
-        p.relative(p.absolute(patch.path), from: absPatchesDir);
-    final patchPath = 'patches/$relFromPatchesDir';
-
-    if (patch.useGit) {
-      result.add({
-        'type': 'patch',
-        if (dest != null) 'dest': dest,
-        'path': patchPath,
-        'use-git': true,
-      });
-    } else {
-      result.add({
-        'type': 'patch',
-        if (dest != null) 'dest': dest,
-        'path': patchPath,
-        // --binary is always set so that `patch` never converts line endings in
-        // either the patch file or the target, which is required for CRLF patches
-        // and harmless for LF-only ones.
-        'options': ['--binary', ...patch.options],
-      });
-    }
   }
 
   return result;
