@@ -211,4 +211,67 @@ modules:
       expect(modules[0]['name'], 'App');
     });
   });
+
+  group('buildLockPaths', () {
+    test('includes extraPubspecPaths in allPubLockPaths', () {
+      final (:allPubLockPaths, :allCargoLockPaths) = buildLockPaths(
+        effectiveLocks: ['/app/pubspec.lock'],
+        extraPubspecPaths: ['/tmp/cargokit/build_tool/pubspec.lock'],
+        cargoLockPaths: [],
+        rustLocks: [],
+        baseDir: '/app',
+      );
+      expect(
+          allPubLockPaths,
+          containsAll(
+              ['/app/pubspec.lock', '/tmp/cargokit/build_tool/pubspec.lock']));
+    });
+
+    test('allPubLockPaths is just effectiveLocks when extraPubspecPaths empty',
+        () {
+      final (:allPubLockPaths, :allCargoLockPaths) = buildLockPaths(
+        effectiveLocks: ['/app/pubspec.lock'],
+        extraPubspecPaths: [],
+        cargoLockPaths: [],
+        rustLocks: [],
+        baseDir: '/app',
+      );
+      expect(allPubLockPaths, ['/app/pubspec.lock']);
+    });
+
+    test('merges cargoLockPaths and rustLocks into allCargoLockPaths', () {
+      final (:allPubLockPaths, :allCargoLockPaths) = buildLockPaths(
+        effectiveLocks: [],
+        extraPubspecPaths: [],
+        cargoLockPaths: ['/tmp/registry/Cargo.lock'],
+        rustLocks: ['rust/Cargo.lock'],
+        baseDir: '/app',
+      );
+      expect(allCargoLockPaths, hasLength(2));
+      expect(allCargoLockPaths[0], '/tmp/registry/Cargo.lock');
+      expect(allCargoLockPaths[1], endsWith('rust/Cargo.lock'));
+    });
+
+    test('rustLocks relative path is resolved against baseDir', () {
+      final (:allPubLockPaths, :allCargoLockPaths) = buildLockPaths(
+        effectiveLocks: [],
+        extraPubspecPaths: [],
+        cargoLockPaths: [],
+        rustLocks: ['rust/Cargo.lock'],
+        baseDir: '/app',
+      );
+      expect(allCargoLockPaths.first, p.join('/app', 'rust/Cargo.lock'));
+    });
+
+    test('rustLocks absolute path is kept as-is', () {
+      final (:allPubLockPaths, :allCargoLockPaths) = buildLockPaths(
+        effectiveLocks: [],
+        extraPubspecPaths: [],
+        cargoLockPaths: [],
+        rustLocks: ['/absolute/Cargo.lock'],
+        baseDir: '/app',
+      );
+      expect(allCargoLockPaths.first, '/absolute/Cargo.lock');
+    });
+  });
 }

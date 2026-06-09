@@ -134,6 +134,7 @@ class GenerateCommand extends Command<void> {
     // ── Resolve foreign deps from registry ───────────────────────────────
     List<Map<String, dynamic>> foreignDepSources = const [];
     List<String> foreignCargoLockPaths = const [];
+    List<String> foreignExtraPubspecPaths = const [];
     if (!noForeignDeps) {
       final registry = ForeignDepsRegistry(ref: cfg.foreignDepsRef);
       try {
@@ -145,17 +146,19 @@ class GenerateCommand extends Command<void> {
         );
         foreignDepSources = depsResult.sources;
         foreignCargoLockPaths = depsResult.cargoLockPaths;
+        foreignExtraPubspecPaths = depsResult.extraPubspecPaths;
       } finally {
         registry.dispose();
       }
     }
 
-    // Explicit rust.locks from config, resolved against baseDir.
-    final allCargoLockPaths = [
-      ...foreignCargoLockPaths,
-      ...cfg.rustLocks
-          .map((l) => p.isAbsolute(l) ? l : p.absolute(p.join(baseDir, l))),
-    ];
+    final (:allPubLockPaths, :allCargoLockPaths) = buildLockPaths(
+      effectiveLocks: effectiveLocks,
+      extraPubspecPaths: foreignExtraPubspecPaths,
+      cargoLockPaths: foreignCargoLockPaths,
+      rustLocks: cfg.rustLocks,
+      baseDir: baseDir,
+    );
 
     // ── Build Flutter SDK generator if ref is configured ─────────────────
     final flutterRef = flutterRefOverride ?? cfg.flutterRef;
@@ -165,7 +168,7 @@ class GenerateCommand extends Command<void> {
           'Pass --flutter <ref> or add flutter.ref to flutpak.yaml.');
     }
     FlutterSdkGenerator? flutterGen;
-    var allLockPaths = effectiveLocks;
+    var allLockPaths = allPubLockPaths;
     if (flutterRef != null) {
       flutterGen = FlutterSdkGenerator(
         flutterRef: flutterRef,
@@ -431,4 +434,26 @@ String injectGeneratedContent({
   }
 
   return editor.toString();
+}
+
+/// Merges effective pub locks with extra pubspec paths from the registry and
+/// cargo lock paths from the registry + explicit config entries.
+///
+/// Extracted as a top-level function so it can be tested independently.
+({List<String> allPubLockPaths, List<String> allCargoLockPaths})
+    buildLockPaths({
+  required List<String> effectiveLocks,
+  required List<String> extraPubspecPaths,
+  required List<String> cargoLockPaths,
+  required List<String> rustLocks,
+  required String baseDir,
+}) {
+  return (
+    allPubLockPaths: [...effectiveLocks, ...extraPubspecPaths],
+    allCargoLockPaths: [
+      ...cargoLockPaths,
+      ...rustLocks
+          .map((l) => p.isAbsolute(l) ? l : p.absolute(p.join(baseDir, l))),
+    ],
+  );
 }
