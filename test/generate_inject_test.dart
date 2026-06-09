@@ -79,7 +79,7 @@ void main() {
         commit: null,
       );
       final env = (_appModule(result)['build-options'] as Map)['env'] as Map;
-      expect(env['CARGO_HOME'], rustupPath);
+      expect(env['CARGO_HOME'], '/run/build/App/cargo');
       expect(env['RUSTUP_HOME'], rustupPath);
     });
 
@@ -159,7 +159,7 @@ modules:
       );
       final env = (_appModule(result)['build-options'] as Map)['env'] as Map;
       expect(env['MY_VAR'], 'hello');
-      expect(env['CARGO_HOME'], '/var/lib/rustup');
+      expect(env['CARGO_HOME'], '/run/build/App/cargo');
     });
 
     test('inserts rustup module before app module', () {

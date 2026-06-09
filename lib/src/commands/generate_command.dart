@@ -391,11 +391,15 @@ String injectGeneratedContent({
         (appModuleMap['build-options'] as Map<String, dynamic>?) ?? {};
     final env = (buildOpts['env'] as Map<String, dynamic>?) ?? {};
     final appendPath = buildOpts['append-path'] as String?;
+    // CARGO_HOME must point to the vendored-cargo directory (where config.toml
+    // lives) so cargo finds the offline vendor config.  RUSTUP_HOME is where
+    // rustup installs toolchains — these two paths must be separate.
+    final cargoHome = '/run/build/$appName/cargo';
     appModuleMap['build-options'] = <String, dynamic>{
       ...buildOpts,
       'env': <String, dynamic>{
         ...env,
-        'CARGO_HOME': rustupPath,
+        'CARGO_HOME': cargoHome,
         'RUSTUP_HOME': rustupPath,
       },
       'append-path': appendPath != null
