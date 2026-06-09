@@ -1,12 +1,8 @@
 output: flatpak
 
-pub:
-  locks:
-    - pubspec.lock
-    - $FLUTTER_ROOT/packages/flutter_tools/pubspec.lock
 
 flutter:
-  sdk: $FLUTTER_ROOT
+  ref: 3.44.1
 
 repo-url: https://github.com/o-murphy/flutpak.git
 

@@ -12,15 +12,27 @@ void main() {
           'locks': ['pubspec.lock', 'packages/a7p/pubspec.lock'],
         },
         'flutter': {
-          'sdk': '/home/user/flutter',
+          'ref': '3.44.1',
           'patch': 'flatpak/patches/flutter/shared.sh.patch',
         },
       });
 
       expect(cfg.output, 'flatpak');
       expect(cfg.pubLocks, ['pubspec.lock', 'packages/a7p/pubspec.lock']);
-      expect(cfg.flutterSdk, '/home/user/flutter');
+      expect(cfg.flutterRef, '3.44.1');
       expect(cfg.patchPath, 'flatpak/patches/flutter/shared.sh.patch');
+    });
+
+    test('parses flutter.ref tag', () {
+      final cfg = FlatpakGenConfig.fromYaml({
+        'flutter': {'ref': '3.44.1'},
+      });
+      expect(cfg.flutterRef, '3.44.1');
+    });
+
+    test('flutterRef is null when flutter.ref absent', () {
+      final cfg = FlatpakGenConfig.fromYaml({});
+      expect(cfg.flutterRef, isNull);
     });
 
     test('defaults output when missing', () {
@@ -33,68 +45,9 @@ void main() {
       expect(cfg.pubLocks, contains('pubspec.lock'));
     });
 
-    test('resolves \$ENV variables in paths', () {
-      final cfg = FlatpakGenConfig.fromYaml({
-        'flutter': {'sdk': '\$HOME/flutter'},
-      });
-      expect(cfg.flutterSdk, isNotNull);
-      expect(cfg.flutterSdk, isNot(isEmpty));
-    });
-
-    test('flutterSdk is null when \$VAR cannot be resolved', () {
-      // Use a variable name that is guaranteed not to be set.
-      final cfg = FlatpakGenConfig.fromYaml({
-        'flutter': {'sdk': r'$FLUTPAK_TEST_UNSET_VAR_XYZ/flutter'},
-      });
-      expect(cfg.flutterSdk, isNull);
-    });
-
-    test('pubLocks preserves unresolvable \$VAR paths for late resolution', () {
-      // Paths with unresolvable \$VAR are kept so effectivePubLocks() can
-      // substitute them later using the effective SDK path.
-      final cfg = FlatpakGenConfig.fromYaml({
-        'pub': {
-          'locks': [
-            'pubspec.lock',
-            r'$FLUTPAK_TEST_UNSET_VAR_XYZ/packages/flutter_tools/pubspec.lock',
-          ],
-        },
-      });
-      expect(cfg.pubLocks, hasLength(2));
-      expect(cfg.pubLocks.last, contains(r'$FLUTPAK_TEST_UNSET_VAR_XYZ'));
-    });
-
-    test('effectivePubLocks substitutes \$FLUTTER_ROOT with sdkPath', () {
-      // Bypass fromYaml (which eagerly substitutes $FLUTTER_ROOT from the
-      // environment) so the literal placeholder is preserved for the test.
-      final cfg = FlatpakGenConfig(
-        output: 'flatpak',
-        pubLocks: [
-          'pubspec.lock',
-          r'$FLUTTER_ROOT/packages/flutter_tools/pubspec.lock',
-        ],
-      );
-      final effective = cfg.effectivePubLocks('/home/user/flutter');
-      expect(effective, [
-        'pubspec.lock',
-        '/home/user/flutter/packages/flutter_tools/pubspec.lock',
-      ]);
-    });
-
-    test('effectivePubLocks returns pubLocks unchanged when sdkPath is null',
-        () {
-      final cfg = FlatpakGenConfig.fromYaml({
-        'pub': {
-          'locks': ['pubspec.lock'],
-        },
-      });
-      expect(cfg.effectivePubLocks(null), cfg.pubLocks);
-    });
-
     test('reads flutter patch from flutter.patch key', () {
       final cfg = FlatpakGenConfig.fromYaml({
         'flutter': {
-          'sdk': '/flutter',
           'patch': 'patches/flutter/shared.sh.patch',
         },
       });
@@ -476,29 +429,4 @@ flutpak:
     });
   });
 
-  group('FlatpakGenConfig flutter-version-file defaults', () {
-    test('defaults to <output>/flutter.version when flutter sdk is configured',
-        () {
-      final cfg = FlatpakGenConfig.fromYaml({
-        'output': 'flatpak',
-        'flutter': {'sdk': '/home/user/flutter'},
-      });
-      expect(cfg.flutterVersionFile, 'flatpak/flutter.version');
-    });
-
-    test('explicit flutter-version-file overrides default', () {
-      final cfg = FlatpakGenConfig.fromYaml({
-        'output': 'flatpak',
-        'flutter': {'sdk': '/home/user/flutter'},
-        'flutter-version-file': 'custom/my.version',
-      });
-      expect(cfg.flutterVersionFile, 'custom/my.version');
-    });
-
-    test('flutter-version-file is null for pure-Dart projects with no SDK', () {
-      if (Platform.environment.containsKey('FLUTTER_ROOT')) return;
-      final cfg = FlatpakGenConfig.fromYaml({'output': 'flatpak'});
-      expect(cfg.flutterVersionFile, isNull);
-    });
-  });
 }

@@ -13,10 +13,10 @@ inputs:
     description: "Commit SHA to pin in the manifest (defaults to github.sha)"
     required: false
     default: ""
-  sdk:
+  flutter-ref:
     description: >
-      Path to Flutter SDK root. Auto-detected from FLUTTER_ROOT env var
-      or 'flutter' in PATH if not set.
+      Flutter SDK git ref (tag, branch, or commit SHA) passed as --flutter.
+      When empty, flutter.ref from the project's flutpak.yaml is used.
     required: false
     default: ""
   metainfo-path:
@@ -96,25 +96,6 @@ runs:
         git fetch origin "refs/tags/${INPUT_TAG}:refs/tags/${INPUT_TAG}" --depth=1 \
           || git fetch --tags --depth=1
 
-    - name: Resolve SDK path
-      id: sdk
-      shell: bash
-      env:
-        INPUT_SDK: ${{ inputs.sdk }}
-      run: |
-        SDK="$INPUT_SDK"
-        if [ -z "$SDK" ]; then
-          if [ -n "${FLUTTER_ROOT:-}" ]; then
-            SDK="$FLUTTER_ROOT"
-          elif command -v flutter &>/dev/null; then
-            SDK="$(dirname "$(dirname "$(command -v flutter)")")"
-          else
-            echo "ERROR: Flutter SDK not found. Set FLUTTER_ROOT, add flutter to PATH, or pass sdk input." >&2
-            exit 1
-          fi
-        fi
-        echo "path=$SDK" >> "$GITHUB_OUTPUT"
-
     - name: Set ref flag
       id: ref
       shell: bash
@@ -136,23 +117,27 @@ runs:
       shell: bash
       env:
         INPUT_CONFIG: ${{ inputs.config }}
-        SDK_PATH: ${{ steps.sdk.outputs.path }}
+        FLUTTER_REF: ${{ inputs.flutter-ref }}
       run: |
         CONFIG_FLAG=""
         [ -n "$INPUT_CONFIG" ] && CONFIG_FLAG="--config $INPUT_CONFIG"
-        flutpak init --force $CONFIG_FLAG --sdk "$SDK_PATH"
+        FLUTTER_FLAG=""
+        [ -n "$FLUTTER_REF" ] && FLUTTER_FLAG="--flutter $FLUTTER_REF"
+        flutpak init --force $CONFIG_FLAG $FLUTTER_FLAG
 
     - name: Flutpak generate
       shell: bash
       env:
         REF_FLAG: ${{ steps.ref.outputs.flag }}
         REF_VALUE: ${{ steps.ref.outputs.value }}
-        SDK_PATH: ${{ steps.sdk.outputs.path }}
+        FLUTTER_REF: ${{ inputs.flutter-ref }}
         INPUT_CONFIG: ${{ inputs.config }}
       run: |
         CONFIG_FLAG=""
         [ -n "$INPUT_CONFIG" ] && CONFIG_FLAG="--config $INPUT_CONFIG"
-        flutpak generate "$REF_FLAG" "$REF_VALUE" --sdk "$SDK_PATH" $CONFIG_FLAG
+        FLUTTER_FLAG=""
+        [ -n "$FLUTTER_REF" ] && FLUTTER_FLAG="--flutter $FLUTTER_REF"
+        flutpak generate "$REF_FLAG" "$REF_VALUE" $FLUTTER_FLAG $CONFIG_FLAG
 
     - name: Install appstream
       if: inputs.metainfo-path != ''

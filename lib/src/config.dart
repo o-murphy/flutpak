@@ -242,15 +242,15 @@ class FlatpakGenConfig {
   /// metainfo) live inside this directory unless overridden by per-file paths.
   final String output;
 
-  /// Lock file paths after env-var substitution at config-load time.
-  /// Paths that still contain `\$FLUTTER_ROOT` (because the env var was not set)
-  /// are preserved and resolved lazily via [effectivePubLocks].
+  /// Lock file paths.
   final List<String> pubLocks;
-  final String? flutterSdk;
-  final String? patchPath;
 
-  /// Optional path to a file storing the pinned Flutter version string.
-  final String? flutterVersionFile;
+  /// Git ref (tag, branch, or commit SHA) for the Flutter SDK.
+  /// When set, engine version files are fetched from GitHub raw API — no
+  /// local Flutter installation needed. When null, flutter sources are skipped.
+  final String? flutterRef;
+
+  final String? patchPath;
 
   /// Project-level patch entries applied to specific pub packages.
   final List<PatchEntry> patches;
@@ -290,9 +290,8 @@ class FlatpakGenConfig {
   const FlatpakGenConfig({
     required this.output,
     required this.pubLocks,
-    this.flutterSdk,
+    this.flutterRef,
     this.patchPath,
-    this.flutterVersionFile,
     this.patches = const [],
     this.icons = const [],
     this.extraModules = const [],
@@ -323,29 +322,7 @@ class FlatpakGenConfig {
         ]
       : icons;
 
-  /// Returns lock paths with any remaining `\$FLUTTER_ROOT` placeholders
-  /// substituted by [sdkPath]. Use this instead of [pubLocks] whenever
-  /// the effective SDK path is known (e.g. from the `--sdk` CLI flag).
-  List<String> effectivePubLocks(String? sdkPath) {
-    if (sdkPath == null) return pubLocks;
-    return pubLocks
-        .map((l) => l.replaceAll(r'$FLUTTER_ROOT', sdkPath))
-        .toList();
-  }
-
   factory FlatpakGenConfig.fromYaml(Map yaml) {
-    String resolve(String s) => s.replaceAllMapped(
-          RegExp(r'\$(\w+)'),
-          (m) => Platform.environment[m.group(1)!] ?? m.group(0)!,
-        );
-
-    // Returns null if any \$VAR placeholder remains after substitution.
-    // Used only for flutterSdk to avoid PathNotFoundException crashes.
-    String? tryResolve(String s) {
-      final result = resolve(s);
-      return RegExp(r'\$[A-Za-z_]\w*').hasMatch(result) ? null : result;
-    }
-
     final pub = yaml['pub'] as Map? ?? {};
     final flutter = yaml['flutter'] as Map? ?? {};
 
@@ -373,27 +350,18 @@ class FlatpakGenConfig {
       iconsList = const [];
     }
 
-    // Determine if a Flutter SDK is configured (either via flutter.sdk or
-    // FLUTTER_ROOT env var) to decide the default flutter_version_file path.
-    final flutterSdkPresent =
-        flutter['sdk'] != null || Platform.environment['FLUTTER_ROOT'] != null;
-
     final extraModules =
         (yaml['modules'] as List?)?.cast<String>() ?? const <String>[];
 
+    if (flutter['sdk'] != null) {
+      logWarn('flutter.sdk is deprecated; use flutter.ref instead.');
+    }
+
     return FlatpakGenConfig(
       output: output,
-      // Substitute env vars that ARE set; keep \$FLUTTER_ROOT literally when
-      // not set — effectivePubLocks() resolves it with the CLI --sdk value.
-      pubLocks: rawLocks.map(resolve).toList(),
-      // tryResolve returns null when \$FLUTTER_ROOT is unset, preventing a
-      // crash in FlutterSdkGenerator when the literal path is used.
-      flutterSdk: flutter['sdk'] != null
-          ? tryResolve(flutter['sdk'] as String)
-          : Platform.environment['FLUTTER_ROOT'],
+      pubLocks: rawLocks,
+      flutterRef: flutter['ref'] as String?,
       patchPath: flutter['patch'] as String?,
-      flutterVersionFile: yaml['flutter-version-file'] as String? ??
-          (flutterSdkPresent ? p.join(output, 'flutter.version') : null),
       patches: patchEntries,
       icons: iconsList,
       extraModules: extraModules,
@@ -440,15 +408,7 @@ class FlatpakGenConfig {
 
     return FlatpakGenConfig(
       output: 'flatpak',
-      pubLocks: [
-        'pubspec.lock',
-        if (Platform.environment['FLUTTER_ROOT'] != null)
-          p.join(
-            Platform.environment['FLUTTER_ROOT']!,
-            'packages/flutter_tools/pubspec.lock',
-          ),
-      ],
-      flutterSdk: Platform.environment['FLUTTER_ROOT'],
+      pubLocks: ['pubspec.lock'],
     );
   }
 

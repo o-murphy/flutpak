@@ -21,9 +21,11 @@ class InitCommand extends Command<void> {
     argParser
       ..addOption('config',
           abbr: 'c', help: 'Config file path.', defaultsTo: 'flutpak.yaml')
-      ..addOption('sdk',
-          abbr: 's', help: 'Flutter SDK path. Defaults to \$FLUTTER_ROOT.')
-      ..addFlag('force', abbr: 'f', help: 'Overwrite existing template files.')
+      ..addOption('flutter',
+          abbr: 'f',
+          help: 'Flutter SDK git ref (tag, branch, or commit SHA). '
+              'Overrides flutter.ref from config.')
+      ..addFlag('force', help: 'Overwrite existing template files.')
       ..addFlag('no-foreign-deps',
           help: 'Skip foreign deps registry fetch (offline/air-gapped use).');
   }
@@ -33,9 +35,8 @@ class InitCommand extends Command<void> {
     final configPath = p.absolute(argResults!['config'] as String);
     final configDir = p.dirname(configPath);
     final cfg = FlatpakGenConfig.load(configPath, configDir);
-    final sdkPath = argResults!['sdk'] as String? ??
-        cfg.flutterSdk ??
-        Platform.environment['FLUTTER_ROOT'];
+    final flutterArg = argResults!['flutter'] as String?;
+    final flutterRef = flutterArg ?? cfg.flutterRef;
     final force = argResults!['force'] as bool;
     final noForeignDeps = argResults!['no-foreign-deps'] as bool;
 
@@ -71,7 +72,7 @@ class InitCommand extends Command<void> {
           '(last segment of app-id); set manifest.command explicitly to override');
     }
 
-    final hasFlutter = sdkPath != null;
+    final hasFlutter = flutterRef != null;
     final sourcesPath =
         p.join(outputDir, 'generated', 'generated-sources.json');
     final generator = ManifestGenerator(
@@ -122,12 +123,9 @@ class InitCommand extends Command<void> {
     await generateCmd.runWithArgs(
       cfg: cfg,
       baseDir: configDir,
-      sdkPath: sdkPath,
       tagArg: null,
       commitArg: null,
-      noSources: false,
-      pubOnly: false,
-      flutterOnly: false,
+      flutterRefOverride: flutterArg,
       noForeignDeps: noForeignDeps,
       outputDir: outputDir,
     );

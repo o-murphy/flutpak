@@ -5,6 +5,7 @@ import 'package:yaml/yaml.dart';
 import 'package:yaml_edit/yaml_edit.dart';
 import '../config.dart';
 import '../foreign_deps_registry.dart';
+import '../generators/flutter_sdk.dart';
 import '../generators/manifest_generator.dart';
 import '../utils/log.dart';
 import '../utils/sources_util.dart';
@@ -30,14 +31,12 @@ class GenerateCommand extends Command<void> {
           help: 'Git tag to embed in the manifest (e.g. v0.1.14).')
       ..addOption('commit',
           help: 'Full git commit SHA. Defaults to HEAD if inside a git repo.')
-      ..addOption('sdk',
-          abbr: 's', help: 'Flutter SDK path. Defaults to \$FLUTTER_ROOT.')
+      ..addOption('flutter',
+          abbr: 'f',
+          help: 'Flutter SDK git ref (tag, branch, or commit SHA). '
+              'Overrides flutter.ref from config.')
       ..addOption('config',
           abbr: 'c', help: 'Config file path.', defaultsTo: 'flutpak.yaml')
-      ..addFlag('no-sources',
-          help: 'Skip source regeneration (placeholder substitution only).')
-      ..addFlag('pub-only', help: 'Skip Flutter SDK sources.')
-      ..addFlag('flutter-only', help: 'Skip pub sources.')
       ..addFlag('no-foreign-deps',
           help: 'Skip foreign deps registry fetch (offline/air-gapped use).')
       ..addFlag('dry-run',
@@ -53,12 +52,7 @@ class GenerateCommand extends Command<void> {
 
     final tagArg = argResults!['tag'] as String?;
     final commitArg = argResults!['commit'] as String?;
-    final sdkPath = argResults!['sdk'] as String? ??
-        cfg.flutterSdk ??
-        Platform.environment['FLUTTER_ROOT'];
-    final noSources = argResults!['no-sources'] as bool;
-    final pubOnly = argResults!['pub-only'] as bool;
-    final flutterOnly = argResults!['flutter-only'] as bool;
+    final flutterArg = argResults!['flutter'] as String?;
     final noForeignDeps = argResults!['no-foreign-deps'] as bool;
     final dryRun = argResults!['dry-run'] as bool;
 
@@ -75,12 +69,9 @@ class GenerateCommand extends Command<void> {
     await runWithArgs(
       cfg: cfg,
       baseDir: configDir,
-      sdkPath: sdkPath,
+      flutterRefOverride: flutterArg,
       tagArg: tagArg,
       commitArg: commitArg,
-      noSources: noSources,
-      pubOnly: pubOnly,
-      flutterOnly: flutterOnly,
       noForeignDeps: noForeignDeps,
       outputDir: outputDir,
     );
@@ -93,12 +84,9 @@ class GenerateCommand extends Command<void> {
   Future<void> runWithArgs({
     required FlatpakGenConfig cfg,
     required String baseDir,
-    required String? sdkPath,
     required String? tagArg,
     required String? commitArg,
-    required bool noSources,
-    required bool pubOnly,
-    required bool flutterOnly,
+    String? flutterRefOverride,
     required String outputDir,
     bool noForeignDeps = false,
   }) async {
@@ -135,8 +123,8 @@ class GenerateCommand extends Command<void> {
     final patchesDir = p.join(outputDir, 'patches');
     final generatedPatchesDir = p.join(generatedDir, 'patches');
 
-    // Lock paths with $FLUTTER_ROOT substituted, then resolved against baseDir.
-    final effectiveLocks = cfg.effectivePubLocks(sdkPath).map((l) {
+    // Lock paths resolved against baseDir.
+    final effectiveLocks = cfg.pubLocks.map((l) {
       if (p.isAbsolute(l)) return l;
       return p.absolute(p.join(baseDir, l));
     }).toList();
@@ -158,7 +146,7 @@ class GenerateCommand extends Command<void> {
 
     // ── Resolve foreign deps from registry ───────────────────────────────
     List<Map<String, dynamic>> foreignDepSources = const [];
-    if (!noForeignDeps && !noSources) {
+    if (!noForeignDeps) {
       final overriddenPackages = patchEntries.map((e) => e.package).toSet();
       final registry = ForeignDepsRegistry(ref: cfg.foreignDepsRef);
       try {
@@ -172,32 +160,38 @@ class GenerateCommand extends Command<void> {
       }
     }
 
-    // ── Generate sources ──────────────────────────────────────────────────
-    // The Flutter shared.sh patch is emitted into generated-sources.json
-    // alongside the pub and SDK archives (emitFlutterPatch: true).
-    if (!noSources) {
-      await generateSourcesJson(
-        lockPaths: effectiveLocks,
-        sdkPath: sdkPath,
-        patchPath: cfg.patchPath,
+    // ── Build Flutter SDK generator if ref is configured ─────────────────
+    final flutterRef = flutterRefOverride ?? cfg.flutterRef;
+    FlutterSdkGenerator? flutterGen;
+    var allLockPaths = effectiveLocks;
+    if (flutterRef != null) {
+      flutterGen = FlutterSdkGenerator(
+        flutterRef: flutterRef,
         outputDir: outputDir,
-        outputPath: sourcesPath,
-        pubOnly: pubOnly,
-        flutterOnly: flutterOnly,
-        emitFlutterPatch: true,
+        patchPath: cfg.patchPath,
         patchDestDir: generatedDir,
-        foreignDepSources: foreignDepSources,
       );
     }
 
-    // ── Write flutter version file ────────────────────────────────────────
-    if (cfg.flutterVersionFile != null) {
-      if (sdkPath == null) {
-        logWarn('flutter_version_file is set but Flutter SDK path could not be '
-            'resolved (\$FLUTTER_ROOT not set); skipping');
-      } else {
-        _writeFlutterVersionFile(sdkPath, p.absolute(cfg.flutterVersionFile!));
+    // ── Generate sources ──────────────────────────────────────────────────
+    try {
+      if (flutterGen != null) {
+        // Fetch flutter_tools pubspec.lock so its deps appear in generated-sources.json.
+        final toolsLockContent = await flutterGen.fetchFlutterToolsLock();
+        final toolsLockFile = File(p.join(generatedDir, 'flutter_tools.lock'))
+          ..createSync(recursive: true)
+          ..writeAsStringSync(toolsLockContent);
+        allLockPaths = [...effectiveLocks, toolsLockFile.path];
       }
+
+      await generateSourcesJson(
+        lockPaths: allLockPaths,
+        outputPath: sourcesPath,
+        flutterGen: flutterGen,
+        foreignDepSources: foreignDepSources,
+      );
+    } finally {
+      flutterGen?.dispose();
     }
 
     if (commit == null) {
@@ -294,18 +288,6 @@ class GenerateCommand extends Command<void> {
           'template runtime-version "$runtimeVersion" does not match config "${cfg.runtimeVersion}": $templatePath');
       exit(1);
     }
-  }
-
-  void _writeFlutterVersionFile(String sdkPath, String outputPath) {
-    final versionFile = File(p.join(sdkPath, 'version'));
-    if (!versionFile.existsSync()) return;
-    final version = versionFile.readAsStringSync().trim();
-    File(outputPath)
-      ..createSync(recursive: true)
-      ..writeAsStringSync(
-          '# Generated by flutpak — https://github.com/o-murphy/flutpak\n'
-          '$version\n');
-    logInfo('✓  flutter.version → $outputPath ($version)');
   }
 
   /// Copies [source] into [dest] recursively, normalising line endings.

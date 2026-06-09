@@ -23,7 +23,6 @@ void main() {
   Future<_Result> runGenerate(List<String> extra) => _runCli(
         [
           'generate',
-          '--no-sources',
           '--config',
           p.join(tmp.path, 'flutpak.yaml'),
           ...extra

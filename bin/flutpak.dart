@@ -2,7 +2,7 @@ import 'dart:io';
 import 'package:args/command_runner.dart';
 import 'package:flutpak/src/commands/generate_command.dart';
 import 'package:flutpak/src/commands/init_command.dart';
-import 'package:flutpak/src/commands/sdk_ext_command.dart';
+import 'package:flutpak/src/commands/sdk_mod_command.dart';
 import 'package:flutpak/src/version.dart';
 
 Future<void> main(List<String> args) async {
@@ -15,16 +15,16 @@ Future<void> main(List<String> args) async {
     'flutpak',
     'Generate Flatpak manifests and offline source bundles for Flutter apps.\n\n'
         'Usage examples:\n'
-        '  flutpak init               # first-run: create template + run generate\n'
-        '  flutpak init --force       # overwrite existing template files\n'
-        '  flutpak generate           # update generated/ from existing template\n'
-        '  flutpak generate --tag v0.1.14 --commit abc1234  # CI: pin tag/commit\n'
-        '  flutpak sdk-ext            # Flutter SDK Extension manifest for Flathub\n'
-        '  flutpak generate --dry-run # preview what generate would do',
+        '  flutpak init                           # first-run: create template + run generate\n'
+        '  flutpak init --force                   # overwrite existing template files\n'
+        '  flutpak generate                       # update generated/ from existing template\n'
+        '  flutpak generate --tag v0.1.14         # CI: pin tag\n'
+        '  flutpak sdk-mod --flutter 3.44.1       # standalone Flutter SDK module JSON\n'
+        '  flutpak generate --dry-run             # preview what generate would do',
   )
     ..addCommand(InitCommand())
     ..addCommand(GenerateCommand())
-    ..addCommand(SdkExtCommand());
+    ..addCommand(SdkModCommand());
 
   try {
     await runner.run(args);

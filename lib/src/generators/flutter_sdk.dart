@@ -1,6 +1,6 @@
 import 'dart:io';
+import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
-import 'package:yaml/yaml.dart';
 import '../models/flatpak_source.dart';
 import '../utils/download_cache.dart';
 import '../utils/log.dart';
@@ -24,6 +24,8 @@ class _Artifact {
 const String _infraBase =
     'https://storage.googleapis.com/flutter_infra_release';
 
+const String _rawBase = 'https://raw.githubusercontent.com/flutter/flutter';
+
 /// Patch content to replace `pub upgrade` with `pub get --offline` inside
 /// Flutter's shared.sh bootstrap function.  Applied automatically when no
 /// explicit [patchPath] is given to [FlutterSdkGenerator].
@@ -46,11 +48,13 @@ const String builtinSharedShPatch = r'''
 /// written when no explicit [patchPath] is provided.
 const String defaultSharedShPatchPath = 'patches/flutter/shared.sh.patch';
 
-/// Generates Flutter SDK [FlatpakSource] entries from a local Flutter SDK install.
+/// Generates Flutter SDK [FlatpakSource] entries by fetching metadata from
+/// the Flutter GitHub repository at [flutterRef].
 ///
-/// Reads version files from [sdkPath] to determine the engine hash, fonts hash
-/// and gradle wrapper hash, then constructs all artifact entries.
-/// SHA-256 checksums are fetched by downloading each artifact (cached locally).
+/// No local Flutter installation is required — engine version hashes and the
+/// flutter_tools pubspec.lock are fetched from GitHub raw content API.
+/// SHA-256 checksums for engine artifacts are obtained via [DownloadCache]
+/// (cached locally in ~/.cache/flutpak/).
 ///
 /// If [patchPath] is null, the built-in [builtinSharedShPatch] is written to
 /// [defaultSharedShPatchPath] relative to [patchDestDir] (or [outputDir] when
@@ -58,7 +62,7 @@ const String defaultSharedShPatchPath = 'patches/flutter/shared.sh.patch';
 /// Pass an explicit [patchPath] to override, or set [outputDir] to null to skip
 /// the patch entirely (not recommended for Flatpak offline builds).
 class FlutterSdkGenerator {
-  final String sdkPath;
+  final String flutterRef;
   final String? patchPath;
   final String? outputDir;
 
@@ -71,46 +75,54 @@ class FlutterSdkGenerator {
 
   final DownloadCache _cache;
 
+  /// HTTP client used to fetch text files (version hashes) from GitHub.
+  final http.Client _client;
+
   /// When false, the patch source is not added to the returned list even if a
   /// patch file exists. The caller is responsible for injecting it elsewhere
   /// (e.g. directly into the manifest). Defaults to true for standalone use.
   final bool includePatchInSources;
 
+  final bool _ownsClient;
+
   FlutterSdkGenerator({
-    required this.sdkPath,
+    required this.flutterRef,
     this.patchPath,
     this.outputDir,
     this.patchDestDir,
     this.includePatchInSources = true,
     DownloadCache? cache,
-  }) : _cache = cache ?? LocalDownloadCache();
+    http.Client? client,
+  })  : _cache = cache ?? LocalDownloadCache(),
+        _client = client ?? http.Client(),
+        _ownsClient = client == null;
+
+  void dispose() {
+    if (_ownsClient) _client.close();
+  }
 
   /// Returns flatpak sources representing the full Flutter SDK for offline builds.
   ///
   /// The returned list can be embedded directly into a flatpak manifest's
   /// `sources:` field or written to a generated-sources JSON file.
   Future<List<FlatpakSource>> generate() async {
-    final internalDir = p.join(sdkPath, 'bin', 'internal');
+    final engineHash = await _fetchText('engine.version');
+    final fontsHash =
+        await _fetchText('material_fonts.version', subdir: 'bin/internal');
+    final gradleHash =
+        await _fetchText('gradle_wrapper.version', subdir: 'bin/internal');
+    final flutterVersion = await _fetchFlutterVersion();
+    final flutterCommit = await _resolveCommit();
 
-    final engineHash =
-        File(p.join(internalDir, 'engine.version')).readAsStringSync().trim();
-    final fontsHash = File(p.join(internalDir, 'material_fonts.version'))
-        .readAsStringSync()
-        .trim();
-    final gradleHash = File(p.join(internalDir, 'gradle_wrapper.version'))
-        .readAsStringSync()
-        .trim();
-    final flutterTag = readFlutterVersion(sdkPath);
-    final flutterCommit = _gitRevParse(sdkPath);
-
-    logInfo('flutter: version=$flutterTag engine=$engineHash');
+    logInfo(
+        'flutter: ref=$flutterRef version=$flutterVersion engine=$engineHash');
 
     final sources = <FlatpakSource>[];
 
     // 1. Flutter SDK git source
     sources.add(GitSource(
       url: 'https://github.com/flutter/flutter.git',
-      tag: flutterTag,
+      tag: flutterVersion,
       commit: flutterCommit,
       dest: 'flutter',
     ));
@@ -168,19 +180,106 @@ class FlutterSdkGenerator {
     return sources;
   }
 
-  /// Returns the patch path to embed in the source list.
+  /// Returns the content of `flutter_tools/pubspec.lock` for [flutterRef].
   ///
-  /// - If [patchPath] was provided explicitly: normalises it to be relative to
-  ///   [outputDir] so flatpak-builder can resolve it from `generated-sources.json`
-  ///   (which lives inside `outputDir/generated/`, the same directory as the manifest).
-  /// - If [outputDir] is set: writes [builtinSharedShPatch] to
-  ///   `outputDir/defaultSharedShPatchPath` and returns the relative path.
-  /// - Otherwise: returns null (no patch included).
+  /// Tries to fetch the committed lockfile first (older Flutter versions that
+  /// committed it). Falls back to fetching `pubspec.yaml` and running
+  /// `dart pub get` in a temp directory to generate the lockfile — Flutter
+  /// stopped committing it for newer releases but still pins all versions
+  /// explicitly, so the generated file is fully deterministic.
+  Future<String> fetchFlutterToolsLock() async {
+    final lockUrl = '$_rawBase/$flutterRef/packages/flutter_tools/pubspec.lock';
+    final lockResp = await _client.get(Uri.parse(lockUrl));
+    if (lockResp.statusCode == 200) return lockResp.body;
+
+    // Fallback: generate from pubspec.yaml via `dart pub get`.
+    final yamlUrl = '$_rawBase/$flutterRef/packages/flutter_tools/pubspec.yaml';
+    final yamlResp = await _client.get(Uri.parse(yamlUrl));
+    if (yamlResp.statusCode != 200) {
+      throw Exception(
+          'Failed to fetch flutter_tools/pubspec.lock for ref=$flutterRef '
+          '(HTTP ${lockResp.statusCode})');
+    }
+    return _generateLockFromPubspecYaml(yamlResp.body);
+  }
+
+  /// Writes [pubspecYaml] to a temp directory, runs `dart pub get`, and
+  /// returns the content of the generated `pubspec.lock`.
+  Future<String> _generateLockFromPubspecYaml(String pubspecYaml) async {
+    final tmpDir = Directory.systemTemp.createTempSync('flutpak_tools_');
+    try {
+      File(p.join(tmpDir.path, 'pubspec.yaml')).writeAsStringSync(pubspecYaml);
+      final result = await Process.run(
+        'dart',
+        ['pub', 'get'],
+        workingDirectory: tmpDir.path,
+      );
+      if (result.exitCode != 0) {
+        throw Exception(
+            'dart pub get failed for flutter_tools: ${result.stderr}');
+      }
+      return File(p.join(tmpDir.path, 'pubspec.lock')).readAsStringSync();
+    } finally {
+      tmpDir.deleteSync(recursive: true);
+    }
+  }
+
+  /// Returns the Flutter version string for [flutterRef].
+  ///
+  /// For a semver tag like "3.44.1" the tag itself is the version; for other
+  /// refs the `version` file is fetched from GitHub.
+  Future<String> _fetchFlutterVersion() async {
+    final url = '$_rawBase/$flutterRef/version';
+    final response = await _client.get(Uri.parse(url));
+    if (response.statusCode == 200) return response.body.trim();
+    // For a plain semver tag, the ref itself may be the version.
+    if (RegExp(r'^\d+\.\d+\.\d+').hasMatch(flutterRef)) return flutterRef;
+    throw Exception('Cannot determine Flutter version for ref=$flutterRef '
+        '(HTTP ${response.statusCode})');
+  }
+
+  /// Fetches a text file from GitHub at the given path under [flutterRef].
+  ///
+  /// [subdir] defaults to `bin/internal`; pass an empty string for repo-root files.
+  Future<String> _fetchText(String filename,
+      {String subdir = 'bin/internal'}) async {
+    final path = subdir.isEmpty ? filename : '$subdir/$filename';
+    final url = '$_rawBase/$flutterRef/$path';
+    final response = await _client.get(Uri.parse(url));
+    if (response.statusCode != 200) {
+      throw Exception(
+          'Failed to fetch $path for ref=$flutterRef (HTTP ${response.statusCode})');
+    }
+    return response.body.trim();
+  }
+
+  /// Returns the full commit SHA for [flutterRef] using git ls-remote.
+  ///
+  /// Falls back to null when git is unavailable or the ref can't be resolved.
+  Future<String?> _resolveCommit() async {
+    if (RegExp(r'^[0-9a-f]{40}$').hasMatch(flutterRef)) return flutterRef;
+
+    try {
+      for (final refSpec in [
+        'refs/tags/$flutterRef',
+        'refs/heads/$flutterRef',
+      ]) {
+        final result = await Process.run(
+          'git',
+          ['ls-remote', 'https://github.com/flutter/flutter.git', refSpec],
+        );
+        if (result.exitCode == 0) {
+          final line = (result.stdout as String).trim();
+          if (line.isNotEmpty) return line.split('\t').first;
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  /// Returns the patch path to embed in the source list.
   String? _resolveOrWritePatch() {
     if (patchPath != null) {
-      // Explicit path from config is relative to the project root (e.g.
-      // 'flatpak/patches/flutter/shared.sh.patch'). Convert it to be relative
-      // to outputDir so flatpak-builder finds it inside generated/patches/.
       if (outputDir != null) {
         return p.relative(p.absolute(patchPath!), from: p.absolute(outputDir!));
       }
@@ -188,8 +287,6 @@ class FlutterSdkGenerator {
     }
     if (outputDir == null) return null;
 
-    // Built-in patch: write to patchDestDir (typically the generated/ dir so
-    // the file is gitignored) rather than the committed patches/ directory.
     final destDir = patchDestDir ?? outputDir!;
     final target = File(p.join(destDir, defaultSharedShPatchPath));
     target.createSync(recursive: true);
@@ -201,24 +298,14 @@ class FlutterSdkGenerator {
   List<_Artifact> _buildArtifactList(
       String engineHash, String fontsHash, String gradleHash) {
     return [
-      // Dart SDK zips contain a top-level dart-sdk/ directory we want to
-      // keep → strip-components: 0.
       _Artifact('dart-sdk-linux-x64.zip', 'flutter/bin/cache',
           onlyArches: ['x86_64'], stripComponents: 0),
       _Artifact('dart-sdk-linux-arm64.zip', 'flutter/bin/cache',
           onlyArches: ['aarch64'], stripComponents: 0),
-
-      // Fonts and gradle — flat archives, keep as-is.
       _Artifact('__fonts__', 'flutter/bin/cache/artifacts/material_fonts',
           stripComponents: 0),
       _Artifact('__gradle__', 'flutter/bin/cache/artifacts/gradle_wrapper',
           stripComponents: 0),
-
-      // Package-style engine artifacts: the zip has a top-level directory
-      // matching the package name (e.g. sky_engine/lib/...) → strip it so
-      // files land directly in dest/.  stripComponents: 1 matches the
-      // default flatpak-builder behaviour used in the hand-crafted manifests
-      // that are known to work.
       _Artifact('sky_engine.zip', 'flutter/bin/cache/pkg/sky_engine',
           stripComponents: 1),
       _Artifact('flutter_gpu.zip', 'flutter/bin/cache/pkg/flutter_gpu',
@@ -229,8 +316,6 @@ class FlutterSdkGenerator {
       _Artifact('flutter_patched_sdk_product.zip',
           'flutter/bin/cache/artifacts/engine/common/flutter_patched_sdk_product',
           stripComponents: 1),
-
-      // Per-arch engine binary archives — already flat, keep as-is.
       _Artifact('linux-x64/artifacts.zip',
           'flutter/bin/cache/artifacts/engine/linux-x64',
           onlyArches: ['x86_64'], stripComponents: 0),
@@ -243,7 +328,6 @@ class FlutterSdkGenerator {
       _Artifact('linux-x64-release/linux-x64-flutter-gtk.zip',
           'flutter/bin/cache/artifacts/engine/linux-x64-release',
           onlyArches: ['x86_64'], stripComponents: 0),
-
       _Artifact('linux-arm64/artifacts.zip',
           'flutter/bin/cache/artifacts/engine/linux-arm64',
           onlyArches: ['aarch64'], stripComponents: 0),
@@ -262,16 +346,12 @@ class FlutterSdkGenerator {
   String _urlFor(
       _Artifact art, String engineHash, String fontsHash, String gradleHash) {
     if (art.path == '__fonts__') {
-      // Newer Flutter stores a full GCS path in material_fonts.version
-      // (e.g. "flutter_infra_release/flutter/fonts/<hash>/fonts.zip")
-      // instead of just the bare hash.
       if (fontsHash.contains('/')) {
         return 'https://storage.googleapis.com/$fontsHash';
       }
       return '$_infraBase/flutter/fonts/$fontsHash/fonts.zip';
     }
     if (art.path == '__gradle__') {
-      // Same pattern may apply to gradle_wrapper.version.
       if (gradleHash.contains('/')) {
         return 'https://storage.googleapis.com/$gradleHash';
       }
@@ -280,39 +360,18 @@ class FlutterSdkGenerator {
     return '$_infraBase/flutter/$engineHash/${art.path}';
   }
 
-  /// Reads the Flutter SDK version tag.
+  /// Build-commands for the flutter-sdk module (used by `flutpak sdk-mod`).
   ///
-  /// Tries in order:
-  ///   1. `flutter/version` — legacy flat file (Flutter < ~3.32)
-  ///   2. `git describe --tags --abbrev=0` — works for any tagged git clone
-  ///   3. `flutter/packages/flutter/pubspec.yaml` — inner package version
-  static String readFlutterVersion(String sdkPath) {
-    final versionFile = File(p.join(sdkPath, 'version'));
-    if (versionFile.existsSync()) return versionFile.readAsStringSync().trim();
-
-    final gitResult = Process.runSync(
-        'git', ['-C', sdkPath, 'describe', '--tags', '--abbrev=0']);
-    if (gitResult.exitCode == 0) {
-      return (gitResult.stdout as String).trim();
-    }
-
-    // Fall back to the inner flutter package pubspec.yaml.
-    final innerPubspec =
-        File(p.join(sdkPath, 'packages', 'flutter', 'pubspec.yaml'));
-    if (innerPubspec.existsSync()) {
-      final yaml = loadYaml(innerPubspec.readAsStringSync());
-      if (yaml is Map && yaml['version'] != null) {
-        return yaml['version'].toString();
-      }
-    }
-
-    throw Exception('Cannot determine Flutter version from $sdkPath');
-  }
-
-  static String? _gitRevParse(String repoPath) {
-    final result =
-        Process.runSync('git', ['-C', repoPath, 'rev-parse', 'HEAD']);
-    if (result.exitCode != 0) return null;
-    return (result.stdout as String).trim();
-  }
+  /// Stamps the engine version files into Flutter's cache directory and
+  /// installs the SDK to `/var/lib/flutter`.
+  static List<String> buildCommands() => [
+        'cp flutter/bin/internal/engine.version flutter/bin/cache/engine-dart-sdk.stamp',
+        'cp flutter/bin/internal/material_fonts.version flutter/bin/cache/material_fonts.stamp',
+        'cp flutter/bin/internal/gradle_wrapper.version flutter/bin/cache/gradle_wrapper.stamp',
+        'cp flutter/bin/internal/engine.version flutter/bin/cache/engine_stamp.stamp',
+        'cp flutter/bin/internal/engine.version flutter/bin/cache/flutter_sdk.stamp',
+        'cp flutter/bin/internal/engine.version flutter/bin/cache/font-subset.stamp',
+        'cp flutter/bin/internal/engine.version flutter/bin/cache/linux-sdk.stamp',
+        'mkdir -p /var/lib && cp -r flutter /var/lib',
+      ];
 }

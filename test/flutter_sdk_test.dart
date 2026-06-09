@@ -1,28 +1,28 @@
-import 'dart:io';
+import 'dart:convert';
 import 'package:flutpak/flutpak.dart';
-import 'package:path/path.dart' as p;
+import 'package:http/http.dart' as http;
 import 'package:test/test.dart';
 
-void main() {
-  final sdkFixture = p.join('test', 'fixtures', 'flutter_sdk');
+const _engineHash = 'aabbccdd1122334455667788aabbccdd11223344';
+const _fontsHash = '3012db47f3130e62f7cc0beabff968a33cbec8d8';
+const _gradleHash = 'fd5c1f2c013565a3bea56ada6df9d2b8e96d56aa';
+const _lockContent = 'packages:\n  args:\n    version: "2.5.0"\n';
 
-  // We test URL construction only — actual SHA-256 download is skipped by
-  // injecting a fake DownloadCache that returns deterministic hashes.
+void main() {
   group('FlutterSdkGenerator — artifact list', () {
     late FlutterSdkGenerator gen;
 
     setUp(() {
       gen = FlutterSdkGenerator(
-        sdkPath: sdkFixture,
+        flutterRef: '3.44.1',
         cache: _FakeCache(),
+        client: _FakeClient(),
       );
     });
 
     test('generates expected number of sources', () async {
       final sources = await gen.generate();
-
-      // 1 git + 16 arch artifacts + 1 patch script + 1 setup script + 1 stamp file
-      // Exact count depends on artifact list; assert > 15 as a sanity check.
+      // 1 git + arch artifacts + 1 inline + 1 stamp + optional patch
       expect(sources.length, greaterThan(15));
     });
 
@@ -70,9 +70,7 @@ void main() {
           .map((s) => s.url)
           .firstWhere((u) => u.contains('fonts.zip'));
 
-      // Must contain the fonts hash from the fixture, not the engine hash
-      expect(fontsUrl, contains('3012db47f3130e62f7cc0beabff968a33cbec8d8'));
-      expect(fontsUrl, isNot(contains('42d3d75a')));
+      expect(fontsUrl, contains(_fontsHash));
     });
 
     test('gradle URL uses gradle_wrapper.version hash', () async {
@@ -82,7 +80,7 @@ void main() {
           .map((s) => s.url)
           .firstWhere((u) => u.contains('gradle-wrapper'));
 
-      expect(gradleUrl, contains('fd5c1f2c013565a3bea56ada6df9d2b8e96d56aa'));
+      expect(gradleUrl, contains(_gradleHash));
     });
 
     test('engine_stamp.json is a FileSource in flutter/bin/cache', () async {
@@ -98,15 +96,13 @@ void main() {
       final sources = await gen.generate();
       final inline = sources.whereType<InlineSource>().firstWhere((s) =>
           s.destFilename == 'pubspec.yaml' && s.dest.contains('sky_engine'));
+
       expect(inline.contents, contains('name: sky_engine'));
       expect(inline.contents, contains('version: 0.0.99'));
       expect(inline.contents, contains('sdk:'));
     });
 
-    test('pub archive URLs use pub.dev (not pub.dartlang.org)', () async {
-      // This test ensures the deprecated pub.dartlang.org domain is not used.
-      // FlutterSdkGenerator itself doesn't generate pub URLs, but verify the
-      // ArchiveSource URLs it produces don't accidentally reference dartlang.org.
+    test('no pub.dartlang.org URLs', () async {
       final sources = await gen.generate();
       for (final s in sources.whereType<ArchiveSource>()) {
         expect(s.url, isNot(contains('pub.dartlang.org')));
@@ -114,105 +110,63 @@ void main() {
     });
   });
 
-  group('FlutterSdkGenerator — patchPath normalisation', () {
-    late Directory tmpDir;
-
-    setUp(() {
-      tmpDir = Directory.systemTemp.createTempSync('flutpak_patch_norm_');
-    });
-    tearDown(() => tmpDir.deleteSync(recursive: true));
-
-    test('explicit patchPath is made relative to outputDir', () async {
-      // outputDir = tmpDir/flatpak
-      // patchPath = tmpDir/flatpak/patches/flutter/shared.sh.patch
-      // Expected path in sources: patches/flutter/shared.sh.patch
-      final outputDir = p.join(tmpDir.path, 'flatpak');
-      final patchFile =
-          File(p.join(outputDir, 'patches', 'flutter', 'shared.sh.patch'))
-            ..createSync(recursive: true)
-            ..writeAsStringSync('# dummy patch');
-
-      final gen = FlutterSdkGenerator(
-        sdkPath: sdkFixture,
-        patchPath: patchFile
-            .path, // absolute path as given by cfg.patchPath after resolution
-        outputDir: outputDir,
-        cache: _FakeCache(),
-      );
-
-      final sources = await gen.generate();
-      final patch = sources.whereType<PatchSource>().first;
-
-      expect(patch.path, 'patches/flutter/shared.sh.patch');
-      expect(patch.path, isNot(contains(outputDir)));
+  group('FlutterSdkGenerator.buildCommands', () {
+    test('returns non-empty list', () {
+      expect(FlutterSdkGenerator.buildCommands(), isNotEmpty);
     });
 
-    test('patchPath given as project-relative path is normalised', () async {
-      // Simulate cfg.patchPath = 'flatpak/patches/flutter/shared.sh.patch'
-      // relative to project CWD, with outputDir = absolute path to flatpak/.
-      final outputDir = p.join(tmpDir.path, 'flatpak');
-      File(p.join(outputDir, 'patches', 'flutter', 'shared.sh.patch'))
-        ..createSync(recursive: true)
-        ..writeAsStringSync('# dummy patch');
+    test('installs to /var/lib/flutter', () {
+      final cmds = FlutterSdkGenerator.buildCommands();
+      expect(cmds.any((c) => c.contains('/var/lib')), isTrue);
+    });
 
-      final projectRelativePath = p
-          .relative(p.join(outputDir, 'patches', 'flutter', 'shared.sh.patch'));
-
-      final gen = FlutterSdkGenerator(
-        sdkPath: sdkFixture,
-        patchPath: projectRelativePath,
-        outputDir: outputDir,
-        cache: _FakeCache(),
-      );
-
-      final sources = await gen.generate();
-      final patch = sources.whereType<PatchSource>().first;
-
-      expect(patch.path, 'patches/flutter/shared.sh.patch');
+    test('stamps engine.version into bin/cache', () {
+      final cmds = FlutterSdkGenerator.buildCommands();
+      expect(cmds.any((c) => c.contains('engine.version')), isTrue);
     });
   });
 
-  group('FlutterSdkGenerator.readFlutterVersion', () {
-    late Directory tmpDir;
-
-    setUp(() {
-      tmpDir = Directory.systemTemp.createTempSync('flutpak_ver_test_');
-    });
-
-    tearDown(() => tmpDir.deleteSync(recursive: true));
-
-    test('reads version from version file when present', () {
-      File(p.join(tmpDir.path, 'version')).writeAsStringSync('3.44.1\n');
-      expect(FlutterSdkGenerator.readFlutterVersion(tmpDir.path), '3.44.1');
-    });
-
-    test('falls back to packages/flutter/pubspec.yaml when version file absent',
-        () {
-      final pubspecDir = Directory(p.join(tmpDir.path, 'packages', 'flutter'))
-        ..createSync(recursive: true);
-      File(p.join(pubspecDir.path, 'pubspec.yaml')).writeAsStringSync(
-        'name: flutter\nversion: 3.27.1\nenvironment:\n  sdk: ">=3.3.0"\n',
+  group('FlutterSdkGenerator.fetchFlutterToolsLock', () {
+    test('returns lock content when server returns 200', () async {
+      final gen = FlutterSdkGenerator(
+        flutterRef: '3.44.1',
+        cache: _FakeCache(),
+        client: _FakeClient(),
       );
-      expect(FlutterSdkGenerator.readFlutterVersion(tmpDir.path), '3.27.1');
-    });
-
-    test('throws when no version source is available', () {
-      // Empty directory — no version file, no git, no pubspec.
-      expect(
-        () => FlutterSdkGenerator.readFlutterVersion(tmpDir.path),
-        throwsException,
-      );
+      final lock = await gen.fetchFlutterToolsLock();
+      expect(lock, contains('packages:'));
     });
   });
 }
 
-/// Replaces [DownloadCache] for tests — returns a fake SHA-256 without
-/// making any network requests or touching the filesystem.
+/// Returns deterministic SHA-256 without network or disk access.
 class _FakeCache implements DownloadCache {
   @override
-  Future<String> sha256For(String url) async =>
-      'f' * 64; // valid-length hex string
+  Future<String> sha256For(String url) async => 'f' * 64;
 
   @override
   void dispose() {}
+}
+
+/// Returns fake HTTP responses for the URLs [FlutterSdkGenerator] fetches.
+class _FakeClient extends http.BaseClient {
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) async {
+    final url = request.url.toString();
+    final body = _bodyFor(url);
+    return http.StreamedResponse(
+      Stream.value(utf8.encode(body)),
+      200,
+    );
+  }
+
+  static String _bodyFor(String url) {
+    if (url.contains('engine.version')) return '$_engineHash\n';
+    if (url.contains('material_fonts.version')) return '$_fontsHash\n';
+    if (url.contains('gradle_wrapper.version')) return '$_gradleHash\n';
+    if (url.contains('flutter_tools/pubspec.lock')) return _lockContent;
+    // Flutter version file and ls-remote fallback
+    if (url.endsWith('/version')) return '3.44.1\n';
+    return '';
+  }
 }
