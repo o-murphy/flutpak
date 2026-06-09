@@ -6,7 +6,6 @@ import 'package:yaml_edit/yaml_edit.dart';
 import '../config.dart';
 import '../foreign_deps_registry.dart';
 import '../generators/manifest_generator.dart';
-import '../patches_registry.dart';
 import '../utils/log.dart';
 import '../utils/sources_util.dart';
 import 'command_utils.dart';
@@ -145,9 +144,8 @@ class GenerateCommand extends Command<void> {
     // ── Resolve patch entries ─────────────────────────────────────────────
     final List<PatchEntry> patchEntries;
     try {
-      patchEntries = resolvePatchEntries(
+      patchEntries = _resolveProjectPatches(
         lockPaths: effectiveLocks,
-        patchesDir: patchesDir,
         projectPatches: cfg.patches,
       );
     } on Exception catch (e) {
@@ -444,4 +442,57 @@ class GenerateCommand extends Command<void> {
 
     return editor.toString();
   }
+}
+
+List<PatchEntry> _resolveProjectPatches({
+  required List<String> lockPaths,
+  required List<PatchEntry> projectPatches,
+}) {
+  final lockedVersions = _readLockedVersions(lockPaths);
+  final entries = <PatchEntry>[];
+  for (final patch in projectPatches) {
+    if (patch.version != null) {
+      final lockedVersion = lockedVersions[patch.package];
+      if (lockedVersion != null && lockedVersion != patch.version) {
+        throw Exception(
+          'patch version mismatch for "${patch.package}": '
+          'config pins ${patch.version} but pubspec.lock has $lockedVersion.\n'
+          'Update the version in your flutpak config, fix the patch for the '
+          'new version, or remove the patch entry if it is no longer needed.',
+        );
+      }
+      entries.add(patch);
+    } else {
+      entries.add(PatchEntry(
+        package: patch.package,
+        version: lockedVersions[patch.package],
+        path: patch.path,
+        destSubpath: patch.destSubpath,
+        options: patch.options,
+        crlf: patch.crlf,
+        useGit: patch.useGit,
+      ));
+    }
+  }
+  return entries;
+}
+
+Map<String, String> _readLockedVersions(List<String> lockPaths) {
+  final versions = <String, String>{};
+  for (final path in lockPaths) {
+    final f = File(path);
+    if (!f.existsSync()) continue;
+    final yaml = loadYaml(f.readAsStringSync());
+    if (yaml is! Map) continue;
+    final pkgs = yaml['packages'];
+    if (pkgs is! Map) continue;
+    for (final e in pkgs.entries) {
+      final name = e.key as String;
+      final info = e.value;
+      if (info is! Map || info['source'] != 'hosted') continue;
+      final ver = info['version'] as String?;
+      if (ver != null) versions[name] = ver;
+    }
+  }
+  return versions;
 }
