@@ -39,7 +39,7 @@ inputs:
     description: >
       Both modes require the job to set:
         container:
-          image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-*
+          image: ghcr.io/flathub-infra/flatpak-github-actions:<runtime>-<version>
           options: --privileged
       false (default): delegate to flatpak/flatpak-github-actions/flatpak-builder@v6
         (uses flatpak-builder; no Flathub-specific validation).
