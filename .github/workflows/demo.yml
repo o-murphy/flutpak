@@ -35,9 +35,20 @@ jobs:
           artifact-name: flatpak-generated
 
   build:
-    name: Build Flatpak
+    name: Build Flatpak (${{ matrix.variant.arch }})
     needs: generate
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        variant:
+          - arch: x86_64
+            runner: ubuntu-24.04
+          - arch: aarch64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.variant.runner }}
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-48
+      options: --privileged
     steps:
       - uses: actions/checkout@v6
 
@@ -50,13 +61,29 @@ jobs:
         with:
           manifest: flatpak/generated/io.github.o_murphy.flutpak.demo.yml
           app-id: io.github.o_murphy.flutpak.demo
-          artifact-name: demo-flatpak
+          arch: ${{ matrix.variant.arch }}
+          artifact-name: demo-flatpak-${{ matrix.variant.arch }}
+          use-flathub-builder: "true"
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Install app from local repo
+  smoke-test:
+    name: Smoke test (x86_64)
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: demo-flatpak-x86_64
+
+      - name: Install Flatpak and runtime
         run: |
-          flatpak remote-add --user --no-gpg-verify local-demo repo
-          flatpak install --user --noninteractive local-demo io.github.o_murphy.flutpak.demo
+          sudo apt-get update -qq
+          sudo apt-get install -y flatpak
+          flatpak remote-add --user --if-not-exists flathub \
+            https://dl.flathub.org/repo/flathub.flatpakrepo
+
+      - name: Install app from bundle
+        run: flatpak install --user --noninteractive io.github.o_murphy.flutpak.demo_x86_64.flatpak
 
       - name: Smoke test — app starts
         run: |

@@ -37,13 +37,14 @@ inputs:
     default: "2"
   use-flathub-builder:
     description: >
-      false (default): delegate to flatpak/flatpak-github-actions/flatpak-builder@v6.
-      true: use native flathub-build + flatpak-builder-lint from the
-      ghcr.io/flathub-infra/flatpak-github-actions container for Flathub
-      compatibility validation. Requires the job to set:
+      Both modes require the job to set:
         container:
           image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-*
           options: --privileged
+      false (default): delegate to flatpak/flatpak-github-actions/flatpak-builder@v6
+        (uses flatpak-builder; no Flathub-specific validation).
+      true: use flathub-build + flatpak-builder-lint for full Flathub compatibility
+        validation (lint manifest → flathub-build → lint repo).
     required: false
     default: "false"
   github-token:
