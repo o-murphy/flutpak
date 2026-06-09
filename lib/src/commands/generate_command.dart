@@ -135,21 +135,20 @@ class GenerateCommand extends Command<void> {
     List<Map<String, dynamic>> foreignDepSources = const [];
     List<String> foreignCargoLockPaths = const [];
     List<String> foreignExtraPubspecPaths = const [];
+    // registry is kept alive until the outer finally so CargoSourcesGenerator
+    // can read the extracted Cargo.lock files before dispose() deletes them.
+    ForeignDepsRegistry? registry;
     if (!noForeignDeps) {
-      final registry = ForeignDepsRegistry(ref: cfg.foreignDepsRef);
-      try {
-        final depsResult = await registry.resolve(
-          lockPaths: effectiveLocks,
-          localForeignDeps: cfg.localForeignDeps,
-          generatedPatchesDir: generatedPatchesDir,
-          projectPatchesDir: p.join(outputDir, 'patches'),
-        );
-        foreignDepSources = depsResult.sources;
-        foreignCargoLockPaths = depsResult.cargoLockPaths;
-        foreignExtraPubspecPaths = depsResult.extraPubspecPaths;
-      } finally {
-        registry.dispose();
-      }
+      registry = ForeignDepsRegistry(ref: cfg.foreignDepsRef);
+      final depsResult = await registry.resolve(
+        lockPaths: effectiveLocks,
+        localForeignDeps: cfg.localForeignDeps,
+        generatedPatchesDir: generatedPatchesDir,
+        projectPatchesDir: p.join(outputDir, 'patches'),
+      );
+      foreignDepSources = depsResult.sources;
+      foreignCargoLockPaths = depsResult.cargoLockPaths;
+      foreignExtraPubspecPaths = depsResult.extraPubspecPaths;
     }
 
     final (:allPubLockPaths, :allCargoLockPaths) = buildLockPaths(
@@ -230,6 +229,7 @@ class GenerateCommand extends Command<void> {
         }
       }
     } finally {
+      registry?.dispose();
       flutterGen?.dispose();
       toolsLockFile?.deleteSync();
     }
@@ -387,9 +387,13 @@ String injectGeneratedContent({
 
   // ── Merge CARGO_HOME / RUSTUP_HOME / append-path into build-options ───
   if (cargoSourcesPath != null && rustupPath != null) {
-    final buildOpts =
-        (appModuleMap['build-options'] as Map<String, dynamic>?) ?? {};
-    final env = (buildOpts['env'] as Map<String, dynamic>?) ?? {};
+    final buildOptsRaw = appModuleMap['build-options'];
+    final buildOpts = buildOptsRaw is Map
+        ? Map<String, dynamic>.from(buildOptsRaw)
+        : <String, dynamic>{};
+    final envRaw = buildOpts['env'];
+    final env =
+        envRaw is Map ? Map<String, dynamic>.from(envRaw) : <String, dynamic>{};
     final appendPath = buildOpts['append-path'] as String?;
     // CARGO_HOME must point to the vendored-cargo directory (where config.toml
     // lives) so cargo finds the offline vendor config.  RUSTUP_HOME is where

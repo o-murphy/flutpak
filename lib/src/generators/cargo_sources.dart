@@ -29,8 +29,16 @@ class CargoSourcesGenerator {
         continue;
       }
 
-      final cargoLock = TomlDocument.parse(file.readAsStringSync()).toMap();
-      final packages = cargoLock['package'] as List? ?? [];
+      final Map<String, dynamic> cargoLock;
+      try {
+        cargoLock = TomlDocument.parse(file.readAsStringSync()).toMap();
+      } catch (e) {
+        logWarn(
+            'cargo: failed to parse Cargo.lock at $lockPath: $e — skipping');
+        continue;
+      }
+      final packagesRaw = cargoLock['package'];
+      final packages = packagesRaw is List ? packagesRaw : const [];
       final packageSources = <Map<String, dynamic>>[];
 
       for (final rawPkg in packages) {

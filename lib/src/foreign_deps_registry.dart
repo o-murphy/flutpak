@@ -43,6 +43,7 @@ class ForeignDepsRegistry {
   final String ref;
   final http.Client _client;
   final Directory _cacheDir;
+  Directory? _extractDir;
 
   ForeignDepsRegistry({
     String? ref,
@@ -133,7 +134,6 @@ class ForeignDepsRegistry {
     final result = <Map<String, dynamic>>[];
     final allCargoLockPaths = <String>[];
     final allExtraPubspecPaths = <String>[];
-    Directory? extractDir;
 
     for (final package in merged.keys) {
       final version = lockedVersions[package];
@@ -147,17 +147,17 @@ class ForeignDepsRegistry {
       // cargo_locks — extract Cargo.lock files from the pub.dev archive.
       final cargoLocks = versionEntry['cargo_locks'];
       if (cargoLocks is List && cargoLocks.isNotEmpty) {
-        extractDir ??= Directory.systemTemp.createTempSync('flutpak_extract_');
+        _extractDir ??= Directory.systemTemp.createTempSync('flutpak_extract_');
         allCargoLockPaths.addAll(await _extractFromArchive(
-            package, version, cargoLocks, 'Cargo.lock', extractDir));
+            package, version, cargoLocks, 'Cargo.lock', _extractDir!));
       }
 
       // extra_pubspecs — extract pubspec.lock from sub-package directories.
       final extraPubspecs = versionEntry['extra_pubspecs'];
       if (extraPubspecs is List && extraPubspecs.isNotEmpty) {
-        extractDir ??= Directory.systemTemp.createTempSync('flutpak_extract_');
+        _extractDir ??= Directory.systemTemp.createTempSync('flutpak_extract_');
         allExtraPubspecPaths.addAll(await _extractFromArchive(
-            package, version, extraPubspecs, 'pubspec.lock', extractDir));
+            package, version, extraPubspecs, 'pubspec.lock', _extractDir!));
       }
 
       final manifest = versionEntry['manifest'];
@@ -215,7 +215,11 @@ class ForeignDepsRegistry {
     );
   }
 
-  void dispose() => _client.close();
+  void dispose() {
+    _client.close();
+    _extractDir?.deleteSync(recursive: true);
+    _extractDir = null;
+  }
 
   /// Downloads [url] bytes to the cache and returns the cache [File].
   ///
