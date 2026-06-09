@@ -1,0 +1,13 @@
+app-id: org.example.App
+runtime: org.freedesktop.Platform
+runtime-version: '25.08'
+sdk: org.freedesktop.Sdk
+command: App
+modules:
+  - name: App
+    buildsystem: simple
+    build-commands:
+      - install -Dm755 App /app/bin/App
+    sources:
+      - type: git
+        url: https://github.com/example/App.git

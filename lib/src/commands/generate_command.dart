@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:args/command_runner.dart';
 import 'package:path/path.dart' as p;
@@ -5,8 +6,10 @@ import 'package:yaml/yaml.dart';
 import 'package:yaml_edit/yaml_edit.dart';
 import '../config.dart';
 import '../foreign_deps_registry.dart';
+import '../generators/cargo_sources.dart';
 import '../generators/flutter_sdk.dart';
 import '../generators/manifest_generator.dart';
+import '../generators/rustup_generator.dart';
 import '../utils/log.dart';
 import '../utils/sources_util.dart';
 import 'command_utils.dart';
@@ -130,6 +133,7 @@ class GenerateCommand extends Command<void> {
 
     // ── Resolve foreign deps from registry ───────────────────────────────
     List<Map<String, dynamic>> foreignDepSources = const [];
+    List<String> foreignCargoLockPaths = const [];
     if (!noForeignDeps) {
       final registry = ForeignDepsRegistry(ref: cfg.foreignDepsRef);
       try {
@@ -140,10 +144,18 @@ class GenerateCommand extends Command<void> {
           projectPatchesDir: p.join(outputDir, 'patches'),
         );
         foreignDepSources = depsResult.sources;
+        foreignCargoLockPaths = depsResult.cargoLockPaths;
       } finally {
         registry.dispose();
       }
     }
+
+    // Explicit rust.locks from config, resolved against baseDir.
+    final allCargoLockPaths = [
+      ...foreignCargoLockPaths,
+      ...cfg.rustLocks
+          .map((l) => p.isAbsolute(l) ? l : p.absolute(p.join(baseDir, l))),
+    ];
 
     // ── Build Flutter SDK generator if ref is configured ─────────────────
     final flutterRef = flutterRefOverride ?? cfg.flutterRef;
@@ -164,6 +176,10 @@ class GenerateCommand extends Command<void> {
     }
 
     // ── Generate sources ──────────────────────────────────────────────────
+    String? generatedCargoSourcesPath;
+    Map<String, dynamic>? rustupModule;
+    final effectiveRustupPath = cfg.rustupPath ?? '/var/lib/rustup';
+
     try {
       if (flutterGen != null) {
         // Fetch flutter_tools pubspec.lock so its deps appear in generated-sources.json.
@@ -180,6 +196,35 @@ class GenerateCommand extends Command<void> {
         flutterGen: flutterGen,
         foreignDepSources: foreignDepSources,
       );
+
+      // ── Generate Rust/Cargo artifacts ─────────────────────────────────
+      if (allCargoLockPaths.isNotEmpty) {
+        final effectiveRustVersion = cfg.rustVersion ?? '1.85.0';
+
+        final cargoSources =
+            await CargoSourcesGenerator.generate(allCargoLockPaths);
+        generatedCargoSourcesPath = p.join(generatedDir, 'cargo-sources.json');
+        File(generatedCargoSourcesPath)
+          ..createSync(recursive: true)
+          ..writeAsStringSync(jsonEncode(cargoSources));
+        logInfo('✓  cargo sources → cargo-sources.json');
+
+        final rustupGen = RustupGenerator(
+          rustVersion: effectiveRustVersion,
+          rustupPath: effectiveRustupPath,
+        );
+        try {
+          rustupModule = await rustupGen.generateModule();
+          final rustupModulePath =
+              p.join(generatedDir, 'rustup-$effectiveRustVersion.json');
+          File(rustupModulePath)
+            ..createSync(recursive: true)
+            ..writeAsStringSync(jsonEncode(rustupModule));
+          logInfo('✓  rustup module → rustup-$effectiveRustVersion.json');
+        } finally {
+          rustupGen.dispose();
+        }
+      }
     } finally {
       flutterGen?.dispose();
     }
@@ -192,11 +237,14 @@ class GenerateCommand extends Command<void> {
     var generatedContent = stripTemplateGuidance(templateContent);
 
     // ── Inject tag/commit, modules, and sources via yaml_edit ────────────
-    generatedContent = _injectGeneratedContent(
+    generatedContent = injectGeneratedContent(
       content: generatedContent,
       manifestCfg: manifestCfg,
       extraModules: cfg.extraModules,
       sourcesPath: sourcesPath,
+      cargoSourcesPath: generatedCargoSourcesPath,
+      rustupModule: rustupModule,
+      rustupPath: effectiveRustupPath,
       tag: tag,
       commit: commit,
     );
@@ -259,106 +307,128 @@ class GenerateCommand extends Command<void> {
       exit(1);
     }
   }
+}
 
-  /// Injects tag/commit, modules, manifest.sources, generated-sources.json,
-  /// and patches into the manifest YAML using yaml_edit.
-  ///
-  /// - tag and commit are set on the git source entry.
-  /// - modules file contents are inserted before the app module.
-  /// - generated-sources.json, manifest.sources, and patch sources are appended
-  ///   to the app module's sources list.
-  String _injectGeneratedContent({
-    required String content,
-    required ManifestConfig manifestCfg,
-    required List<Object> extraModules,
-    required String sourcesPath,
-    required String? tag,
-    required String? commit,
-  }) {
-    final editor = YamlEditor(content);
-    final yamlTree = loadYaml(content);
+/// Injects tag/commit, modules, sources, and Rust/Cargo artifacts into the
+/// manifest YAML using yaml_edit.
+///
+/// The whole app module map is replaced in a single editor.update() to avoid
+/// the yaml_edit 2.x crash when creating new keys in block-sequence elements.
+/// Source appends happen after that replacement so they land in the right place.
+String injectGeneratedContent({
+  required String content,
+  required ManifestConfig manifestCfg,
+  required List<Object> extraModules,
+  required String sourcesPath,
+  String? cargoSourcesPath,
+  Map<String, dynamic>? rustupModule,
+  String? rustupPath,
+  required String? tag,
+  required String? commit,
+}) {
+  final editor = YamlEditor(content);
+  final yamlTree = loadYaml(content);
 
-    final modules = yamlTree['modules'];
-    if (modules is! List) {
-      logWarn(
-          'modules key not found or not a list in template — skipping injection');
-      return content;
-    }
-
-    final appName = manifestCfg.appId.split('.').last;
-    final appModuleIdx =
-        modules.toList().indexWhere((m) => m is Map && m['name'] == appName);
-    if (appModuleIdx < 0) {
-      logWarn(
-          'app module "$appName" not found in template — skipping injection');
-      return content;
-    }
-
-    final appModule = modules.toList()[appModuleIdx];
-    if (appModule is! Map || appModule['sources'] is! List) {
-      logWarn(
-          'sources key not found or not a list in app module "$appName" — skipping injection');
-      return content;
-    }
-
-    // ── Set tag and commit on git source ──────────────────────────────────
-    // Both fields are always written (when commit is available). When no
-    // --tag is given, _resolveRefs returns (sha, sha) so both fields get the
-    // same SHA value.
-    //
-    // We replace the whole git source map in one editor.update() call rather
-    // than updating individual keys.  yaml_edit 2.x crashes when asked to
-    // CREATE a new key inside a map that is an element of a block sequence
-    // (the tag/commit keys are absent from fresh templates).  Replacing the
-    // entire list element avoids that code path.
-    final sourcesBase = ['modules', appModuleIdx, 'sources'];
-    final appSources = modules.toList()[appModuleIdx]['sources'];
-    if (appSources is List && (tag != null || commit != null)) {
-      final gitSrcIdx = appSources.toList().indexWhere(
-            (s) => s is Map && s['type'] == 'git',
-          );
-      if (gitSrcIdx >= 0) {
-        final existing =
-            Map<String, dynamic>.from(appSources.toList()[gitSrcIdx] as Map);
-        if (tag != null) existing['tag'] = tag;
-        if (commit != null) existing['commit'] = commit;
-        editor.update([...sourcesBase, gitSrcIdx], existing);
-      }
-    }
-
-    // ── Append to app module sources ──────────────────────────────────────
-    // Order: generated-sources.json → manifest.sources → flutter patch → pub patches
-
-    editor.appendToList(sourcesBase, p.basename(sourcesPath));
-
-    for (final src in manifestCfg.sources) {
-      editor.appendToList(sourcesBase, Map<String, dynamic>.from(src));
-    }
-
-    // ── Insert modules before app module ────────────────────────────
-    // Iterate in reverse so that sequential insertions at the same index
-    // preserve the original order from modules.
-    var insertIdx = appModuleIdx;
-    for (final mod in extraModules.reversed) {
-      if (mod is String) {
-        final f = File(mod);
-        if (!f.existsSync()) {
-          logWarn('modules: file not found: $mod');
-          continue;
-        }
-        final modYaml = loadYaml(f.readAsStringSync());
-        if (modYaml is List) {
-          for (final m in modYaml.reversed) {
-            editor.insertIntoList(['modules'], insertIdx, m);
-          }
-        } else if (modYaml is Map) {
-          editor.insertIntoList(['modules'], insertIdx, modYaml);
-        }
-      } else if (mod is Map) {
-        editor.insertIntoList(['modules'], insertIdx, mod);
-      }
-    }
-
-    return editor.toString();
+  final modules = yamlTree['modules'];
+  if (modules is! List) {
+    logWarn(
+        'modules key not found or not a list in template — skipping injection');
+    return content;
   }
+
+  final appName = manifestCfg.appId.split('.').last;
+  final appModuleIdx =
+      modules.toList().indexWhere((m) => m is Map && m['name'] == appName);
+  if (appModuleIdx < 0) {
+    logWarn('app module "$appName" not found in template — skipping injection');
+    return content;
+  }
+
+  final appModule = modules.toList()[appModuleIdx];
+  if (appModule is! Map || appModule['sources'] is! List) {
+    logWarn(
+        'sources key not found or not a list in app module "$appName" — skipping injection');
+    return content;
+  }
+
+  // Deep-convert once; ALL mutations (git source, sources list, build-options)
+  // happen in-memory on this plain map before the single editor.update() call.
+  // Mixing editor.update() with subsequent editor.appendToList() on the same
+  // module triggers a yaml_edit 2.x stale-node bug, so we build the final
+  // module in one shot.
+  final appModuleMap =
+      jsonDecode(jsonEncode(appModule)) as Map<String, dynamic>;
+  final srcList = appModuleMap['sources'] as List;
+
+  // ── Set tag and commit on git source ──────────────────────────────────
+  if (tag != null || commit != null) {
+    final gitSrcIdx = srcList.indexWhere((s) => s is Map && s['type'] == 'git');
+    if (gitSrcIdx >= 0) {
+      final src = srcList[gitSrcIdx] as Map<String, dynamic>;
+      if (tag != null) src['tag'] = tag;
+      if (commit != null) src['commit'] = commit;
+    }
+  }
+
+  // ── Append sources ────────────────────────────────────────────────────
+  // Order: generated-sources.json → manifest.sources → cargo-sources.json
+  srcList.add(p.basename(sourcesPath));
+  for (final src in manifestCfg.sources) {
+    srcList.add(Map<String, dynamic>.from(src));
+  }
+  if (cargoSourcesPath != null) {
+    srcList.add(p.basename(cargoSourcesPath));
+  }
+
+  // ── Merge CARGO_HOME / RUSTUP_HOME / append-path into build-options ───
+  if (cargoSourcesPath != null && rustupPath != null) {
+    final buildOpts =
+        (appModuleMap['build-options'] as Map<String, dynamic>?) ?? {};
+    final env = (buildOpts['env'] as Map<String, dynamic>?) ?? {};
+    final appendPath = buildOpts['append-path'] as String?;
+    appModuleMap['build-options'] = <String, dynamic>{
+      ...buildOpts,
+      'env': <String, dynamic>{
+        ...env,
+        'CARGO_HOME': rustupPath,
+        'RUSTUP_HOME': rustupPath,
+      },
+      'append-path': appendPath != null
+          ? '$appendPath:$rustupPath/bin'
+          : '$rustupPath/bin',
+    };
+  }
+
+  // Replace the whole app module in one shot.
+  editor.update(['modules', appModuleIdx], appModuleMap);
+
+  // ── Insert modules before app module ──────────────────────────────────
+  // Inserting at the same index in reverse preserves original order.
+  // rustup is inserted last (at insertIdx), so it ends up first — before
+  // extraModules — which is correct (Rust must be set up before the app).
+  var insertIdx = appModuleIdx;
+  for (final mod in extraModules.reversed) {
+    if (mod is String) {
+      final f = File(mod);
+      if (!f.existsSync()) {
+        logWarn('modules: file not found: $mod');
+        continue;
+      }
+      final modYaml = loadYaml(f.readAsStringSync());
+      if (modYaml is List) {
+        for (final m in modYaml.reversed) {
+          editor.insertIntoList(['modules'], insertIdx, m);
+        }
+      } else if (modYaml is Map) {
+        editor.insertIntoList(['modules'], insertIdx, modYaml);
+      }
+    } else if (mod is Map) {
+      editor.insertIntoList(['modules'], insertIdx, mod);
+    }
+  }
+  if (rustupModule != null) {
+    editor.insertIntoList(['modules'], insertIdx, rustupModule);
+  }
+
+  return editor.toString();
 }
