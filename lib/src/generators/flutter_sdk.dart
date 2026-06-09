@@ -199,7 +199,7 @@ class FlutterSdkGenerator {
     if (yamlResp.statusCode != 200) {
       throw Exception(
           'Failed to fetch flutter_tools/pubspec.lock for ref=$flutterRef '
-          '(HTTP ${lockResp.statusCode})');
+          '(HTTP ${yamlResp.statusCode})');
     }
     return _generateLockFromPubspecYaml(yamlResp.body);
   }
