@@ -5,6 +5,7 @@ import 'package:crypto/crypto.dart';
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
 import 'package:yaml/yaml.dart';
+import 'package:pub_semver/pub_semver.dart';
 import 'generators/manifest_generator.dart' show convertPatchToCrlf;
 import 'utils/log.dart';
 
@@ -117,8 +118,8 @@ class ForeignDepsRegistry {
 
       final packageMap = merged[package];
       if (packageMap is! Map) continue;
-      final versionEntry = packageMap[version];
-      if (versionEntry is! Map) continue;
+      final (matchedVersion, versionEntry) = _matchVersion(packageMap, version);
+      if (versionEntry == null) continue;
       final manifest = versionEntry['manifest'];
       if (manifest is! Map) continue;
       final sources = manifest['sources'];
@@ -160,7 +161,11 @@ class ForeignDepsRegistry {
         result.add(source);
       }
 
-      logInfo('foreign-deps: $package $version — ${sources.length} source(s)');
+      final versionLabel = matchedVersion == version
+          ? version
+          : '$version (matched registry $matchedVersion)';
+      logInfo(
+          'foreign-deps: $package $versionLabel — ${sources.length} source(s)');
     }
 
     return result;
@@ -297,6 +302,55 @@ Map<String, String> _readLockedVersions(List<String> lockPaths) {
     }
   }
   return versions;
+}
+
+/// Finds the best-matching registry version entry for [installedVersion].
+///
+/// Returns the entry with the highest registry version that is ≤ [installedVersion],
+/// along with the matched version string. Returns `(installedVersion, null)` if no
+/// suitable entry exists.
+(String, Map<String, dynamic>?) _matchVersion(
+    Map packageMap, String installedVersion) {
+  final installed = _parseVersion(installedVersion);
+  if (installed == null) return (installedVersion, null);
+
+  String? bestKey;
+  Version? bestParsed;
+
+  for (final key in packageMap.keys) {
+    final parsed = _parseVersion(key as String);
+    if (parsed == null) continue;
+    if (parsed > installed) continue; // registry > installed
+    if (bestParsed == null || parsed > bestParsed) {
+      bestKey = key;
+      bestParsed = parsed;
+    }
+  }
+
+  if (bestKey == null) return (installedVersion, null);
+  final entry = packageMap[bestKey];
+  return (bestKey, entry is Map ? Map<String, dynamic>.from(entry) : null);
+}
+
+/// Parses a version string via [Version.parse], padding short versions
+/// (e.g. `1.2` → `1.2.0`) to satisfy semver's three-component requirement.
+/// Returns null if parsing fails after padding.
+Version? _parseVersion(String version) {
+  try {
+    return Version.parse(version);
+  } catch (_) {
+    try {
+      final parts = version.split('-');
+      final numeric = parts.first.split('.');
+      if (numeric.length < 3) {
+        final padded = [...numeric, ...List.filled(3 - numeric.length, '0')];
+        final normalized = padded.join('.') +
+            (parts.length > 1 ? '-${parts.sublist(1).join("-")}' : '');
+        return Version.parse(normalized);
+      }
+    } catch (_) {}
+    return null;
+  }
 }
 
 /// Recursively converts YamlMap/YamlList to plain Dart Map/List.
