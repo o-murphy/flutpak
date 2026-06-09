@@ -105,10 +105,11 @@ runs:
 
     # ── use-flathub-builder: true — container mode with flathub-build ────────
 
-    - name: Add Flathub remote
+    - name: Prepare container environment
       if: inputs.use-flathub-builder == 'true'
       shell: bash
       run: |
+        [ -f /etc/machine-id ] || dbus-uuidgen > /etc/machine-id
         flatpak remote-add --user --if-not-exists flathub \
           https://dl.flathub.org/repo/flathub.flatpakrepo
         flatpak update --user --appstream
