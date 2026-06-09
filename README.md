@@ -23,6 +23,7 @@ build to produce a fully-substituted, `flatpak-builder`-ready output.
 - **Standalone `flutpak.yaml`** — recommended; keeps Flatpak config separate from your Dart project metadata (a `flutpak:` section in `pubspec.yaml` is also supported)
 - **yaml_edit injection** — `generate` sets `tag:` and `commit:` directly in the git source block via `yaml_edit`; no placeholder strings to maintain in the template
 - **Foreign deps registry** — known packages (e.g. `objectbox_flutter_libs`, `sqlite3_flutter_libs`) resolved and injected automatically; local overrides via `foreign-deps:` in config
+- **Rust/Cargo support** — cargokit-based packages (e.g. `rhttp`, `metadata_god`) handled automatically: `Cargo.lock` extracted from pub archives, `cargo-sources.json` generated, `rustup` offline-installer module injected; configure via `rust:` in `flutpak.yaml`
 - **Validation on every run** — `generate` errors early if the template is missing or its `app-id`, `command`, or `runtime-version` diverge from config
 - **Retry on transient errors** — pub.dev and Flutter artifact downloads retry on 429/5xx
 - **`sdk-mod` command** — generates a standalone Flutter SDK module JSON for `!include` in any manifest or SDK Extension
@@ -60,8 +61,8 @@ flutpak (Dart) take different approaches to the same goal.
 | **Config** | Structured `flutpak.yaml` (or `pubspec.yaml` section) | CLI flags + the manifest itself |
 | **Template lifecycle** | Template committed to git; generated output gitignored | Input manifest modified in place; output replaces it |
 | **Flutter SDK needed for `generate`?** | No — engine versions fetched from GitHub API via `flutter.ref` | Yes — Flutter SDK must be installed and discoverable |
-| **Foreign dep Cargo.lock discovery** | Planned (downloads pub archives automatically) | Reads from locally cloned source after `flutter pub get` |
-| **Rust / Cargo support** | Planned (see backlog) | Yes |
+| **Foreign dep Cargo.lock discovery** | Downloads from pub.dev archives automatically | Reads from locally cloned source after `flutter pub get` |
+| **Rust / Cargo support** | Yes — cargokit packages via `rust:` config | Yes |
 | **Version matching in registry** | Highest registry version ≤ installed | Same |
 
 ### Which one to use
@@ -109,9 +110,14 @@ features added in v0.6.0:
 - **`--config` with a subdirectory path** — the workflow passes
   `--config examples/demo_app/flutpak.yaml`; all paths are resolved relative
   to the config file's directory.
-- **Minimum viable `flutpak.yaml`** — the demo config has only `app-id`,
-  `runtime-version`, `command`, `flutter.ref`, and `repo-url`; everything
-  else is auto-detected.
+- **Rust/Cargo via cargokit** — the demo uses `rhttp ^0.12.0` (Rust HTTP client
+  via cargokit); `flutpak generate` resolves the `Cargo.lock`, generates
+  `cargo-sources.json`, and injects a `rustup` offline-installer module. Smoke
+  checks in the template verify `librhttp.so` is bundled and `libsqlite3` is
+  visible from the Flatpak runtime.
+- **SQLite** — the demo uses `sqlite3_flutter_libs ^0.6.0`; `0.6.0` links
+  against the system SQLite provided by `org.freedesktop.Platform` (no extra
+  sources needed). For local `flutter run`, install `libsqlite3-dev`.
 
 The demo app config: [`examples/demo_app/flutpak.yaml`](examples/demo_app/flutpak.yaml)
 The template manifest: [`examples/demo_app/flatpak/io.github.o_murphy.flutpak.demo.yml`](examples/demo_app/flatpak/io.github.o_murphy.flutpak.demo.yml)
@@ -316,13 +322,31 @@ Categories=Utility;
 <?xml version="1.0" encoding="UTF-8"?>
 <component type="desktop-application">
   <id>io.github.YourOrg.YourApp</id>
-  <metadata_license>MIT</metadata_license>
-  <project_license>MIT</project_license>
   <name>Your App</name>
   <summary>Short one-line description</summary>
+  <metadata_license>MIT</metadata_license>
+  <project_license>MIT</project_license>
+  <description>
+    <p>A longer description of your application.</p>
+  </description>
+  <developer id="io.github.YourOrg">
+    <name>Your Name</name>
+  </developer>
+  <categories>
+    <category>Utility</category>
+  </categories>
+  <url type="homepage">https://github.com/YourOrg/YourApp</url>
+  <url type="bugtracker">https://github.com/YourOrg/YourApp/issues</url>
+  <launchable type="desktop-id">io.github.YourOrg.YourApp.desktop</launchable>
+  <supports>
+    <control>pointing</control>
+    <control>keyboard</control>
+    <control>touch</control>
+  </supports>
   <releases>
     <release version="0.1.0" date="2025-01-01"/>
   </releases>
+  <content_rating type="oars-1.1"/>
 </component>
 ```
 
@@ -430,6 +454,8 @@ Open a PR to your app's Flathub repository. Copy the contents of
 <flathub-repo>/
 ├── <app-id>.yml               # flatpak/generated/<app-id>.yml
 ├── generated-sources.json     # flatpak/generated/generated-sources.json
+├── cargo-sources.json         # flatpak/generated/cargo-sources.json  (Rust/cargokit only)
+├── rustup-<version>.json      # flatpak/generated/rustup-<version>.json  (Rust/cargokit only)
 └── patches/                   # flatpak/generated/patches/ (if any)
 ```
 
@@ -487,22 +513,27 @@ foreign-deps:
 
 ### Currently supported packages
 
-| Package | Versions |
-|---|---|
-| `audiotags` | 1.4.5 |
-| `flutter_new_pipe_extractor` | 0.1.0 |
-| `flutter_webrtc` | 1.3.0 |
-| `fvp` | 0.35.0 |
-| `media_kit_libs_linux` | 1.2.1 |
-| `pdfium_flutter` | 0.1.7 |
-| `powersync` | 2.1.0 |
-| `printing` | 5.14.2 |
-| `simple_secure_storage_linux` | 0.2.5 |
-| `sqlcipher_flutter_libs` | 0.6.8 |
-| `sqlite3` | 2.9.4, 3.0.0, 3.3.0 |
-| `sqlite3_flutter_libs` | 0.5.30, 0.5.32, 0.5.34, 0.5.39, 0.5.41, 0.5.42, 0.6.0 |
-| `objectbox_flutter_libs` | 5.3.1, 5.3.2 |
-| `objectbox_sync_flutter_libs` | 5.3.1, 5.3.2 |
+| Package | Versions | Notes |
+|---|---|---|
+| `audiotags` | 1.4.5 | |
+| `flutter_discord_rpc` | 1.0.0 | cargokit |
+| `flutter_new_pipe_extractor` | 0.1.0 | |
+| `flutter_vodozemac` | 0.5.0 | cargokit |
+| `flutter_webrtc` | 1.3.0 | |
+| `fvp` | 0.35.0 | |
+| `media_kit_libs_linux` | 1.2.1 | |
+| `metadata_god` | 1.1.0 | cargokit |
+| `objectbox_flutter_libs` | 5.3.1, 5.3.2 | |
+| `objectbox_sync_flutter_libs` | 5.3.1, 5.3.2 | |
+| `pdfium_flutter` | 0.1.7 | |
+| `powersync` | 2.1.0 | |
+| `printing` | 5.14.2 | |
+| `rhttp` | 0.12.0 | cargokit |
+| `simple_secure_storage_linux` | 0.2.5 | |
+| `sqlcipher_flutter_libs` | 0.6.8 | |
+| `sqlite3` | 2.9.4, 3.0.0, 3.3.0 | |
+| `sqlite3_flutter_libs` | 0.5.30, 0.5.32, 0.5.34, 0.5.39, 0.5.41, 0.5.42, 0.6.0 | |
+| `super_native_extensions` | 0.8.24 | cargokit |
 
 For the full list see [`foreign_deps/foreign_deps.json`](foreign_deps/foreign_deps.json).
 
@@ -544,6 +575,13 @@ flutter:
   ref: "3.44.1"                   # tag, branch ("stable", "main"), or commit SHA
                                    # omit for pure-Dart projects
   patch: flatpak/patches/flutter/shared.sh.patch  # optional custom patch
+
+# Rust/Cargo support (cargokit-based packages). Omit for projects without Rust.
+rust:
+  version: 1.85.0              # Rust toolchain version (default: 1.85.0)
+  rustup-path: /var/lib/rustup  # CARGO_HOME / RUSTUP_HOME path (default: /var/lib/rustup)
+  locks:                        # extra Cargo.lock paths, resolved relative to config dir
+    - rust/Cargo.lock
 
 # Local overrides / additions for the foreign deps registry.
 # Deep-merged on top of the remote registry before source resolution.
@@ -620,6 +658,9 @@ build-options:
 | `pub.locks` | list | `[pubspec.lock]` | Lock files to scan; `$ENV` vars expanded |
 | `flutter.ref` | string | — | Flutter git ref (tag, branch, or SHA). When set, engine versions fetched from GitHub API — no local Flutter install needed for `generate`. Omit for pure-Dart projects. |
 | `flutter.patch` | string | — | Custom patch for Flutter's `shared.sh` bootstrap script. Defaults to the built-in patch when omitted. |
+| `rust.version` | string | `1.85.0` | Rust toolchain version to install via rustup. |
+| `rust.rustup-path` | string | `/var/lib/rustup` | Path used for `CARGO_HOME` and `RUSTUP_HOME` during the Flatpak build. |
+| `rust.locks` | list | `[]` | Extra `Cargo.lock` paths (relative to the config dir, or absolute) merged with any paths from the foreign deps registry. |
 | `foreign-deps` | map | `{}` | Local overrides for the remote foreign deps registry. Deep-merged on top before resolution. See [Local overrides and suppression](#local-overrides-and-suppression). |
 | `foreign-deps-ref` | string | `main` | Git ref used to fetch the foreign deps registry. Pin to a tag or SHA for reproducible builds. |
 | `repo-url` | string | `git remote get-url origin` | Source git URL written into template |

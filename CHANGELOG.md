@@ -7,6 +7,83 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] — 2026-06-09
+
+### Added
+
+- **Rust/Cargo support via cargokit** — `flutpak generate` now handles Flutter
+  packages that use [cargokit](https://github.com/nickel-lang/cargokit) for Rust
+  native code. When a project uses cargokit-based packages (e.g. `rhttp`,
+  `metadata_god`) and the `rust:` config section is present, `generate`:
+  - Parses all resolved `Cargo.lock` files and fetches crate checksums from
+    crates.io to emit a `cargo-sources.json` for offline builds.
+  - Generates a `rustup-<version>.json` module that installs Rust offline:
+    downloads the channel manifest, `rustup-init` binary, and a minimal toolchain
+    (rustc, cargo, rust-std) for both `x86_64` and `aarch64`; creates a `stable`
+    symlink to the pinned version.
+  - Inserts the `rustup` module before the app module in the generated manifest.
+  - Injects `CARGO_HOME`, `RUSTUP_HOME`, and `<rustup-path>/bin` in the app
+    module's `build-options.env` / `append-path`.
+  - Appends `cargo-sources.json` to the app module's `sources` list after
+    `generated-sources.json`.
+
+- **`rust:` config section** in `flutpak.yaml`:
+  ```yaml
+  rust:
+    version: 1.85.0              # Rust toolchain version; default: 1.85.0
+    rustup-path: /var/lib/rustup  # CARGO_HOME / RUSTUP_HOME; default: /var/lib/rustup
+    locks:                        # extra Cargo.lock paths (resolved vs config dir)
+      - rust/Cargo.lock
+  ```
+
+- **`CargoSourcesGenerator`** — parses one or more `Cargo.lock` files, fetches
+  SHA-256 checksums from the crates.io sparse registry index, and emits a
+  `flatpak-builder`-ready archive source list (`cargo-sources.json`).
+
+- **`RustupGenerator`** — generates a complete `rustup-<version>.json` Flatpak
+  module (offline Rust toolchain installer). Downloads channel manifests,
+  architecture-specific `rustup-init` binaries, and the minimal toolchain
+  components; adds `RUSTUP_DIST_SERVER` pointing at the pre-downloaded static
+  directory so `rustup-init` never touches the network at build time.
+
+- **Foreign deps registry — 5 cargokit packages added** (alphabetical order):
+
+  | Package | Version |
+  |---|---|
+  | `flutter_discord_rpc` | 1.0.0 |
+  | `flutter_vodozemac` | 0.5.0 |
+  | `metadata_god` | 1.1.0 |
+  | `rhttp` | 0.12.0 |
+  | `super_native_extensions` | 0.8.24 |
+
+  Each entry specifies `cargo_locks` (for `Cargo.lock` extraction from the
+  pub.dev archive) and `extra_pubspecs` (for `cargokit/build_tool/pubspec.lock`),
+  plus a `cargokit/run_build_tool.sh.patch` source that adds `--offline` to
+  `pub get` inside the cargokit build tool.
+
+- **`foreign_deps/cargokit/run_build_tool.sh.patch`** — adds `--offline` to
+  `pub get` in cargokit's `run_build_tool.sh`; required for Flatpak offline builds.
+
+### Fixed
+
+- **`extraPubspecPaths` not wired into pub sources** — `cargokit/build_tool/pubspec.lock`
+  paths extracted by the foreign deps registry were collected but never passed to
+  `generateSourcesJson`. Cargokit build tool Dart dependencies were missing from
+  `generated-sources.json`. Fixed by extracting `buildLockPaths` as a top-level
+  testable function that explicitly merges `extraPubspecPaths` into `allPubLockPaths`.
+
+### Demo
+
+- **Demo app** (`examples/demo_app/`) extended to exercise sqlite3 + rhttp:
+  - Added `sqlite3 ^2.7.0`, `sqlite3_flutter_libs ^0.6.0`, `rhttp ^0.12.0`
+  - `main.dart` now shows the SQLite version string (from `SELECT sqlite_version()`)
+    and rhttp initialisation status
+  - `flutpak.yaml` gains `rust:` section (`version: 1.85.0`,
+    `rustup-path: /var/lib/rustup`) and `foreign-deps-ref: feat/rust-based-deps`
+  - Template manifest gains two post-build smoke checks:
+    `test -f "$BUNDLE_PATH/lib/librhttp.so"` (Rust native lib bundled by cargokit)
+    and `ldconfig -p | grep -q libsqlite3` (SQLite available from Flatpak runtime)
+
 ## [0.7.1] — 2026-06-09
 
 ### Added
@@ -955,7 +1032,8 @@ git remote.
   output files
 - MIT License
 
-[Unreleased]: https://github.com/o-murphy/flutpak/compare/v0.7.1...HEAD
+[Unreleased]: https://github.com/o-murphy/flutpak/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/o-murphy/flutpak/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/o-murphy/flutpak/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/o-murphy/flutpak/compare/v0.6.1...v0.7.0
 [0.6.1]: https://github.com/o-murphy/flutpak/compare/v0.6.0...v0.6.1

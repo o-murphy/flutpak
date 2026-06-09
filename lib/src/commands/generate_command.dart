@@ -182,12 +182,13 @@ class GenerateCommand extends Command<void> {
     String? generatedCargoSourcesPath;
     Map<String, dynamic>? rustupModule;
     final effectiveRustupPath = cfg.rustupPath ?? '/var/lib/rustup';
+    File? toolsLockFile;
 
     try {
       if (flutterGen != null) {
         // Fetch flutter_tools pubspec.lock so its deps appear in generated-sources.json.
         final toolsLockContent = await flutterGen.fetchFlutterToolsLock();
-        final toolsLockFile = File(p.join(generatedDir, 'flutter_tools.lock'))
+        toolsLockFile = File(p.join(generatedDir, 'flutter_tools.lock'))
           ..createSync(recursive: true)
           ..writeAsStringSync(toolsLockContent);
         allLockPaths = [...effectiveLocks, toolsLockFile.path];
@@ -230,6 +231,7 @@ class GenerateCommand extends Command<void> {
       }
     } finally {
       flutterGen?.dispose();
+      toolsLockFile?.deleteSync();
     }
 
     if (commit == null) {
