@@ -147,7 +147,8 @@ class GenerateCommand extends Command<void> {
     // ── Build Flutter SDK generator if ref is configured ─────────────────
     final flutterRef = flutterRefOverride ?? cfg.flutterRef;
     if (flutterRef == null) {
-      logWarn('flutter.ref is not set — Flutter SDK sources will not be generated. '
+      logWarn(
+          'flutter.ref is not set — Flutter SDK sources will not be generated. '
           'Pass --flutter <ref> or add flutter.ref to flutpak.yaml.');
     }
     FlutterSdkGenerator? flutterGen;
@@ -268,7 +269,7 @@ class GenerateCommand extends Command<void> {
   String _injectGeneratedContent({
     required String content,
     required ManifestConfig manifestCfg,
-    required List<String> extraModules,
+    required List<Object> extraModules,
     required String sourcesPath,
     required String? tag,
     required String? commit,
@@ -337,19 +338,23 @@ class GenerateCommand extends Command<void> {
     // Iterate in reverse so that sequential insertions at the same index
     // preserve the original order from modules.
     var insertIdx = appModuleIdx;
-    for (final modPath in extraModules.reversed) {
-      final f = File(modPath);
-      if (!f.existsSync()) {
-        logWarn('modules: file not found: $modPath');
-        continue;
-      }
-      final modYaml = loadYaml(f.readAsStringSync());
-      if (modYaml is List) {
-        for (final mod in modYaml.reversed) {
-          editor.insertIntoList(['modules'], insertIdx, mod);
+    for (final mod in extraModules.reversed) {
+      if (mod is String) {
+        final f = File(mod);
+        if (!f.existsSync()) {
+          logWarn('modules: file not found: $mod');
+          continue;
         }
-      } else if (modYaml is Map) {
-        editor.insertIntoList(['modules'], insertIdx, modYaml);
+        final modYaml = loadYaml(f.readAsStringSync());
+        if (modYaml is List) {
+          for (final m in modYaml.reversed) {
+            editor.insertIntoList(['modules'], insertIdx, m);
+          }
+        } else if (modYaml is Map) {
+          editor.insertIntoList(['modules'], insertIdx, modYaml);
+        }
+      } else if (mod is Map) {
+        editor.insertIntoList(['modules'], insertIdx, mod);
       }
     }
 

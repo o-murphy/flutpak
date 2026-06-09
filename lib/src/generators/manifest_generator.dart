@@ -93,6 +93,7 @@ class ManifestGenerator {
 
     // App module. modules are injected by `flutpak generate`.
     _line(buf, '  - name: $appName');
+    if (cfg.subdir != null) _line(buf, '    subdir: ${cfg.subdir}');
     _line(buf, '    buildsystem: simple');
     _buildOptions(buf, appName, effectiveExtensions);
     _buildCommands(buf, appName);

@@ -60,6 +60,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **`generate` action input `sdk` renamed to `flutter-ref`**.
 
+- **`manifest:` section removed** — all fields (`app-id`, `runtime-version`,
+  `command`, `sdk-extensions`, `finish-args`, `subdir`, `sources`, `env`,
+  `build-options`) are now top-level keys in `flutpak.yaml`.
+  ```yaml
+  # before
+  manifest:
+    app-id: io.github.YourOrg.YourApp
+    runtime-version: '25.08'
+    finish-args:
+      - --share=network
+
+  # after
+  app-id: io.github.YourOrg.YourApp
+  runtime-version: '25.08'
+  finish-args:
+    - --share=network
+  ```
+
+- **`patches[].strip-trailing-cr` removed** — this key was deprecated in 0.5.0
+  in favour of `crlf:`. The alias is no longer recognised; use `crlf: true`.
+
 ### Added
 
 - **`flutter.ref` config key** — git ref (tag, branch, or commit SHA) for
@@ -78,6 +99,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **`crlf:` on `type: patch` sources** in `foreign-deps:` — normalises the
   patch file to CRLF after download/copy; key is stripped from output JSON.
+
+- **`subdir:` config key** — when the Flutter project lives in a subdirectory
+  of the git repo, set `subdir: apps/myapp` in `flutpak.yaml`; `flutpak init`
+  emits it on the app module automatically. The generated stamp `cp` commands
+  use `$FLATPAK_BUILDER_BUILDDIR` and are unaffected by `subdir:`.
+
+- **Inline modules in `modules:`** — entries can now be either a string path
+  to a YAML file or an inline module map in standard Flatpak manifest format:
+  ```yaml
+  modules:
+    - flatpak/modules/bclibc.yml        # file path (existing)
+    - name: some-dep                    # inline map (new)
+      buildsystem: simple
+      sources:
+        - type: archive
+          url: https://example.com/dep.tar.gz
+          sha256: abc123
+  ```
 
 - **`FlutterSdkGenerator.dispose()`** — `_ownsClient` pattern; closes the
   internal HTTP client only when it was created internally. Eliminates the

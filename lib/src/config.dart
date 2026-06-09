@@ -112,6 +112,11 @@ class ManifestConfig {
   /// Duplicates are silently dropped; mandatory args always appear first.
   final List<String> finishArgs;
 
+  /// Subdirectory within the source tree where the build is performed.
+  /// Passed verbatim as `subdir:` on the app module. Useful when the Flutter
+  /// project lives in a subdirectory of the git repository.
+  final String? subdir;
+
   const ManifestConfig({
     required this.appId,
     required this.runtimeVersion,
@@ -123,6 +128,7 @@ class ManifestConfig {
     this.env = const {},
     this.sources = const [],
     this.finishArgs = const [],
+    this.subdir,
   });
 
   factory ManifestConfig.fromYaml(Map yaml) {
@@ -162,6 +168,7 @@ class ManifestConfig {
           .map((e) => _deepConvertYaml(e) as Map<String, dynamic>)
           .toList(),
       finishArgs: finishArgsRaw,
+      subdir: yaml['subdir'] as String?,
     );
   }
 }
@@ -194,9 +201,10 @@ class FlatpakGenConfig {
   final List<IconEntry> icons;
 
   /// Paths to extra module YAML files injected before the app module at
-  /// generate time. Each file may contain a single module map or a list of
-  /// module maps.
-  final List<String> extraModules;
+  /// generate time. Each element is either a [String] path to a YAML file
+  /// (which may contain a single module map or a list of module maps) or a
+  /// [Map] inline module definition in standard Flatpak manifest format.
+  final List<Object> extraModules;
 
   /// Git repository URL for the app source entry.
   final String? repoUrl;
@@ -227,7 +235,7 @@ class FlatpakGenConfig {
     this.patchPath,
     this.localForeignDeps = const {},
     this.icons = const [],
-    this.extraModules = const [],
+    this.extraModules = const <Object>[],
     this.repoUrl,
     this.disableSubmodules = false,
     this.metainfoPath,
@@ -279,8 +287,13 @@ class FlatpakGenConfig {
       iconsList = const [];
     }
 
-    final extraModules =
-        (yaml['modules'] as List?)?.cast<String>() ?? const <String>[];
+    final extraModules = (yaml['modules'] as List?)?.map((e) {
+          if (e is String) return e as Object;
+          if (e is Map) return _deepConvertYaml(e) as Object;
+          throw ArgumentError(
+              'modules: each entry must be a string path or a module map, got ${e.runtimeType}');
+        }).toList() ??
+        const <Object>[];
 
     if (flutter['sdk'] != null) {
       logWarn('flutter.sdk is deprecated; use flutter.ref instead.');
@@ -302,9 +315,7 @@ class FlatpakGenConfig {
       disableSubmodules: yaml['disable-submodules'] as bool? ?? false,
       metainfoPath: yaml['metainfo-path'] as String?,
       desktopEntryPath: yaml['desktop-entry-path'] as String?,
-      manifest: yaml['manifest'] != null
-          ? ManifestConfig.fromYaml(yaml['manifest'] as Map)
-          : null,
+      manifest: yaml['app-id'] != null ? ManifestConfig.fromYaml(yaml) : null,
       foreignDepsRef: yaml['foreign-deps-ref'] as String?,
     );
   }

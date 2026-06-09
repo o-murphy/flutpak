@@ -78,12 +78,10 @@ void main() {
 
     test('parses manifest config (kebab-case keys)', () {
       final cfg = FlatpakGenConfig.fromYaml({
-        'manifest': {
-          'app-id': 'io.github.example.myapp',
-          'runtime-version': '25.08',
-          'command': 'myapp',
-          'sdk-extensions': ['org.freedesktop.Sdk.Extension.llvm20'],
-        },
+        'app-id': 'io.github.example.myapp',
+        'runtime-version': '25.08',
+        'command': 'myapp',
+        'sdk-extensions': ['org.freedesktop.Sdk.Extension.llvm20'],
       });
       expect(cfg.manifest, isNotNull);
       expect(cfg.manifest!.appId, 'io.github.example.myapp');
@@ -99,7 +97,7 @@ void main() {
           {'size': '256x256', 'path': 'app/share/icons/256/myapp.png'},
           {'size': '512x512', 'path': 'app/share/icons/512/myapp.png'},
         ],
-        'manifest': {'app-id': 'io.example.app'},
+        'app-id': 'io.example.app',
       });
       expect(cfg.icons, hasLength(2));
       expect(cfg.icons.first.size, '256x256');
@@ -111,7 +109,7 @@ void main() {
           'icons': [
             {'size': '512x512', 'path': 'app/share/icons/512/myapp.png'},
           ],
-          'manifest': {'app-id': 'io.example.app'},
+          'app-id': 'io.example.app',
         }),
         throwsArgumentError,
       );
@@ -119,7 +117,7 @@ void main() {
 
     test('icons empty when key absent', () {
       final cfg = FlatpakGenConfig.fromYaml({
-        'manifest': {'app-id': 'io.example.app'},
+        'app-id': 'io.example.app',
       });
       expect(cfg.icons, isEmpty);
     });

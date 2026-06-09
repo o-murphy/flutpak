@@ -193,8 +193,7 @@ metadata and avoids any key-convention ambiguity with `pubspec.yaml`.
 
 ```yaml
 # flutpak.yaml
-manifest:
-  app-id: io.github.YourOrg.YourApp
+app-id: io.github.YourOrg.YourApp
 ```
 
 Everything else is either optional or auto-detected at runtime. For Flutter
@@ -202,10 +201,9 @@ projects, add the Flutter git ref (tag, branch, or commit SHA):
 
 ```yaml
 # flutpak.yaml
+app-id: io.github.YourOrg.YourApp
 flutter:
   ref: "3.44.1"              # tag, "stable", "main", or commit SHA
-manifest:
-  app-id: io.github.YourOrg.YourApp
 ```
 
 `flutter.ref` tells `flutpak generate` which Flutter version to fetch engine
@@ -215,9 +213,9 @@ The Flutter SDK is still needed in CI to run `flutter pub get` / `flutter build`
 > [!TIP]
 > **Sandbox permissions (`finish-args`)** — `flutpak init` writes sensible
 > Flutter desktop defaults into the template. To add extras (e.g.
-> `--filesystem=xdg-documents`), list them under `manifest.finish-args:` in
-> your config — they are merged after the mandatory args with duplicates
-> removed. You can also edit the template directly.
+> `--filesystem=xdg-documents`), list them under `finish-args:` in your config
+> — they are merged after the mandatory args with duplicates removed. You can
+> also edit the template directly.
 
 See [Full config reference](#full-config-reference) for all options.
 
@@ -329,10 +327,10 @@ which sections are safe to edit. Key rules:
 
 > [!TIP]
 > If your Flutter project lives in a **subdirectory** of the git repo (e.g. `apps/myapp/`),
-> add `subdir: apps/myapp` to the module in the template. The generated `cp` stamp commands
-> already use `$FLATPAK_BUILDER_BUILDDIR` (always the module root, not the `subdir`), so
-> they resolve correctly. Other paths in `build-commands` that reference files inside
-> the Flutter project (assets, desktop entry, etc.) remain relative to the `subdir`.
+> set `subdir: apps/myapp` in `flutpak.yaml` — `flutpak init` will emit it on the
+> app module automatically. The generated `cp` stamp commands use `$FLATPAK_BUILDER_BUILDDIR`
+> (always the module root, not the `subdir`), so they resolve correctly. Other paths in
+> `build-commands` that reference files inside the Flutter project remain relative to `subdir:`.
 
 ---
 
@@ -528,32 +526,34 @@ icons:                             # default: single 256x256 entry
 modules:
   - flatpak/modules/bclibc.yml
 
-manifest:
-  app-id: io.github.YourOrg.YourApp  # required
-  runtime-version: '25.08'           # default: '25.08'
+app-id: io.github.YourOrg.YourApp    # required
+runtime-version: '25.08'             # default: '25.08'
 
-  # For Flutter projects, org.freedesktop.Sdk.Extension.llvmXX is auto-injected
-  # based on runtime-version (25.08→llvm20, 24.08→llvm19, 23.08→llvm17).
-  # Add extra extensions manually if needed:
-  sdk-extensions:
-    - org.freedesktop.Sdk.Extension.rust-stable
+# For Flutter projects, org.freedesktop.Sdk.Extension.llvmXX is auto-injected
+# based on runtime-version (25.08→llvm20, 24.08→llvm19, 23.08→llvm17).
+# Add extra extensions manually if needed:
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.rust-stable
 
-  # Auto-detected if omitted (info printed on init):
-  command: yourapp                   # default: last segment of app-id
+# When the Flutter project lives in a subdirectory of the git repo:
+subdir: apps/myapp                   # optional; emitted as subdir: on the app module
 
-  # Extra finish-args merged after the mandatory Flutter defaults:
-  finish-args:
-    - --filesystem=xdg-documents
-    - --share=network
+# Auto-detected if omitted (info printed on init):
+command: yourapp                     # default: last segment of app-id
 
-  # Verbatim flatpak source entries appended to the app module:
-  sources: []
-  env: {}
-  build-options:
-    append-path: /custom/bin
-    prepend-ld-library-path: /custom/lib
-    env:
-      MY_VAR: value
+# Extra finish-args merged after the mandatory Flutter defaults:
+finish-args:
+  - --filesystem=xdg-documents
+  - --share=network
+
+# Verbatim flatpak source entries appended to the app module:
+sources: []
+env: {}
+build-options:
+  append-path: /custom/bin
+  prepend-ld-library-path: /custom/lib
+  env:
+    MY_VAR: value
 ```
 
 ### Field reference table
@@ -571,27 +571,23 @@ manifest:
 | `metainfo-path` | string | `app/share/metainfo/<id>.metainfo.xml` | Validated on `init` and `generate` |
 | `desktop-entry-path` | string | `app/share/applications/<id>.desktop` | Validated on `init` and `generate` |
 | `icons` | list | `[{size: 256x256, path: app/share/icons/…}]` | Must include 256x256 if key is present |
-| `modules` | list | `[]` | YAML files injected as extra modules before the app module |
-| `manifest.app-id` | string | **required** | Reverse-DNS app ID |
-| `manifest.runtime-version` | string | `25.08` | Freedesktop runtime version |
-| `manifest.command` | string | last segment of `app-id` | Executable name inside `/app/bin/` |
-| `manifest.sdk-extensions` | list | `[]` | For Flutter projects, `llvmXX` is **auto-injected** based on `runtime-version` (25.08 → llvm20, 24.08 → llvm19, 23.08 → llvm17). Add here only extensions beyond llvm (e.g. `rust-stable`). |
-| `manifest.finish-args` | list | `[]` | Extra sandbox permission flags appended after the mandatory Flutter defaults (`--share=ipc`, `--socket=fallback-x11`, `--socket=wayland`, `--device=dri`). Duplicates are silently removed. |
-| `manifest.sources` | list | `[]` | Verbatim flatpak source entries appended to the app module |
-| `manifest.env` | map | `{}` | Build-time env vars (shorthand) |
-| `manifest.build-options.append-path` | string | — | Appended to `PATH` during build |
-| `manifest.build-options.prepend-ld-library-path` | string | — | Prepended to `LD_LIBRARY_PATH` |
-| `manifest.build-options.env` | map | `{}` | Merged with top-level `env:` |
+| `modules` | list | `[]` | Path strings or inline module maps injected as extra modules before the app module |
+| `app-id` | string | **required** | Reverse-DNS app ID |
+| `runtime-version` | string | `25.08` | Freedesktop runtime version |
+| `command` | string | last segment of `app-id` | Executable name inside `/app/bin/` |
+| `subdir` | string | — | Subdirectory within the source tree where the build runs. Emitted as `subdir:` on the app module. Useful when the Flutter project lives in a subdirectory of the git repo. The generated stamp `cp` commands use `$FLATPAK_BUILDER_BUILDDIR` and are unaffected by `subdir:`. |
+| `sdk-extensions` | list | `[]` | For Flutter projects, `llvmXX` is **auto-injected** based on `runtime-version` (25.08 → llvm20, 24.08 → llvm19, 23.08 → llvm17). Add here only extensions beyond llvm (e.g. `rust-stable`). |
+| `finish-args` | list | `[]` | Extra sandbox permission flags appended after the mandatory Flutter defaults (`--share=ipc`, `--socket=fallback-x11`, `--socket=wayland`, `--device=dri`). Duplicates are silently removed. |
+| `sources` | list | `[]` | Verbatim flatpak source entries appended to the app module |
+| `env` | map | `{}` | Build-time env vars (shorthand) |
+| `build-options.append-path` | string | — | Appended to `PATH` during build |
+| `build-options.prepend-ld-library-path` | string | — | Prepended to `LD_LIBRARY_PATH` |
+| `build-options.env` | map | `{}` | Merged with top-level `env:` |
 
 > [!NOTE]
-> The `manifest:` section currently supports only the fields listed above. It is
-> **not** a full Flatpak manifest — fields like `build-commands` and `modules`
-> are not read from config. Edit the template file (`flatpak/<app-id>.yml`)
-> directly to change those.
->
-> Future versions plan to treat `manifest:` as a full Flatpak manifest fragment,
-> with flutpak injecting sources, patches, and modules in merge mode (adding
-> only what is not already present) rather than generating a fixed template.
+> Only the fields listed above are read from `flutpak.yaml`. Fields like
+> `build-commands` and the full `modules` tree are not read from config —
+> edit the template file (`flatpak/<app-id>.yml`) directly to change those.
 
 ---
 
@@ -1115,9 +1111,9 @@ file is gitignored and rebuilt on every CI run.
 `generate` also validates consistency between the template and config before
 writing anything:
 
-- `app-id` in template must match `manifest.app-id` in config
-- `command` in template must match `manifest.command` in config (or its default)
-- `runtime-version` in template must match `manifest.runtime-version` in config
+- `app-id` in template must match `app-id` in config
+- `command` in template must match `command` in config (or its default)
+- `runtime-version` in template must match `runtime-version` in config
 
 ---
 

@@ -20,8 +20,8 @@ finish-args:
   - --device=dri
 modules:
   - name: demo
-    buildsystem: simple
     subdir: examples/demo_app
+    buildsystem: simple
     build-options:
       arch:
         x86_64:

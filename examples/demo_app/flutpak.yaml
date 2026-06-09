@@ -6,7 +6,7 @@ flutter:
 
 repo-url: https://github.com/o-murphy/flutpak.git
 
-manifest:
-  app-id: io.github.o_murphy.flutpak.demo
-  runtime-version: '25.08'
-  command: demo_app
+app-id: io.github.o_murphy.flutpak.demo
+runtime-version: '25.08'
+command: demo_app
+subdir: examples/demo_app

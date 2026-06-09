@@ -31,10 +31,9 @@ void main() {
     setUp(() {
       writeFile('flutpak.yaml', '''
 output: flatpak
-manifest:
-  app-id: io.example.App
-  runtime-version: "25.08"
-  command: app
+app-id: io.example.App
+runtime-version: "25.08"
+command: app
 ''');
     });
 
