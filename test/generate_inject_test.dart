@@ -179,6 +179,44 @@ modules:
       expect(modules[1]['name'], 'App');
     });
 
+    test('inserts flutter-sdk module before rustup and app', () {
+      final result = injectGeneratedContent(
+        content: _template(),
+        manifestCfg: _cfg(),
+        extraModules: [],
+        sourcesPath: '/out/generated-sources.json',
+        cargoSourcesPath: '/out/cargo-sources.json',
+        flutterSdkModule: 'flutter-sdk-3.44.1.json',
+        rustupModule: 'rustup-1.85.0.json',
+        rustupPath: '/var/lib/rustup',
+        tag: null,
+        commit: null,
+      );
+      final modules = (loadYaml(result) as Map)['modules'] as List;
+      expect(modules[0], 'flutter-sdk-3.44.1.json');
+      expect(modules[1], 'rustup-1.85.0.json');
+      expect(modules[2]['name'], 'App');
+    });
+
+    test('inserts only rustup when flutterSdkModule is null', () {
+      final result = injectGeneratedContent(
+        content: _template(),
+        manifestCfg: _cfg(),
+        extraModules: [],
+        sourcesPath: '/out/generated-sources.json',
+        cargoSourcesPath: '/out/cargo-sources.json',
+        flutterSdkModule: null,
+        rustupModule: 'rustup-1.85.0.json',
+        rustupPath: '/var/lib/rustup',
+        tag: null,
+        commit: null,
+      );
+      final modules = (loadYaml(result) as Map)['modules'] as List;
+      expect(modules, hasLength(2));
+      expect(modules[0], 'rustup-1.85.0.json');
+      expect(modules[1]['name'], 'App');
+    });
+
     test('no build-options changes when cargoSourcesPath is null', () {
       final result = injectGeneratedContent(
         content: _template(),

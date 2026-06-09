@@ -150,8 +150,8 @@ class ManifestGenerator {
       }
     }
     if (hasFlutter) {
-      // Flutter SDK is bundled into the build dir — add its bin to PATH.
-      appendParts.add('/run/build/$appName/flutter/bin');
+      // Flutter SDK is installed to /var/lib/flutter by the flutter-sdk module.
+      appendParts.add('/var/lib/flutter/bin');
     }
     if (cfg.appendPath != null) appendParts.add(cfg.appendPath!);
 
@@ -176,35 +176,7 @@ class ManifestGenerator {
     buf.writeln('    build-commands:');
 
     if (hasFlutter) {
-      // Flutter cache stamp copies.
-      final stamps = [
-        'engine-dart-sdk.stamp',
-        'material_fonts.stamp',
-        'gradle_wrapper.stamp',
-        'engine_stamp.stamp',
-        'flutter_sdk.stamp',
-        'font-subset.stamp',
-        'linux-sdk.stamp',
-      ];
-      final versionFiles = {
-        'engine-dart-sdk.stamp': 'engine.version',
-        'material_fonts.stamp': 'material_fonts.version',
-        'gradle_wrapper.stamp': 'gradle_wrapper.version',
-        'engine_stamp.stamp': 'engine.version',
-        'flutter_sdk.stamp': 'engine.version',
-        'font-subset.stamp': 'engine.version',
-        'linux-sdk.stamp': 'engine.version',
-      };
-      for (final stamp in stamps) {
-        final src = versionFiles[stamp]!;
-        // Use $FLATPAK_BUILDER_BUILDDIR (always the module root, regardless of
-        // whether subdir: is set) so these commands work correctly when the
-        // Flutter project lives in a subdirectory of the git repo.
-        buf.writeln(
-            '      - cp \$FLATPAK_BUILDER_BUILDDIR/flutter/bin/internal/$src'
-            ' \$FLATPAK_BUILDER_BUILDDIR/flutter/bin/cache/$stamp');
-      }
-
+      // Flutter cache stamp copies are done in the flutter-sdk module (Phase 1).
       buf
         ..writeln('      - flutter pub get --offline')
         ..writeln('      - flutter build linux --release --no-pub')
