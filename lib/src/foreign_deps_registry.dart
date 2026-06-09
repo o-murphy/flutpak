@@ -131,6 +131,8 @@ class ForeignDepsRegistry {
     );
 
     final result = <Map<String, dynamic>>[];
+    final allCargoLockPaths = <String>[];
+    Directory? cargoExtractDir;
 
     for (final package in merged.keys) {
       final version = lockedVersions[package];
@@ -140,6 +142,17 @@ class ForeignDepsRegistry {
       if (packageMap is! Map) continue;
       final (matchedVersion, versionEntry) = _matchVersion(packageMap, version);
       if (versionEntry == null) continue;
+
+      // cargo_locks — extract Cargo.lock files from the pub.dev archive.
+      final cargoLocks = versionEntry['cargo_locks'];
+      if (cargoLocks is List && cargoLocks.isNotEmpty) {
+        cargoExtractDir ??=
+            Directory.systemTemp.createTempSync('flutpak_cargolocks_');
+        final extracted = await _extractCargoLocks(
+            package, version, cargoLocks, cargoExtractDir);
+        allCargoLockPaths.addAll(extracted);
+      }
+
       final manifest = versionEntry['manifest'];
       if (manifest is! Map) continue;
       final sources = manifest['sources'];
@@ -188,10 +201,84 @@ class ForeignDepsRegistry {
           'foreign-deps: $package $versionLabel — ${sources.length} source(s)');
     }
 
-    return ForeignDepsResult(sources: result);
+    return ForeignDepsResult(
+        sources: result, cargoLockPaths: allCargoLockPaths);
   }
 
   void dispose() => _client.close();
+
+  /// Downloads [url] bytes to the cache and returns the cache [File].
+  ///
+  /// Identical semantics to [_downloadFile] but returns the cached file
+  /// instead of copying bytes to a destination path.
+  Future<File> _fetchCached(String url) async {
+    final cacheKey = sha256.convert(utf8.encode(url)).toString();
+    final cacheFile = File(p.join(_cacheDir.path, cacheKey));
+    if (!cacheFile.existsSync()) {
+      final response = await _client.get(Uri.parse(url));
+      if (response.statusCode != 200) {
+        throw Exception('HTTP ${response.statusCode} for $url');
+      }
+      _cacheDir.createSync(recursive: true);
+      cacheFile.writeAsBytesSync(response.bodyBytes);
+    }
+    return cacheFile;
+  }
+
+  /// Downloads the pub.dev archive for [package] [version] and extracts the
+  /// `Cargo.lock` file from each entry in [cargoLockEntries] into [extractDir].
+  ///
+  /// Each entry is a path string like `\$PUB_DEV/rust`; `\$PUB_DEV/` is
+  /// stripped to obtain the archive-relative directory (e.g. `rust`), and
+  /// `Cargo.lock` is appended to form the full archive path.
+  ///
+  /// Returns the absolute paths of the successfully extracted files.
+  Future<List<String>> _extractCargoLocks(
+    String package,
+    String version,
+    List<dynamic> cargoLockEntries,
+    Directory extractDir,
+  ) async {
+    final archiveUrl =
+        'https://pub.dev/packages/$package/versions/$version.tar.gz';
+    final File archiveFile;
+    try {
+      archiveFile = await _fetchCached(archiveUrl);
+    } catch (e) {
+      logWarn(
+          'cargo: could not download $package-$version archive ($e) — skipping');
+      return const [];
+    }
+
+    final extracted = <String>[];
+    for (final raw in cargoLockEntries) {
+      if (raw is! String) continue;
+      final relDir =
+          raw.replaceFirst(r'$PUB_DEV/', '').replaceFirst(r'$PUB_DEV', '');
+      final archivePath = relDir.isEmpty ? 'Cargo.lock' : '$relDir/Cargo.lock';
+
+      final destFile =
+          File(p.join(extractDir.path, '$package-$version', archivePath));
+      destFile.parent.createSync(recursive: true);
+
+      final result = await Process.run(
+        'tar',
+        ['-xzOf', archiveFile.path, archivePath],
+        stdoutEncoding: utf8,
+        stderrEncoding: utf8,
+      );
+      if (result.exitCode != 0) {
+        logWarn('cargo: $package-$version: could not extract $archivePath'
+            ' (${(result.stderr as String).trim()}) — skipping');
+        continue;
+      }
+
+      destFile.writeAsStringSync(result.stdout as String);
+      logInfo('cargo: extracted $archivePath from $package-$version');
+      extracted.add(destFile.path);
+    }
+    return extracted;
+  }
 
   /// Replaces `\$PUB_DEV` with `.pub-cache/hosted/pub.dev/<package>-<version>`
   /// recursively in all string values of [source]. `\$APP` is left as-is.

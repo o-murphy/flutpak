@@ -523,6 +523,175 @@ packages:
       expect(result.sources.first['url'], 'https://local.com/new.so');
     });
   });
+
+  // ── cargo_locks extraction ────────────────────────────────────────────────
+
+  group('cargo_locks extraction', () {
+    const cargoLockContent = '''
+version = 3
+
+[[package]]
+name = "libc"
+version = "0.2.172"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "deadbeef"
+''';
+
+    /// Creates a .tar.gz archive containing rust/Cargo.lock and returns its bytes.
+    Future<Uint8List> makeArchive() async {
+      final tmp = Directory.systemTemp.createTempSync('flutpak_arch_test_');
+      try {
+        File(p.join(tmp.path, 'rust', 'Cargo.lock'))
+          ..createSync(recursive: true)
+          ..writeAsStringSync(cargoLockContent);
+        await Process.run('tar', [
+          '-czf',
+          p.join(tmp.path, 'pkg.tar.gz'),
+          '-C',
+          tmp.path,
+          'rust/Cargo.lock',
+        ]);
+        return File(p.join(tmp.path, 'pkg.tar.gz')).readAsBytesSync();
+      } finally {
+        tmp.deleteSync(recursive: true);
+      }
+    }
+
+    test('extracts Cargo.lock and returns its path in cargoLockPaths',
+        () async {
+      final archiveBytes = await makeArchive();
+
+      final lockFile = File(p.join(tmpDir.path, 'cargo.lock'))
+        ..writeAsStringSync('''
+packages:
+  mypkg:
+    dependency: "direct main"
+    source: hosted
+    version: "1.0.0"
+''');
+
+      final r = ForeignDepsRegistry(
+        client: MockClient((req) async {
+          final url = req.url.toString();
+          if (url.endsWith('foreign_deps.json')) {
+            return http.Response(
+              jsonEncode({
+                'mypkg': {
+                  '1.0.0': {
+                    'cargo_locks': [r'$PUB_DEV/rust'],
+                    'manifest': {
+                      'sources': [
+                        {
+                          'type': 'file',
+                          'url': 'https://x.com/lib.so',
+                          'dest': r'$PUB_DEV'
+                        }
+                      ]
+                    }
+                  }
+                }
+              }),
+              200,
+            );
+          }
+          if (url.contains('pub.dev/packages/mypkg/versions/1.0.0.tar.gz')) {
+            return http.Response.bytes(archiveBytes, 200);
+          }
+          return http.Response('not found', 404);
+        }),
+        cacheDir: cacheDir,
+      );
+
+      final result = await r.resolve(
+        lockPaths: [lockFile.path],
+        generatedPatchesDir: p.join(tmpDir.path, 'patches'),
+      );
+
+      expect(result.cargoLockPaths, hasLength(1));
+      expect(result.cargoLockPaths.first, endsWith('Cargo.lock'));
+      expect(
+        File(result.cargoLockPaths.first).readAsStringSync(),
+        contains('libc'),
+      );
+    });
+
+    test('cargoLockPaths is empty when no cargo_locks entries in registry',
+        () async {
+      final lockFile = File(p.join(tmpDir.path, 'plain.lock'))
+        ..writeAsStringSync('''
+packages:
+  mypkg:
+    dependency: "direct main"
+    source: hosted
+    version: "1.0.0"
+''');
+
+      final r = ForeignDepsRegistry(
+        client: _mockClient(registryJson: {
+          'mypkg': {
+            '1.0.0': {
+              'manifest': {
+                'sources': [
+                  {
+                    'type': 'file',
+                    'url': 'https://x.com/lib.so',
+                    'dest': r'$PUB_DEV'
+                  }
+                ]
+              }
+            }
+          }
+        }),
+        cacheDir: cacheDir,
+      );
+
+      final result = await r.resolve(
+        lockPaths: [lockFile.path],
+        generatedPatchesDir: p.join(tmpDir.path, 'patches'),
+      );
+
+      expect(result.cargoLockPaths, isEmpty);
+    });
+
+    test('skips entry gracefully when pub.dev archive returns 404', () async {
+      final lockFile = File(p.join(tmpDir.path, 'err.lock'))
+        ..writeAsStringSync('''
+packages:
+  badpkg:
+    dependency: "direct main"
+    source: hosted
+    version: "0.1.0"
+''');
+
+      final r = ForeignDepsRegistry(
+        client: MockClient((req) async {
+          final url = req.url.toString();
+          if (url.endsWith('foreign_deps.json')) {
+            return http.Response(
+              jsonEncode({
+                'badpkg': {
+                  '0.1.0': {
+                    'cargo_locks': [r'$PUB_DEV/rust'],
+                    'manifest': {'sources': []}
+                  }
+                }
+              }),
+              200,
+            );
+          }
+          return http.Response('not found', 404);
+        }),
+        cacheDir: cacheDir,
+      );
+
+      final result = await r.resolve(
+        lockPaths: [lockFile.path],
+        generatedPatchesDir: p.join(tmpDir.path, 'patches'),
+      );
+
+      expect(result.cargoLockPaths, isEmpty);
+    });
+  });
 }
 
 // Compute the cache key the same way ForeignDepsRegistry does.
