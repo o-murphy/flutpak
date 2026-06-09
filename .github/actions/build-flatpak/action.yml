@@ -1,7 +1,12 @@
 name: Build Flatpak
 description: >
-  Installs org.flatpak.Builder, lints the manifest, builds the Flatpak,
-  lints the resulting repo, and exports a .flatpak bundle.
+  Builds a Flatpak and optionally exports a .flatpak bundle.
+  Two modes are available via use-flathub-builder:
+    false (default) — delegates to flatpak/flatpak-github-actions/flatpak-builder.
+    true             — runs lint + flathub-build + lint using native binaries from
+                       the ghcr.io/flathub-infra/flatpak-github-actions container
+                       (requires container: at the job level). Validates Flathub
+                       compatibility via flathub-build.
 
 inputs:
   manifest:
@@ -30,6 +35,17 @@ inputs:
     description: "Artifact retention in days"
     required: false
     default: "2"
+  use-flathub-builder:
+    description: >
+      false (default): delegate to flatpak/flatpak-github-actions/flatpak-builder@v6.
+      true: use native flathub-build + flatpak-builder-lint from the
+      ghcr.io/flathub-infra/flatpak-github-actions container for Flathub
+      compatibility validation. Requires the job to set:
+        container:
+          image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-*
+          options: --privileged
+    required: false
+    default: "false"
   github-token:
     description: "GitHub token for private source downloads via ~/.netrc"
     required: false
@@ -43,7 +59,7 @@ outputs:
     description: "Architecture used for the build"
     value: ${{ steps.meta.outputs.arch }}
   artifact-url:
-    description: "URL of the uploaded artifact"
+    description: "URL of the uploaded artifact (use-flathub-builder: true only)"
     value: ${{ steps.upload.outputs.artifact-url }}
 
 runs:
@@ -65,20 +81,6 @@ runs:
         [ -z "$BUNDLE" ] && BUNDLE="${INPUT_APP_ID}_${ARCH}.flatpak"
         echo "bundle=$BUNDLE" >> "$GITHUB_OUTPUT"
 
-    - name: Install org.flatpak.Builder
-      shell: bash
-      run: |
-        source "$GITHUB_ACTION_PATH/../../../scripts/flatpak-build.sh"
-        install_flatpak_builder
-
-    - name: Lint manifest
-      shell: bash
-      env:
-        INPUT_MANIFEST: ${{ inputs.manifest }}
-      run: |
-        source "$GITHUB_ACTION_PATH/../../../scripts/flatpak-build.sh"
-        lint_flatpak_manifest "$INPUT_MANIFEST"
-
     - name: Configure GitHub token
       if: inputs.github-token != ''
       shell: bash
@@ -88,7 +90,31 @@ runs:
         echo "machine github.com login x-access-token password ${INPUT_GITHUB_TOKEN}" >> ~/.netrc
         chmod 600 ~/.netrc
 
+    # ── use-flathub-builder: false — delegate to flatpak-github-actions ──────
+
     - name: Build Flatpak
+      if: inputs.use-flathub-builder != 'true'
+      uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+      with:
+        manifest-path: ${{ inputs.manifest }}
+        bundle: ${{ steps.meta.outputs.bundle }}
+        arch: ${{ steps.meta.outputs.arch }}
+        upload-artifact: ${{ inputs.artifact-name != '' }}
+        cache-key: flatpak-builder-${{ steps.meta.outputs.arch }}-${{ github.sha }}
+
+    # ── use-flathub-builder: true — container mode with flathub-build ────────
+
+    - name: Lint manifest
+      if: inputs.use-flathub-builder == 'true'
+      shell: bash
+      env:
+        INPUT_MANIFEST: ${{ inputs.manifest }}
+      run: |
+        source "$GITHUB_ACTION_PATH/../../../scripts/flatpak-build.sh"
+        lint_flatpak_manifest "$INPUT_MANIFEST"
+
+    - name: Build Flatpak
+      if: inputs.use-flathub-builder == 'true'
       shell: bash
       env:
         INPUT_MANIFEST: ${{ inputs.manifest }}
@@ -97,12 +123,14 @@ runs:
         build_flatpak "$INPUT_MANIFEST"
 
     - name: Lint repo
+      if: inputs.use-flathub-builder == 'true'
       shell: bash
       run: |
         source "$GITHUB_ACTION_PATH/../../../scripts/flatpak-build.sh"
         lint_flatpak_repo repo
 
     - name: Export bundle
+      if: inputs.use-flathub-builder == 'true'
       shell: bash
       env:
         META_ARCH: ${{ steps.meta.outputs.arch }}
@@ -114,7 +142,7 @@ runs:
 
     - name: Upload bundle artifact
       id: upload
-      if: inputs.artifact-name != ''
+      if: ${{ inputs.use-flathub-builder == 'true' && inputs.artifact-name != '' }}
       uses: actions/upload-artifact@v7
       with:
         name: ${{ inputs.artifact-name }}
