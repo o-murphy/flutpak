@@ -19,7 +19,7 @@ import 'command_utils.dart';
 ///
 /// Reads `<output>/<app_id>.yml` as the template, validates it, substitutes
 /// `__FLATPAK_TAG__` / `__FLATPAK_COMMIT__` placeholders, generates
-/// `generated-sources.json`, copies patches, and writes the final manifest to
+/// `pubspec-sources.json`, copies patches, and writes the final manifest to
 /// `<output>/generated/<app_id>.yml`.
 class GenerateCommand extends Command<void> {
   @override
@@ -27,7 +27,7 @@ class GenerateCommand extends Command<void> {
   @override
   final description =
       'Substitute tag/commit placeholders in the template manifest, generate\n'
-      'generated-sources.json, and copy everything into generated/.';
+      'pubspec-sources.json, and copy everything into generated/.';
 
   GenerateCommand() {
     argParser
@@ -121,7 +121,7 @@ class GenerateCommand extends Command<void> {
 
     // ── Output paths ──────────────────────────────────────────────────────
     final generatedDir = p.join(outputDir, 'generated');
-    final sourcesPath = p.join(generatedDir, 'generated-sources.json');
+    final sourcesPath = p.join(generatedDir, 'pubspec-sources.json');
     final generatedManifestPath =
         p.join(generatedDir, '${manifestCfg.appId}.yml');
     final generatedPatchesDir = p.join(generatedDir, 'patches');
@@ -398,7 +398,7 @@ String injectGeneratedContent({
   }
 
   // ── Append sources ────────────────────────────────────────────────────
-  // Order: generated-sources.json → manifest.sources → cargo-sources.json
+  // Order: pubspec-sources.json → manifest.sources → cargo-sources.json
   srcList.add(p.basename(sourcesPath));
   for (final src in manifestCfg.sources) {
     srcList.add(Map<String, dynamic>.from(src));

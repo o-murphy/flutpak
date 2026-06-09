@@ -27,7 +27,7 @@ void main() {
         content: _template(),
         manifestCfg: _cfg(),
         extraModules: [],
-        sourcesPath: '/out/generated-sources.json',
+        sourcesPath: '/out/pubspec-sources.json',
         tag: 'v1.2.3',
         commit: 'deadbeef',
       );
@@ -37,32 +37,32 @@ void main() {
       expect(src['commit'], 'deadbeef');
     });
 
-    test('appends generated-sources.json to app module sources', () {
+    test('appends pubspec-sources.json to app module sources', () {
       final result = injectGeneratedContent(
         content: _template(),
         manifestCfg: _cfg(),
         extraModules: [],
-        sourcesPath: '/out/generated-sources.json',
+        sourcesPath: '/out/pubspec-sources.json',
         tag: null,
         commit: null,
       );
       final sources = (_appModule(result)['sources'] as List);
-      expect(sources.last, 'generated-sources.json');
+      expect(sources.last, 'pubspec-sources.json');
     });
 
-    test('appends cargo-sources.json after generated-sources.json', () {
+    test('appends cargo-sources.json after pubspec-sources.json', () {
       final result = injectGeneratedContent(
         content: _template(),
         manifestCfg: _cfg(),
         extraModules: [],
-        sourcesPath: '/out/generated-sources.json',
+        sourcesPath: '/out/pubspec-sources.json',
         cargoSourcesPath: '/out/cargo-sources.json',
         rustupPath: '/var/lib/rustup',
         tag: null,
         commit: null,
       );
       final sources = (_appModule(result)['sources'] as List);
-      expect(sources[sources.length - 2], 'generated-sources.json');
+      expect(sources[sources.length - 2], 'pubspec-sources.json');
       expect(sources.last, 'cargo-sources.json');
     });
 
@@ -72,7 +72,7 @@ void main() {
         content: _template(),
         manifestCfg: _cfg(),
         extraModules: [],
-        sourcesPath: '/out/generated-sources.json',
+        sourcesPath: '/out/pubspec-sources.json',
         cargoSourcesPath: '/out/cargo-sources.json',
         rustupPath: rustupPath,
         tag: null,
@@ -88,7 +88,7 @@ void main() {
         content: _template(),
         manifestCfg: _cfg(),
         extraModules: [],
-        sourcesPath: '/out/generated-sources.json',
+        sourcesPath: '/out/pubspec-sources.json',
         cargoSourcesPath: '/out/cargo-sources.json',
         rustupPath: '/var/lib/rustup',
         tag: null,
@@ -119,7 +119,7 @@ modules:
         content: templateWithPath,
         manifestCfg: _cfg(),
         extraModules: [],
-        sourcesPath: '/out/generated-sources.json',
+        sourcesPath: '/out/pubspec-sources.json',
         cargoSourcesPath: '/out/cargo-sources.json',
         rustupPath: '/var/lib/rustup',
         tag: null,
@@ -151,7 +151,7 @@ modules:
         content: templateWithEnv,
         manifestCfg: _cfg(),
         extraModules: [],
-        sourcesPath: '/out/generated-sources.json',
+        sourcesPath: '/out/pubspec-sources.json',
         cargoSourcesPath: '/out/cargo-sources.json',
         rustupPath: '/var/lib/rustup',
         tag: null,
@@ -167,7 +167,7 @@ modules:
         content: _template(),
         manifestCfg: _cfg(),
         extraModules: [],
-        sourcesPath: '/out/generated-sources.json',
+        sourcesPath: '/out/pubspec-sources.json',
         cargoSourcesPath: '/out/cargo-sources.json',
         rustupModule: 'rustup-1.85.0.json',
         rustupPath: '/var/lib/rustup',
@@ -184,7 +184,7 @@ modules:
         content: _template(),
         manifestCfg: _cfg(),
         extraModules: [],
-        sourcesPath: '/out/generated-sources.json',
+        sourcesPath: '/out/pubspec-sources.json',
         cargoSourcesPath: '/out/cargo-sources.json',
         flutterSdkModule: 'flutter-sdk-3.44.1.json',
         rustupModule: 'rustup-1.85.0.json',
@@ -203,7 +203,7 @@ modules:
         content: _template(),
         manifestCfg: _cfg(),
         extraModules: [],
-        sourcesPath: '/out/generated-sources.json',
+        sourcesPath: '/out/pubspec-sources.json',
         cargoSourcesPath: '/out/cargo-sources.json',
         flutterSdkModule: null,
         rustupModule: 'rustup-1.85.0.json',
@@ -222,7 +222,7 @@ modules:
         content: _template(),
         manifestCfg: _cfg(),
         extraModules: [],
-        sourcesPath: '/out/generated-sources.json',
+        sourcesPath: '/out/pubspec-sources.json',
         tag: null,
         commit: null,
       );
@@ -234,7 +234,7 @@ modules:
         content: _template(),
         manifestCfg: _cfg(),
         extraModules: [],
-        sourcesPath: '/out/generated-sources.json',
+        sourcesPath: '/out/pubspec-sources.json',
         tag: null,
         commit: null,
       );

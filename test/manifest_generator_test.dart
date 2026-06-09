@@ -33,7 +33,7 @@ ManifestGenerator _generator({
 }) =>
     ManifestGenerator(
       cfg: cfg ?? _baseConfig(),
-      generatedSourcesPath: 'flatpak/generated-sources.json',
+      generatedSourcesPath: 'flatpak/pubspec-sources.json',
       outputRelDir: outputRelDir,
       resolvedRepoUrl: resolvedRepoUrl,
       hasFlutter: hasFlutter,
@@ -213,12 +213,12 @@ void main() {
       expect(yaml, isNot(contains('url:')));
     });
 
-    test('does not include generated-sources.json (injected at generate time)',
+    test('does not include pubspec-sources.json (injected at generate time)',
         () {
       final yaml = _generator(cfg: _baseConfig(command: 'myapp')).generate();
 
-      // generated-sources.json may appear in the header comment but not as a source entry
-      expect(yaml, isNot(contains('- generated-sources.json')));
+      // pubspec-sources.json may appear in the header comment but not as a source entry
+      expect(yaml, isNot(contains('- pubspec-sources.json')));
     });
 
     test('does not include patch or extra sources (injected at generate time)',

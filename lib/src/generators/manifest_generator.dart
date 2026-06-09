@@ -7,7 +7,7 @@ import '../config.dart';
 class ManifestGenerator {
   final ManifestConfig cfg;
 
-  /// Path to generated-sources.json relative to the project root.
+  /// Path to pubspec-sources.json relative to the project root.
   final String generatedSourcesPath;
 
   /// Directory path relative to the project source root used in install
@@ -61,7 +61,7 @@ class ManifestGenerator {
     _line(buf,
         '# SAFE TO EDIT   finish-args, build-commands, build-options, sdk-extensions, modules');
     _line(buf,
-        '# AUTO-INJECTED  tag, commit, modules, manifest.sources, generated-sources.json, and patches are set/appended by generate');
+        '# AUTO-INJECTED  tag, commit, modules, manifest.sources, pubspec-sources.json, and patches are set/appended by generate');
     _line(buf, 'app-id: ${cfg.appId}');
     _line(buf, 'runtime: org.freedesktop.Platform');
     _line(buf, "runtime-version: '${cfg.runtimeVersion}'");
@@ -212,7 +212,7 @@ class ManifestGenerator {
       buf.writeln('        url: $url');
     }
     if (disableSubmodules) buf.writeln('        disable-submodules: true');
-    // tag, commit, manifest.sources, generated-sources.json, and patches are
+    // tag, commit, manifest.sources, pubspec-sources.json, and patches are
     // set/appended by `flutpak generate` via yaml_edit.
   }
 
