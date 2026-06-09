@@ -18,6 +18,7 @@ finish-args:
   - --socket=fallback-x11
   - --socket=wayland
   - --device=dri
+  - --share=network
 modules:
   - name: demo
     subdir: examples/demo_app
@@ -45,6 +46,10 @@ modules:
       - cp $FLATPAK_BUILDER_BUILDDIR/flutter/bin/internal/engine.version $FLATPAK_BUILDER_BUILDDIR/flutter/bin/cache/linux-sdk.stamp
       - flutter pub get --offline
       - flutter build linux --release --no-pub
+      # Smoke: rhttp Rust native lib must be bundled by cargokit
+      - test -f "$BUNDLE_PATH/lib/librhttp.so" && echo "smoke: librhttp.so OK"
+      # Smoke: SQLite system lib must be visible in Flatpak runtime
+      - ldconfig -p | grep -q libsqlite3 && echo "smoke: libsqlite3 OK"
       - mkdir -p /app/demo
       - cp -r "$BUNDLE_PATH"/. /app/demo/
       - install -Dm755 flatpak/demo-wrapper.sh /app/bin/demo_app
