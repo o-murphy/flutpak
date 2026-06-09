@@ -19,7 +19,7 @@ class CargoSourcesGenerator {
   }) async {
     final sources = <Map<String, dynamic>>[];
     final cargoVendoredSources = <String, dynamic>{
-      _vendoredSources: {'directory': 'vendor'},
+      _vendoredSources: {'directory': _cargoCrates},
     };
 
     for (final lockPath in cargoLockPaths) {
