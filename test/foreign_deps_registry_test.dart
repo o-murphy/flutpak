@@ -692,6 +692,191 @@ packages:
       expect(result.cargoLockPaths, isEmpty);
     });
   });
+
+  // ── extra_pubspecs extraction ─────────────────────────────────────────────
+
+  group('extra_pubspecs extraction', () {
+    const pubspecLockContent = '''
+packages:
+  args:
+    dependency: transitive
+    source: hosted
+    version: "2.5.0"
+''';
+
+    Future<Uint8List> makeArchive({bool includeCargo = false}) async {
+      final tmp = Directory.systemTemp.createTempSync('flutpak_arch_test_');
+      try {
+        File(p.join(tmp.path, 'cargokit', 'build_tool', 'pubspec.lock'))
+          ..createSync(recursive: true)
+          ..writeAsStringSync(pubspecLockContent);
+        final tarArgs = [
+          '-czf',
+          p.join(tmp.path, 'pkg.tar.gz'),
+          '-C',
+          tmp.path,
+          'cargokit/build_tool/pubspec.lock',
+        ];
+        if (includeCargo) {
+          File(p.join(tmp.path, 'rust', 'Cargo.lock'))
+            ..createSync(recursive: true)
+            ..writeAsStringSync('version = 3\n');
+          tarArgs.add('rust/Cargo.lock');
+        }
+        await Process.run('tar', tarArgs);
+        return File(p.join(tmp.path, 'pkg.tar.gz')).readAsBytesSync();
+      } finally {
+        tmp.deleteSync(recursive: true);
+      }
+    }
+
+    test('extracts pubspec.lock and returns its path in extraPubspecPaths',
+        () async {
+      final archiveBytes = await makeArchive();
+
+      final lockFile = File(p.join(tmpDir.path, 'pub.lock'))
+        ..writeAsStringSync('''
+packages:
+  mypkg:
+    dependency: "direct main"
+    source: hosted
+    version: "1.0.0"
+''');
+
+      final r = ForeignDepsRegistry(
+        client: MockClient((req) async {
+          final url = req.url.toString();
+          if (url.endsWith('foreign_deps.json')) {
+            return http.Response(
+              jsonEncode({
+                'mypkg': {
+                  '1.0.0': {
+                    'extra_pubspecs': [r'$PUB_DEV/cargokit/build_tool'],
+                    'manifest': {
+                      'sources': [
+                        {
+                          'type': 'file',
+                          'url': 'https://x.com/f',
+                          'dest': r'$PUB_DEV'
+                        }
+                      ]
+                    }
+                  }
+                }
+              }),
+              200,
+            );
+          }
+          if (url.contains('pub.dev/packages/mypkg/versions/1.0.0.tar.gz')) {
+            return http.Response.bytes(archiveBytes, 200);
+          }
+          return http.Response('not found', 404);
+        }),
+        cacheDir: cacheDir,
+      );
+
+      final result = await r.resolve(
+        lockPaths: [lockFile.path],
+        generatedPatchesDir: p.join(tmpDir.path, 'patches'),
+      );
+
+      expect(result.extraPubspecPaths, hasLength(1));
+      expect(result.extraPubspecPaths.first, endsWith('pubspec.lock'));
+      expect(
+        File(result.extraPubspecPaths.first).readAsStringSync(),
+        contains('args'),
+      );
+    });
+
+    test('cargo_locks and extra_pubspecs together share one archive download',
+        () async {
+      final archiveBytes = await makeArchive(includeCargo: true);
+      var downloadCount = 0;
+
+      final lockFile = File(p.join(tmpDir.path, 'both.lock'))
+        ..writeAsStringSync('''
+packages:
+  mypkg:
+    dependency: "direct main"
+    source: hosted
+    version: "2.0.0"
+''');
+
+      final r = ForeignDepsRegistry(
+        client: MockClient((req) async {
+          final url = req.url.toString();
+          if (url.endsWith('foreign_deps.json')) {
+            return http.Response(
+              jsonEncode({
+                'mypkg': {
+                  '2.0.0': {
+                    'cargo_locks': [r'$PUB_DEV/rust'],
+                    'extra_pubspecs': [r'$PUB_DEV/cargokit/build_tool'],
+                    'manifest': {'sources': []}
+                  }
+                }
+              }),
+              200,
+            );
+          }
+          if (url.contains('pub.dev/packages/mypkg/versions/2.0.0.tar.gz')) {
+            downloadCount++;
+            return http.Response.bytes(archiveBytes, 200);
+          }
+          return http.Response('not found', 404);
+        }),
+        cacheDir: cacheDir,
+      );
+
+      final result = await r.resolve(
+        lockPaths: [lockFile.path],
+        generatedPatchesDir: p.join(tmpDir.path, 'patches'),
+      );
+
+      expect(result.cargoLockPaths, hasLength(1));
+      expect(result.extraPubspecPaths, hasLength(1));
+      // Archive fetched once, second call served from cache.
+      expect(downloadCount, 1);
+    });
+
+    test('extraPubspecPaths is empty when no extra_pubspecs in registry',
+        () async {
+      final lockFile = File(p.join(tmpDir.path, 'nopub.lock'))
+        ..writeAsStringSync('''
+packages:
+  mypkg:
+    dependency: "direct main"
+    source: hosted
+    version: "1.0.0"
+''');
+
+      final r = ForeignDepsRegistry(
+        client: _mockClient(registryJson: {
+          'mypkg': {
+            '1.0.0': {
+              'manifest': {
+                'sources': [
+                  {
+                    'type': 'file',
+                    'url': 'https://x.com/f',
+                    'dest': r'$PUB_DEV'
+                  }
+                ]
+              }
+            }
+          }
+        }),
+        cacheDir: cacheDir,
+      );
+
+      final result = await r.resolve(
+        lockPaths: [lockFile.path],
+        generatedPatchesDir: p.join(tmpDir.path, 'patches'),
+      );
+
+      expect(result.extraPubspecPaths, isEmpty);
+    });
+  });
 }
 
 // Compute the cache key the same way ForeignDepsRegistry does.

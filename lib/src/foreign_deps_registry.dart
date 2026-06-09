@@ -132,7 +132,8 @@ class ForeignDepsRegistry {
 
     final result = <Map<String, dynamic>>[];
     final allCargoLockPaths = <String>[];
-    Directory? cargoExtractDir;
+    final allExtraPubspecPaths = <String>[];
+    Directory? extractDir;
 
     for (final package in merged.keys) {
       final version = lockedVersions[package];
@@ -146,11 +147,17 @@ class ForeignDepsRegistry {
       // cargo_locks — extract Cargo.lock files from the pub.dev archive.
       final cargoLocks = versionEntry['cargo_locks'];
       if (cargoLocks is List && cargoLocks.isNotEmpty) {
-        cargoExtractDir ??=
-            Directory.systemTemp.createTempSync('flutpak_cargolocks_');
-        final extracted = await _extractCargoLocks(
-            package, version, cargoLocks, cargoExtractDir);
-        allCargoLockPaths.addAll(extracted);
+        extractDir ??= Directory.systemTemp.createTempSync('flutpak_extract_');
+        allCargoLockPaths.addAll(await _extractFromArchive(
+            package, version, cargoLocks, 'Cargo.lock', extractDir));
+      }
+
+      // extra_pubspecs — extract pubspec.lock from sub-package directories.
+      final extraPubspecs = versionEntry['extra_pubspecs'];
+      if (extraPubspecs is List && extraPubspecs.isNotEmpty) {
+        extractDir ??= Directory.systemTemp.createTempSync('flutpak_extract_');
+        allExtraPubspecPaths.addAll(await _extractFromArchive(
+            package, version, extraPubspecs, 'pubspec.lock', extractDir));
       }
 
       final manifest = versionEntry['manifest'];
@@ -202,7 +209,10 @@ class ForeignDepsRegistry {
     }
 
     return ForeignDepsResult(
-        sources: result, cargoLockPaths: allCargoLockPaths);
+      sources: result,
+      cargoLockPaths: allCargoLockPaths,
+      extraPubspecPaths: allExtraPubspecPaths,
+    );
   }
 
   void dispose() => _client.close();
@@ -225,18 +235,19 @@ class ForeignDepsRegistry {
     return cacheFile;
   }
 
-  /// Downloads the pub.dev archive for [package] [version] and extracts the
-  /// `Cargo.lock` file from each entry in [cargoLockEntries] into [extractDir].
+  /// Downloads the pub.dev archive for [package] [version] and extracts
+  /// [filename] from each directory in [entries] into [extractDir].
   ///
   /// Each entry is a path string like `\$PUB_DEV/rust`; `\$PUB_DEV/` is
   /// stripped to obtain the archive-relative directory (e.g. `rust`), and
-  /// `Cargo.lock` is appended to form the full archive path.
+  /// [filename] is appended (e.g. `rust/Cargo.lock`).
   ///
   /// Returns the absolute paths of the successfully extracted files.
-  Future<List<String>> _extractCargoLocks(
+  Future<List<String>> _extractFromArchive(
     String package,
     String version,
-    List<dynamic> cargoLockEntries,
+    List<dynamic> entries,
+    String filename,
     Directory extractDir,
   ) async {
     final archiveUrl =
@@ -246,35 +257,36 @@ class ForeignDepsRegistry {
       archiveFile = await _fetchCached(archiveUrl);
     } catch (e) {
       logWarn(
-          'cargo: could not download $package-$version archive ($e) — skipping');
+          'foreign-deps: could not download $package-$version archive ($e) — skipping');
       return const [];
     }
 
     final extracted = <String>[];
-    for (final raw in cargoLockEntries) {
+    for (final raw in entries) {
       if (raw is! String) continue;
       final relDir =
           raw.replaceFirst(r'$PUB_DEV/', '').replaceFirst(r'$PUB_DEV', '');
-      final archivePath = relDir.isEmpty ? 'Cargo.lock' : '$relDir/Cargo.lock';
+      final archivePath = relDir.isEmpty ? filename : '$relDir/$filename';
 
       final destFile =
           File(p.join(extractDir.path, '$package-$version', archivePath));
       destFile.parent.createSync(recursive: true);
 
-      final result = await Process.run(
+      final proc = await Process.run(
         'tar',
         ['-xzOf', archiveFile.path, archivePath],
         stdoutEncoding: utf8,
         stderrEncoding: utf8,
       );
-      if (result.exitCode != 0) {
-        logWarn('cargo: $package-$version: could not extract $archivePath'
-            ' (${(result.stderr as String).trim()}) — skipping');
+      if (proc.exitCode != 0) {
+        logWarn(
+            'foreign-deps: $package-$version: could not extract $archivePath'
+            ' (${(proc.stderr as String).trim()}) — skipping');
         continue;
       }
 
-      destFile.writeAsStringSync(result.stdout as String);
-      logInfo('cargo: extracted $archivePath from $package-$version');
+      destFile.writeAsStringSync(proc.stdout as String);
+      logInfo('foreign-deps: extracted $archivePath from $package-$version');
       extracted.add(destFile.path);
     }
     return extracted;
