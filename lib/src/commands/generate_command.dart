@@ -146,6 +146,10 @@ class GenerateCommand extends Command<void> {
 
     // ── Build Flutter SDK generator if ref is configured ─────────────────
     final flutterRef = flutterRefOverride ?? cfg.flutterRef;
+    if (flutterRef == null) {
+      logWarn('flutter.ref is not set — Flutter SDK sources will not be generated. '
+          'Pass --flutter <ref> or add flutter.ref to flutpak.yaml.');
+    }
     FlutterSdkGenerator? flutterGen;
     var allLockPaths = effectiveLocks;
     if (flutterRef != null) {
