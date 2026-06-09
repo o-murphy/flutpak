@@ -190,7 +190,7 @@ class GenerateCommand extends Command<void> {
         toolsLockFile = File(p.join(generatedDir, 'flutter_tools.lock'))
           ..createSync(recursive: true)
           ..writeAsStringSync(toolsLockContent);
-        allLockPaths = [...effectiveLocks, toolsLockFile.path];
+        allLockPaths = [...allPubLockPaths, toolsLockFile.path];
       }
 
       await generateSourcesJson(
