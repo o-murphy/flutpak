@@ -48,7 +48,7 @@ void main() {
 
       final contents = configSource['contents'] as String;
       expect(contents, contains('vendored-sources'));
-      expect(contents, contains('cargo/vendor'));
+      expect(contents, contains("directory = 'vendor'"));
       expect(contents, contains('crates-io'));
     });
 
