@@ -109,9 +109,9 @@ runs:
       if: inputs.use-flathub-builder == 'true'
       shell: bash
       run: |
-        flatpak remote-add --if-not-exists flathub \
+        flatpak remote-add --user --if-not-exists flathub \
           https://dl.flathub.org/repo/flathub.flatpakrepo
-        flatpak update --appstream
+        flatpak update --user --appstream
 
     - name: Lint manifest
       if: inputs.use-flathub-builder == 'true'
