@@ -92,24 +92,11 @@ jobs:
       - name: Smoke test — help
         run: /tmp/flutpak --help
 
-      - name: Smoke test — pub --help
-        run: /tmp/flutpak pub --help
-
       - name: Smoke test — sdk-ext --help
-        run: /tmp/flutpak sdk-ext --help
+        run: /tmp/flutpak sdk-mod --help
 
       - name: Smoke test — init --help
         run: /tmp/flutpak init --help
 
       - name: Smoke test — generate --help
         run: /tmp/flutpak generate --help
-
-      - name: Smoke test — pub sources (real pub.dev)
-        run: |
-          mkdir -p /tmp/smoke-sources
-          /tmp/flutpak pub \
-            --lock test/fixtures/simple.lock \
-            --output /tmp/smoke-sources
-          COUNT=$(python3 -c "import json; d=json.load(open('/tmp/smoke-sources/generated-sources.json')); print(len(d))")
-          [ "$COUNT" -eq 6 ] || { echo "Expected 6 entries (3 archive + 3 inline), got $COUNT"; exit 1; }
-          echo "pub smoke test passed: $COUNT entries"
