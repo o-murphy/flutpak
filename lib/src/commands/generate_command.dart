@@ -5,11 +5,11 @@ import 'package:path/path.dart' as p;
 import 'package:yaml/yaml.dart';
 import 'package:yaml_edit/yaml_edit.dart';
 import '../config.dart';
+import '../flutter_sdk_registry.dart';
 import '../foreign_deps_registry.dart';
 import '../generators/cargo_sources.dart';
 import '../generators/flutter_sdk.dart';
 import '../generators/manifest_generator.dart';
-import '../models/flatpak_source.dart';
 import '../generators/rustup_generator.dart';
 import '../utils/log.dart';
 import '../utils/sources_util.dart';
@@ -194,23 +194,35 @@ class GenerateCommand extends Command<void> {
           ..writeAsStringSync(toolsLockContent);
         allLockPaths = [...allPubLockPaths, toolsLockFile.path];
 
-        // Generate Flutter SDK as a standalone module (like rustup).
-        final sdkSources = await flutterGen.generate();
-        final gitSrc = sdkSources.whereType<GitSource>().firstOrNull;
-        final flutterVersion = gitSrc?.tag ?? flutterRef!;
+        final flutterVersion = await flutterGen.fetchFlutterVersion();
         final sdkModuleFilename = 'flutter-sdk-$flutterVersion.json';
-        final sdkModulePath = p.join(generatedDir, sdkModuleFilename);
-        final sdkModule = {
-          'name': 'flutter-sdk',
-          'buildsystem': 'simple',
-          'build-commands': FlutterSdkGenerator.buildCommands(),
-          'sources': sdkSources.map((s) => s.toJson()).toList(),
-        };
-        File(sdkModulePath)
+        final sdkRegistry = FlutterSdkRegistry(
+          ref: cfg.flutterSdkRef ?? 'main',
+        );
+
+        // Try pre-built module from registry (cached or remote).
+        String? moduleJson = await sdkRegistry.fetchPrebuilt(flutterVersion);
+
+        if (moduleJson == null) {
+          logInfo(
+              'flutter-sdk: generating for $flutterVersion (not in registry)');
+          final sdkSources = await flutterGen.generate();
+          final sdkModule = {
+            'name': 'flutter-sdk',
+            'buildsystem': 'simple',
+            'build-commands': FlutterSdkGenerator.buildCommands(),
+            'sources': sdkSources.map((s) => s.toJson()).toList(),
+          };
+          moduleJson = jsonEncode(sdkModule);
+          sdkRegistry.cacheLocally(flutterVersion, moduleJson);
+        }
+
+        File(p.join(generatedDir, sdkModuleFilename))
           ..createSync(recursive: true)
-          ..writeAsStringSync(jsonEncode(sdkModule));
+          ..writeAsStringSync(moduleJson);
         flutterSdkModule = sdkModuleFilename;
         logInfo('✓  flutter SDK module → $sdkModuleFilename');
+        sdkRegistry.dispose();
       }
 
       await generatePubSourcesJson(

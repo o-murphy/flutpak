@@ -228,6 +228,11 @@ class FlatpakGenConfig {
   /// Defaults to 'main' when null.
   final String? foreignDepsRef;
 
+  /// Git ref (branch/tag) of the flutpak repo from which pre-built
+  /// `flutter_sdk/flutter-sdk-{version}.json` modules are fetched.
+  /// Defaults to 'main' when null.
+  final String? flutterSdkRef;
+
   /// Rust toolchain version for offline rustup module generation.
   /// Corresponds to `rust.version` in YAML. Defaults to '1.85.0' at use-site.
   final String? rustVersion;
@@ -254,6 +259,7 @@ class FlatpakGenConfig {
     this.desktopEntryPath,
     this.manifest,
     this.foreignDepsRef,
+    this.flutterSdkRef,
     this.rustVersion,
     this.rustupPath,
     this.rustLocks = const [],
@@ -333,6 +339,7 @@ class FlatpakGenConfig {
       desktopEntryPath: yaml['desktop-entry-path'] as String?,
       manifest: yaml['app-id'] != null ? ManifestConfig.fromYaml(yaml) : null,
       foreignDepsRef: yaml['foreign-deps-ref'] as String?,
+      flutterSdkRef: yaml['flutter-sdk-ref'] as String?,
       rustVersion: rust['version'] as String?,
       rustupPath: rust['rustup-path'] as String?,
       rustLocks: (rust['locks'] as List?)?.cast<String>() ?? const [],
