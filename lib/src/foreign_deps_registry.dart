@@ -217,7 +217,9 @@ class ForeignDepsRegistry {
 
   void dispose() {
     _client.close();
-    _extractDir?.deleteSync(recursive: true);
+    try {
+      _extractDir?.deleteSync(recursive: true);
+    } catch (_) {}
     _extractDir = null;
   }
 
@@ -274,24 +276,30 @@ class ForeignDepsRegistry {
 
       final destFile =
           File(p.join(extractDir.path, '$package-$version', archivePath));
-      destFile.parent.createSync(recursive: true);
+      try {
+        destFile.parent.createSync(recursive: true);
 
-      final proc = await Process.run(
-        'tar',
-        ['-xzOf', archiveFile.path, archivePath],
-        stdoutEncoding: utf8,
-        stderrEncoding: utf8,
-      );
-      if (proc.exitCode != 0) {
+        final proc = await Process.run(
+          'tar',
+          ['-xzOf', archiveFile.path, archivePath],
+          stdoutEncoding: utf8,
+          stderrEncoding: utf8,
+        );
+        if (proc.exitCode != 0) {
+          logWarn(
+              'foreign-deps: $package-$version: could not extract $archivePath'
+              ' (${(proc.stderr as String).trim()}) — skipping');
+          continue;
+        }
+
+        destFile.writeAsStringSync(proc.stdout as String);
+        logInfo('foreign-deps: extracted $archivePath from $package-$version');
+        extracted.add(destFile.path);
+      } catch (e) {
         logWarn(
-            'foreign-deps: $package-$version: could not extract $archivePath'
-            ' (${(proc.stderr as String).trim()}) — skipping');
-        continue;
+            'foreign-deps: $package-$version: failed to extract $archivePath'
+            ' ($e) — skipping');
       }
-
-      destFile.writeAsStringSync(proc.stdout as String);
-      logInfo('foreign-deps: extracted $archivePath from $package-$version');
-      extracted.add(destFile.path);
     }
     return extracted;
   }
