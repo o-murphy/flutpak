@@ -5,6 +5,7 @@ import 'package:crypto/crypto.dart';
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
 import 'package:yaml/yaml.dart';
+import 'package:pub_semver/pub_semver.dart';
 import 'generators/manifest_generator.dart' show convertPatchToCrlf;
 import 'utils/log.dart';
 
@@ -314,13 +315,13 @@ Map<String, String> _readLockedVersions(List<String> lockPaths) {
   if (installed == null) return (installedVersion, null);
 
   String? bestKey;
-  List<int>? bestParsed;
+  Version? bestParsed;
 
   for (final key in packageMap.keys) {
     final parsed = _parseVersion(key as String);
     if (parsed == null) continue;
-    if (_compareVersions(parsed, installed) > 0) continue; // registry > installed
-    if (bestParsed == null || _compareVersions(parsed, bestParsed) > 0) {
+    if (parsed > installed) continue; // registry > installed
+    if (bestParsed == null || parsed > bestParsed) {
       bestKey = key;
       bestParsed = parsed;
     }
@@ -331,26 +332,25 @@ Map<String, String> _readLockedVersions(List<String> lockPaths) {
   return (bestKey, entry is Map ? Map<String, dynamic>.from(entry) : null);
 }
 
-/// Parses a version string into a list of numeric components.
-/// Strips pre-release and build metadata. Returns null on parse failure.
-List<int>? _parseVersion(String version) {
-  final clean = version.split('+').first.split('-').first;
-  final parts = clean.split('.');
+/// Parses a version string via [Version.parse], padding short versions
+/// (e.g. `1.2` → `1.2.0`) to satisfy semver's three-component requirement.
+/// Returns null if parsing fails after padding.
+Version? _parseVersion(String version) {
   try {
-    return parts.map(int.parse).toList();
+    return Version.parse(version);
   } catch (_) {
+    try {
+      final parts = version.split('-');
+      final numeric = parts.first.split('.');
+      if (numeric.length < 3) {
+        final padded = [...numeric, ...List.filled(3 - numeric.length, '0')];
+        final normalized = padded.join('.') +
+            (parts.length > 1 ? '-${parts.sublist(1).join("-")}' : '');
+        return Version.parse(normalized);
+      }
+    } catch (_) {}
     return null;
   }
-}
-
-/// Compares two parsed version component lists lexicographically.
-/// Returns negative if a < b, zero if equal, positive if a > b.
-int _compareVersions(List<int> a, List<int> b) {
-  final len = a.length < b.length ? a.length : b.length;
-  for (var i = 0; i < len; i++) {
-    if (a[i] != b[i]) return a[i].compareTo(b[i]);
-  }
-  return a.length.compareTo(b.length);
 }
 
 /// Recursively converts YamlMap/YamlList to plain Dart Map/List.
