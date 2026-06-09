@@ -347,5 +347,4 @@ flutpak:
           containsAll(['--filesystem=xdg-documents', '--share=network']));
     });
   });
-
 }

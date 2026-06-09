@@ -20,7 +20,9 @@ void main() {
   group('PubSourcesGenerator golden output', () {
     test('matches golden file', () async {
       final gen = PubSourcesGenerator(
-        lockFilePaths: [p.join(_projectRoot, 'test', 'fixtures', 'simple.lock')],
+        lockFilePaths: [
+          p.join(_projectRoot, 'test', 'fixtures', 'simple.lock')
+        ],
         client: MockClient(
           (req) async => http.Response(
             jsonEncode({'archive_sha256': _fakeSha256}),

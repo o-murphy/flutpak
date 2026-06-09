@@ -28,8 +28,10 @@ void main() {
         repoSlug: 'o-murphy/ebalistyka-app',
         ref: 'v0.1.15',
       );
-      expect(result, contains('ebalistyka-app/v0.1.15/docs/screenshots/home.png'));
-      expect(result, contains('ebalistyka-app/v0.1.15/docs/screenshots/conditions.png'));
+      expect(
+          result, contains('ebalistyka-app/v0.1.15/docs/screenshots/home.png'));
+      expect(result,
+          contains('ebalistyka-app/v0.1.15/docs/screenshots/conditions.png'));
       expect(result, isNot(contains('v0.1.14')));
       expect(result, contains('<screenshot type="default">'));
     });
@@ -41,7 +43,8 @@ void main() {
         repoSlug: 'o-murphy/ebalistyka-app',
         ref: 'abc1234567890abcdef',
       );
-      expect(result, contains('ebalistyka-app/abc1234567890abcdef/docs/screenshots/'));
+      expect(result,
+          contains('ebalistyka-app/abc1234567890abcdef/docs/screenshots/'));
       expect(result, isNot(contains('v0.1.14')));
     });
 
@@ -135,7 +138,8 @@ void main() {
 </releases>
 ''';
       final result = patchMetainfoReleases(input, 'v0.1.15', date);
-      expect(result, contains('  <release version="0.1.15" date="2026-05-19"/>'));
+      expect(
+          result, contains('  <release version="0.1.15" date="2026-05-19"/>'));
     });
 
     test('returns content unchanged when tag is empty', () {

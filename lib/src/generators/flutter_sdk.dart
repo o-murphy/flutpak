@@ -30,6 +30,8 @@ const String _rawBase = 'https://raw.githubusercontent.com/flutter/flutter';
 /// Flutter's shared.sh bootstrap function.  Applied automatically when no
 /// explicit [patchPath] is given to [FlutterSdkGenerator].
 const String builtinSharedShPatch = r'''
+diff --git a/flutter/bin/internal/shared.sh b/flutter/bin/internal/shared.sh
+index d78e0cd..b8eb978 100644
 --- a/flutter/bin/internal/shared.sh
 +++ b/flutter/bin/internal/shared.sh
 @@ -20,7 +20,7 @@ function pub_upgrade_with_retry {
@@ -37,9 +39,8 @@ const String builtinSharedShPatch = r'''
    local remaining_tries=$((total_tries - 1))
    while [[ "$remaining_tries" -gt 0 ]]; do
 -    (cd "$FLUTTER_TOOLS_DIR" && "$DART" pub upgrade --suppress-analytics >&2) && break
--    >&2 echo "Error: Unable to 'pub upgrade' flutter tool. Retrying in five seconds... ($remaining_tries tries left)"
-+    (cd "$FLUTTER_TOOLS_DIR" && "$DART" pub get --offline --suppress-analytics >&2) && break
-+    >&2 echo "Error: Unable to 'pub get --offline' flutter tool. Retrying in five seconds... ($remaining_tries tries left)"
++    (cd "$FLUTTER_TOOLS_DIR" && "$DART" pub upgrade --offline --suppress-analytics >&2) && break
+     >&2 echo "Error: Unable to 'pub upgrade' flutter tool. Retrying in five seconds... ($remaining_tries tries left)"
      remaining_tries=$((remaining_tries - 1))
      sleep 5
 ''';

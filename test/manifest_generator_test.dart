@@ -19,7 +19,6 @@ ManifestConfig _baseConfig({
       finishArgs: finishArgs,
     );
 
-
 ManifestGenerator _generator({
   ManifestConfig? cfg,
   String? resolvedRepoUrl,
@@ -115,10 +114,13 @@ void main() {
 
       expect(yaml, contains('/usr/lib/sdk/llvm20/bin'));
       expect(yaml, contains('/run/build/myapp/flutter/bin'));
-      expect(yaml, contains('prepend-ld-library-path: /usr/lib/sdk/llvm20/lib'));
+      expect(
+          yaml, contains('prepend-ld-library-path: /usr/lib/sdk/llvm20/lib'));
     });
 
-    test('auto-injects llvm20 for Flutter project with runtime 25.08 when no llvm in config', () {
+    test(
+        'auto-injects llvm20 for Flutter project with runtime 25.08 when no llvm in config',
+        () {
       final yaml = _generator(
         cfg: _baseConfig(command: 'myapp', runtimeVersion: '25.08'),
         hasFlutter: true,
@@ -126,7 +128,8 @@ void main() {
 
       expect(yaml, contains('org.freedesktop.Sdk.Extension.llvm20'));
       expect(yaml, contains('/usr/lib/sdk/llvm20/bin'));
-      expect(yaml, contains('prepend-ld-library-path: /usr/lib/sdk/llvm20/lib'));
+      expect(
+          yaml, contains('prepend-ld-library-path: /usr/lib/sdk/llvm20/lib'));
     });
 
     test('auto-injects llvm19 for Flutter project with runtime 24.08', () {
@@ -158,8 +161,10 @@ void main() {
 
       final count = RegExp('llvm20').allMatches(yaml).length;
       // llvm20 appears in sdk-extensions, append-path, prepend-ld-library-path — not duplicated
-      expect(yaml, isNot(contains('- org.freedesktop.Sdk.Extension.llvm20\n'
-          '  - org.freedesktop.Sdk.Extension.llvm20')));
+      expect(
+          yaml,
+          isNot(contains('- org.freedesktop.Sdk.Extension.llvm20\n'
+              '  - org.freedesktop.Sdk.Extension.llvm20')));
       expect(count, lessThan(5));
     });
 
@@ -172,7 +177,9 @@ void main() {
       expect(yaml, isNot(contains('llvm')));
     });
 
-    test('does not include tag or commit in template (set by generate via yaml_edit)', () {
+    test(
+        'does not include tag or commit in template (set by generate via yaml_edit)',
+        () {
       final yaml = _generator(
         cfg: _baseConfig(command: 'myapp'),
         resolvedRepoUrl: 'https://github.com/example/app.git',
@@ -182,7 +189,8 @@ void main() {
       expect(yaml, isNot(contains('commit:')));
     });
 
-    test('includes repo url in git source when provided via resolvedRepoUrl', () {
+    test('includes repo url in git source when provided via resolvedRepoUrl',
+        () {
       final yaml = _generator(
         cfg: _baseConfig(command: 'myapp'),
         resolvedRepoUrl: 'https://github.com/example/app.git',
@@ -205,14 +213,16 @@ void main() {
       expect(yaml, isNot(contains('url:')));
     });
 
-    test('does not include generated-sources.json (injected at generate time)', () {
+    test('does not include generated-sources.json (injected at generate time)',
+        () {
       final yaml = _generator(cfg: _baseConfig(command: 'myapp')).generate();
 
       // generated-sources.json may appear in the header comment but not as a source entry
       expect(yaml, isNot(contains('- generated-sources.json')));
     });
 
-    test('does not include patch or extra sources (injected at generate time)', () {
+    test('does not include patch or extra sources (injected at generate time)',
+        () {
       final yaml = _generator(cfg: _baseConfig(command: 'myapp')).generate();
 
       expect(yaml, isNot(contains('type: patch')));
@@ -272,7 +282,9 @@ void main() {
           contains('install -Dm755 flatpak/myapp-wrapper.sh /app/bin/myapp'));
     });
 
-    test('wrapper install uses command, not last app-id segment, when they differ', () {
+    test(
+        'wrapper install uses command, not last app-id segment, when they differ',
+        () {
       final yaml = _generator(
         cfg: _baseConfig(appId: 'io.github.example.demo', command: 'demo_app'),
         outputRelDir: 'flatpak',
@@ -322,7 +334,8 @@ void main() {
       final effectiveIcons = [
         const IconEntry(
           size: '256x256',
-          path: 'app/share/icons/hicolor/256x256/apps/io.github.example.myapp.png',
+          path:
+              'app/share/icons/hicolor/256x256/apps/io.github.example.myapp.png',
         ),
       ];
       final yaml = _generator(
@@ -363,8 +376,7 @@ void main() {
     test('includes metainfo install command using provided metainfoPath', () {
       final yaml = _generator(
         cfg: _baseConfig(command: 'myapp'),
-        metainfoPath:
-            'app/share/metainfo/io.github.example.myapp.metainfo.xml',
+        metainfoPath: 'app/share/metainfo/io.github.example.myapp.metainfo.xml',
       ).generate();
 
       expect(
@@ -377,7 +389,8 @@ void main() {
       );
     });
 
-    test('includes desktop entry install command using provided desktopEntryPath',
+    test(
+        'includes desktop entry install command using provided desktopEntryPath',
         () {
       final yaml = _generator(
         cfg: _baseConfig(command: 'myapp'),
@@ -395,7 +408,9 @@ void main() {
       );
     });
 
-    test('omits disable-submodules by default (matches flatpak-builder default)', () {
+    test(
+        'omits disable-submodules by default (matches flatpak-builder default)',
+        () {
       final yaml = _generator(
         resolvedRepoUrl: 'https://github.com/example/app.git',
       ).generate();
@@ -427,7 +442,8 @@ void main() {
     // replace the whole git source map at once rather than updating individual
     // keys.  This test verifies the template → injection round-trip produces
     // valid YAML containing the injected tag and commit.
-    test('tag and commit can be injected into generated template via yaml_edit', () {
+    test('tag and commit can be injected into generated template via yaml_edit',
+        () {
       final template = stripTemplateGuidance(
         _generator(
           resolvedRepoUrl: 'https://github.com/example/app.git',
@@ -443,8 +459,7 @@ void main() {
       expect(gitSrcIdx, greaterThanOrEqualTo(0));
 
       final editor = YamlEditor(template);
-      final existing =
-          Map<String, dynamic>.from(sources[gitSrcIdx] as Map);
+      final existing = Map<String, dynamic>.from(sources[gitSrcIdx] as Map);
       existing['tag'] = 'v1.0.0';
       existing['commit'] = 'abc123def456';
       editor.update(['modules', 0, 'sources', gitSrcIdx], existing);
@@ -500,4 +515,3 @@ void _crlfHelpersTests() {
     });
   });
 }
-

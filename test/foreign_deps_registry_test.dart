@@ -353,7 +353,11 @@ void main() {
             '1.0.0': {
               'manifest': {
                 'sources': [
-                  {'type': 'file', 'url': 'https://remote.com/old.so', 'dest': r'$PUB_DEV'}
+                  {
+                    'type': 'file',
+                    'url': 'https://remote.com/old.so',
+                    'dest': r'$PUB_DEV'
+                  }
                 ]
               }
             }
@@ -377,7 +381,11 @@ packages:
           'some_pkg': {
             'manifest': {
               'sources': [
-                {'type': 'file', 'url': 'https://local.com/new.so', 'dest': r'$PUB_DEV'}
+                {
+                  'type': 'file',
+                  'url': 'https://local.com/new.so',
+                  'dest': r'$PUB_DEV'
+                }
               ]
             }
           }

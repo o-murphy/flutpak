@@ -7,6 +7,104 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] — 2026-06-09
+
+### Breaking Changes
+
+- **`flutter.sdk` removed** — replace with `flutter.ref: "<tag-or-branch>"` in
+  `flutpak.yaml`. Engine versions are now fetched from GitHub raw API; no local
+  Flutter installation is required for `flutpak generate`.
+  ```yaml
+  # before
+  flutter:
+    sdk: $FLUTTER_ROOT
+
+  # after
+  flutter:
+    ref: "3.44.1"   # tag, "stable", "main", or commit SHA
+  ```
+
+- **`--sdk` flag removed** from `generate` and `init` — use `--flutter <ref>`
+  (`-f`) instead.
+
+- **`--no-sources`, `--pub-only`, `--flutter-only` flags removed** from
+  `generate` — use `--no-foreign-deps` for offline runs; pub-only vs. full
+  generation is now driven by whether `flutter.ref` is set in config.
+
+- **`config.patches` / `PatchEntry` removed** — replaced by `foreign-deps:`
+  in `flutpak.yaml`. Local overrides use the same format as
+  `foreign_deps/foreign_deps.json`.
+  ```yaml
+  # before
+  patches:
+    - package: objectbox_flutter_libs
+      path: flatpak/patches/objectbox.patch
+      crlf: true
+
+  # after
+  foreign-deps:
+    objectbox_flutter_libs:
+      manifest:
+        sources:
+          - type: patch
+            path: patches/objectbox.patch
+            crlf: true
+  ```
+
+- **`pub`, `flutter`, `sources` commands removed** — use `generate` directly.
+
+- **`sdk-ext` command replaced by `sdk-mod`** — generates a standalone Flutter
+  SDK module JSON (installs Flutter to `/var/lib/flutter`) instead of an SDK
+  Extension. Pre-generated JSONs for Flutter 3.35.x, 3.38.x, and 3.41.x are
+  available in [`modules/flutter-sdk/`](modules/flutter-sdk/).
+
+- **`generate` action input `sdk` renamed to `flutter-ref`**.
+
+### Added
+
+- **`flutter.ref` config key** — git ref (tag, branch, or commit SHA) for
+  the Flutter SDK. Engine version files (`engine.version`,
+  `material_fonts.version`, `gradle_wrapper.version`) are fetched from GitHub
+  raw API. No local Flutter install needed for source generation.
+
+- **`flutter_tools/pubspec.lock` auto-fetched** — when `flutter.ref` is set,
+  `generate` fetches `packages/flutter_tools/pubspec.lock` from GitHub and
+  includes its deps in `generated-sources.json`. No longer needs to be listed
+  in `pub.locks`.
+
+- **`foreign-deps:` config key** — local overrides for the remote registry.
+  Deep-merged on top before resolution. Shorthand format (no version key)
+  resolves from `pubspec.lock`. `sources: []` suppresses a remote entry.
+
+- **`crlf:` on `type: patch` sources** in `foreign-deps:` — normalises the
+  patch file to CRLF after download/copy; key is stripped from output JSON.
+
+- **`FlutterSdkGenerator.dispose()`** — `_ownsClient` pattern; closes the
+  internal HTTP client only when it was created internally. Eliminates the
+  multi-second hang after `generate` completes.
+
+- **`--flutter` / `-f` flag** on `generate` and `init` — overrides
+  `flutter.ref` from config at the CLI level.
+
+- **`flutpak sdk-mod`** — new command replacing `sdk-ext`. Generates a
+  standalone Flutter SDK module JSON for `!include` in any manifest. Output:
+  `modules/flutter-sdk/flutter-sdk-<version>.json`. Pre-generated JSONs
+  shipped in the repository.
+
+### Changed
+
+- **Built-in `shared.sh.patch` updated** — replaced `pub get --offline`
+  with `pub upgrade --offline` for more reliable flutter_tools bootstrap.
+
+- **Foreign deps registry deep-merge** — `ForeignDepsRegistry.resolve()` now
+  accepts `localForeignDeps: Map<String, dynamic>` instead of
+  `overriddenPackages: Set<String>`. Supports both shorthand and versioned
+  override formats.
+
+- **`generate` action** — removed `sdk` input, added `flutter-ref` input.
+  Flutter SDK is still installed via the `flutter` action for `flutter pub get`
+  / `flutter build`; `flutpak generate` itself no longer reads from a local SDK.
+
 ## [0.6.1] — 2026-06-08
 
 ### Changed
@@ -801,7 +899,8 @@ git remote.
   output files
 - MIT License
 
-[Unreleased]: https://github.com/o-murphy/flutpak/compare/v0.6.1...HEAD
+[Unreleased]: https://github.com/o-murphy/flutpak/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/o-murphy/flutpak/compare/v0.6.1...v0.7.0
 [0.6.1]: https://github.com/o-murphy/flutpak/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/o-murphy/flutpak/compare/v0.6.0
 [0.5.0]: https://github.com/o-murphy/flutpak/compare/v0.5.0

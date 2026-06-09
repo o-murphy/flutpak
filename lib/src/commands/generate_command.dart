@@ -352,4 +352,3 @@ class GenerateCommand extends Command<void> {
     return editor.toString();
   }
 }
-
