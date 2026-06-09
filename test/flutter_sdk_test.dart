@@ -10,24 +10,23 @@ const _lockContent = 'packages:\n  args:\n    version: "2.5.0"\n';
 
 void main() {
   group('FlutterSdkGenerator — artifact list', () {
-    late FlutterSdkGenerator gen;
+    late List<FlatpakSource> sources;
 
-    setUp(() {
-      gen = FlutterSdkGenerator(
+    setUpAll(() async {
+      final gen = FlutterSdkGenerator(
         flutterRef: '3.44.1',
         cache: _FakeCache(),
         client: _FakeClient(),
       );
+      sources = await gen.generate();
     });
 
-    test('generates expected number of sources', () async {
-      final sources = await gen.generate();
+    test('generates expected number of sources', () {
       // 1 git + arch artifacts + 1 inline + 1 stamp + optional patch
       expect(sources.length, greaterThan(15));
     });
 
-    test('includes Flutter git source as first entry', () async {
-      final sources = await gen.generate();
+    test('includes Flutter git source as first entry', () {
       final git = sources.whereType<GitSource>().first;
 
       expect(git.url, 'https://github.com/flutter/flutter.git');
@@ -35,8 +34,7 @@ void main() {
       expect(git.dest, 'flutter');
     });
 
-    test('x86_64-only artifacts have correct only-arches', () async {
-      final sources = await gen.generate();
+    test('x86_64-only artifacts have correct only-arches', () {
       final x64Only = sources
           .whereType<ArchiveSource>()
           .where((s) => s.onlyArches?.contains('x86_64') == true)
@@ -49,8 +47,7 @@ void main() {
       }
     });
 
-    test('aarch64-only artifacts have correct only-arches', () async {
-      final sources = await gen.generate();
+    test('aarch64-only artifacts have correct only-arches', () {
       final arm64Only = sources
           .whereType<ArchiveSource>()
           .where((s) => s.onlyArches?.contains('aarch64') == true)
@@ -63,8 +60,7 @@ void main() {
       }
     });
 
-    test('fonts URL uses material_fonts.version hash', () async {
-      final sources = await gen.generate();
+    test('fonts URL uses material_fonts.version hash', () {
       final fontsUrl = sources
           .whereType<ArchiveSource>()
           .map((s) => s.url)
@@ -73,8 +69,7 @@ void main() {
       expect(fontsUrl, contains(_fontsHash));
     });
 
-    test('gradle URL uses gradle_wrapper.version hash', () async {
-      final sources = await gen.generate();
+    test('gradle URL uses gradle_wrapper.version hash', () {
       final gradleUrl = sources
           .whereType<ArchiveSource>()
           .map((s) => s.url)
@@ -83,8 +78,7 @@ void main() {
       expect(gradleUrl, contains(_gradleHash));
     });
 
-    test('engine_stamp.json is a FileSource in flutter/bin/cache', () async {
-      final sources = await gen.generate();
+    test('engine_stamp.json is a FileSource in flutter/bin/cache', () {
       final stamp = sources
           .whereType<FileSource>()
           .firstWhere((s) => s.url.contains('engine_stamp.json'));
@@ -92,8 +86,7 @@ void main() {
       expect(stamp.dest, 'flutter/bin/cache');
     });
 
-    test('sky_engine/pubspec.yaml is an InlineSource', () async {
-      final sources = await gen.generate();
+    test('sky_engine/pubspec.yaml is an InlineSource', () {
       final inline = sources.whereType<InlineSource>().firstWhere((s) =>
           s.destFilename == 'pubspec.yaml' && s.dest.contains('sky_engine'));
 
@@ -102,8 +95,7 @@ void main() {
       expect(inline.contents, contains('sdk:'));
     });
 
-    test('no pub.dartlang.org URLs', () async {
-      final sources = await gen.generate();
+    test('no pub.dartlang.org URLs', () {
       for (final s in sources.whereType<ArchiveSource>()) {
         expect(s.url, isNot(contains('pub.dartlang.org')));
       }
