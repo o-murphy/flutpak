@@ -152,6 +152,33 @@ void main() {
       expect(cfg.foreignDepsRef, 'v0.6.0');
     });
 
+    test('parses rust.version, rust.rustup-path, rust.locks', () {
+      final cfg = FlatpakGenConfig.fromYaml({
+        'rust': {
+          'version': '1.85.0',
+          'rustup-path': '/var/lib/rustup',
+          'locks': ['rust/Cargo.lock', 'other/Cargo.lock'],
+        },
+      });
+      expect(cfg.rustVersion, '1.85.0');
+      expect(cfg.rustupPath, '/var/lib/rustup');
+      expect(cfg.rustLocks, ['rust/Cargo.lock', 'other/Cargo.lock']);
+    });
+
+    test('rust fields default to null/empty when rust: section absent', () {
+      final cfg = FlatpakGenConfig.fromYaml({});
+      expect(cfg.rustVersion, isNull);
+      expect(cfg.rustupPath, isNull);
+      expect(cfg.rustLocks, isEmpty);
+    });
+
+    test('rust.locks defaults to empty when only version/rustup-path set', () {
+      final cfg = FlatpakGenConfig.fromYaml({
+        'rust': {'version': '1.85.0', 'rustup-path': '/var/lib/rustup'},
+      });
+      expect(cfg.rustLocks, isEmpty);
+    });
+
     test('parses repo-url, metainfo-path, desktop-entry-path from root config',
         () {
       final cfg = FlatpakGenConfig.fromYaml({
