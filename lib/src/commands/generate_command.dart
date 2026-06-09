@@ -133,12 +133,13 @@ class GenerateCommand extends Command<void> {
     if (!noForeignDeps) {
       final registry = ForeignDepsRegistry(ref: cfg.foreignDepsRef);
       try {
-        foreignDepSources = await registry.resolve(
+        final depsResult = await registry.resolve(
           lockPaths: effectiveLocks,
           localForeignDeps: cfg.localForeignDeps,
           generatedPatchesDir: generatedPatchesDir,
           projectPatchesDir: p.join(outputDir, 'patches'),
         );
+        foreignDepSources = depsResult.sources;
       } finally {
         registry.dispose();
       }

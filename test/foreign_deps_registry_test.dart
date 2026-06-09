@@ -196,7 +196,7 @@ void main() {
         },
         generatedPatchesDir: patchesDir,
       );
-      expect(result.every((s) {
+      expect(result.sources.every((s) {
         final dest = s['dest'] as String? ?? '';
         return !dest.contains('some_package');
       }), isTrue);
@@ -221,7 +221,7 @@ void main() {
         lockPaths: [_lockPath()],
         generatedPatchesDir: p.join(tmpDir.path, 'patches'),
       );
-      expect(result, isEmpty);
+      expect(result.sources, isEmpty);
     });
 
     test('returns empty list when registry has no matching entries', () async {
@@ -233,7 +233,7 @@ void main() {
         lockPaths: [_lockPath()],
         generatedPatchesDir: p.join(tmpDir.path, 'patches'),
       );
-      expect(result, isEmpty);
+      expect(result.sources, isEmpty);
     });
 
     test('rewrites path to patches/<path> for type:patch sources', () async {
@@ -250,7 +250,7 @@ void main() {
         lockPaths: [_lockPath()],
         generatedPatchesDir: patchesDir,
       );
-      final patch = result.firstWhere((s) => s['type'] == 'patch');
+      final patch = result.sources.firstWhere((s) => s['type'] == 'patch');
       expect(patch['path'], 'patches/some_package/fix.patch');
     });
 
@@ -268,7 +268,7 @@ void main() {
         lockPaths: [_lockPath()],
         generatedPatchesDir: p.join(tmpDir.path, 'patches'),
       );
-      for (final src in result) {
+      for (final src in result.sources) {
         final dest = src['dest'] as String?;
         if (dest != null) {
           expect(dest, isNot(contains(r'$PUB_DEV')));
@@ -289,7 +289,7 @@ void main() {
         lockPaths: [_lockPath()],
         generatedPatchesDir: p.join(tmpDir.path, 'patches'),
       );
-      final patch = result.firstWhere((s) => s['type'] == 'patch');
+      final patch = result.sources.firstWhere((s) => s['type'] == 'patch');
       expect(patch['use-git'], isTrue);
     });
 
@@ -319,9 +319,9 @@ void main() {
         lockPaths: [_lockPath()],
         generatedPatchesDir: p.join(tmpDir.path, 'patches'),
       );
-      expect(result, hasLength(1));
-      expect(result.first['dest-filename'], 'lib.so');
-      expect(result.first['only-arches'], ['x86_64']);
+      expect(result.sources, hasLength(1));
+      expect(result.sources.first['dest-filename'], 'lib.so');
+      expect(result.sources.first['only-arches'], ['x86_64']);
     });
 
     test('patch file bytes are written as-is without line ending modification',
@@ -399,8 +399,8 @@ packages:
         lockPaths: [lockFile.path],
         generatedPatchesDir: p.join(tmpDir.path, 'patches'),
       );
-      expect(result, hasLength(1));
-      expect(result.first['url'], 'https://x.com/1.2.0');
+      expect(result.sources, hasLength(1));
+      expect(result.sources.first['url'], 'https://x.com/1.2.0');
     });
 
     test('skips package when all registry versions are > installed', () async {
@@ -434,7 +434,7 @@ packages:
         lockPaths: [lockFile.path],
         generatedPatchesDir: p.join(tmpDir.path, 'patches'),
       );
-      expect(result, isEmpty);
+      expect(result.sources, isEmpty);
     });
 
     test('exact version match still works', () async {
@@ -468,8 +468,8 @@ packages:
         lockPaths: [lockFile.path],
         generatedPatchesDir: p.join(tmpDir.path, 'patches'),
       );
-      expect(result, hasLength(1));
-      expect(result.first['url'], 'https://x.com/1.0.0');
+      expect(result.sources, hasLength(1));
+      expect(result.sources.first['url'], 'https://x.com/1.0.0');
     });
 
     test('localForeignDeps shorthand overrides remote entry for locked version',
@@ -519,8 +519,8 @@ packages:
         },
         generatedPatchesDir: p.join(tmpDir.path, 'patches'),
       );
-      expect(result, hasLength(1));
-      expect(result.first['url'], 'https://local.com/new.so');
+      expect(result.sources, hasLength(1));
+      expect(result.sources.first['url'], 'https://local.com/new.so');
     });
   });
 }

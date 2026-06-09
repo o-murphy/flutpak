@@ -9,6 +9,26 @@ import 'package:pub_semver/pub_semver.dart';
 import 'generators/manifest_generator.dart' show convertPatchToCrlf;
 import 'utils/log.dart';
 
+/// Result returned by [ForeignDepsRegistry.resolve].
+class ForeignDepsResult {
+  /// Flatpak source maps ready for `generated-sources.json`.
+  final List<Map<String, dynamic>> sources;
+
+  /// Paths to extracted `Cargo.lock` files for packages with `cargo_locks`
+  /// entries in the registry. Populated in phase 2.2.
+  final List<String> cargoLockPaths;
+
+  /// Paths to extracted `pubspec.lock` files for packages with
+  /// `extra_pubspecs` entries in the registry. Populated in phase 2.3.
+  final List<String> extraPubspecPaths;
+
+  const ForeignDepsResult({
+    required this.sources,
+    this.cargoLockPaths = const [],
+    this.extraPubspecPaths = const [],
+  });
+}
+
 /// Resolves package dependencies from the flutpak foreign_deps registry,
 /// compatible with the flatpak-flutter foreign_deps.json format.
 ///
@@ -87,7 +107,7 @@ class ForeignDepsRegistry {
   ///     included as-is.
   ///
   /// Returns source maps ready to append to `generated-sources.json`.
-  Future<List<Map<String, dynamic>>> resolve({
+  Future<ForeignDepsResult> resolve({
     required List<String> lockPaths,
     required String generatedPatchesDir,
     Map<String, dynamic> localForeignDeps = const {},
@@ -98,7 +118,7 @@ class ForeignDepsRegistry {
       registry = await fetchJson();
     } catch (e) {
       logWarn('foreign-deps: registry unavailable ($e) — skipping');
-      return const [];
+      return const ForeignDepsResult(sources: []);
     }
 
     final lockedVersions = _readLockedVersions(lockPaths);
@@ -168,7 +188,7 @@ class ForeignDepsRegistry {
           'foreign-deps: $package $versionLabel — ${sources.length} source(s)');
     }
 
-    return result;
+    return ForeignDepsResult(sources: result);
   }
 
   void dispose() => _client.close();
