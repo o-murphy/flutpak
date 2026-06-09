@@ -1,11 +1,8 @@
 import 'dart:io';
 import 'package:args/command_runner.dart';
-import 'package:flutpak/src/commands/flutter_command.dart';
 import 'package:flutpak/src/commands/generate_command.dart';
 import 'package:flutpak/src/commands/init_command.dart';
-import 'package:flutpak/src/commands/pub_command.dart';
-import 'package:flutpak/src/commands/sdk_ext_command.dart';
-import 'package:flutpak/src/commands/sources_command.dart';
+import 'package:flutpak/src/commands/sdk_mod_command.dart';
 import 'package:flutpak/src/version.dart';
 
 Future<void> main(List<String> args) async {
@@ -18,29 +15,19 @@ Future<void> main(List<String> args) async {
     'flutpak',
     'Generate Flatpak manifests and offline source bundles for Flutter apps.\n\n'
         'Usage examples:\n'
-        '  flutpak init               # first-run: create template + run generate\n'
-        '  flutpak init --force       # overwrite existing template files\n'
-        '  flutpak generate           # update generated/ from existing template\n'
-        '  flutpak generate --tag v0.1.14 --commit abc1234  # CI: pin tag/commit\n'
-        '  flutpak sources            # pub + Flutter SDK → generated-sources.json\n'
-        '  flutpak pub                # only pub packages\n'
-        '  flutpak flutter            # only Flutter SDK artifacts\n'
-        '  flutpak sdk-ext            # Flutter SDK Extension manifest for Flathub\n'
-        '  flutpak generate --dry-run # preview what generate would do',
+        '  flutpak init                           # first-run: create template + run generate\n'
+        '  flutpak init --force                   # overwrite existing template files\n'
+        '  flutpak generate                       # update generated/ from existing template\n'
+        '  flutpak generate --tag v0.1.14         # CI: pin tag\n'
+        '  flutpak sdk-mod --flutter 3.44.1       # standalone Flutter SDK module JSON\n'
+        '  flutpak generate --dry-run             # preview what generate would do',
   )
     ..addCommand(InitCommand())
     ..addCommand(GenerateCommand())
-    ..addCommand(SourcesCommand())
-    ..addCommand(PubCommand())
-    ..addCommand(FlutterCommand())
-    ..addCommand(SdkExtCommand());
-
-  // Default to 'sources' when no subcommand given
-  final effectiveArgs =
-      args.isEmpty || args.first.startsWith('-') ? ['sources', ...args] : args;
+    ..addCommand(SdkModCommand());
 
   try {
-    await runner.run(effectiveArgs);
+    await runner.run(args);
   } on UsageException catch (e) {
     stderr.writeln(e.message);
     stderr.writeln(e.usage);

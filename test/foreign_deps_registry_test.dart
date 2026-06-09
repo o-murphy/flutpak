@@ -176,7 +176,7 @@ void main() {
   // ── resolve ───────────────────────────────────────────────────────────────
 
   group('resolve', () {
-    test('skips packages in overriddenPackages', () async {
+    test('suppresses entry via localForeignDeps empty sources', () async {
       final patchBytes = Uint8List.fromList(utf8.encode('patch content'));
       final r = ForeignDepsRegistry(
         client: _mockClient(
@@ -186,9 +186,14 @@ void main() {
         cacheDir: cacheDir,
       );
       final patchesDir = p.join(tmpDir.path, 'patches');
+      // Suppress some_package by providing an empty sources list.
       final result = await r.resolve(
         lockPaths: [_lockPath()],
-        overriddenPackages: {'some_package'},
+        localForeignDeps: {
+          'some_package': {
+            'manifest': {'sources': []}
+          }
+        },
         generatedPatchesDir: patchesDir,
       );
       expect(result.every((s) {
@@ -214,7 +219,6 @@ void main() {
       );
       final result = await r.resolve(
         lockPaths: [_lockPath()],
-        overriddenPackages: {},
         generatedPatchesDir: p.join(tmpDir.path, 'patches'),
       );
       expect(result, isEmpty);
@@ -227,7 +231,6 @@ void main() {
       );
       final result = await r.resolve(
         lockPaths: [_lockPath()],
-        overriddenPackages: {},
         generatedPatchesDir: p.join(tmpDir.path, 'patches'),
       );
       expect(result, isEmpty);
@@ -245,7 +248,6 @@ void main() {
       final patchesDir = p.join(tmpDir.path, 'patches');
       final result = await r.resolve(
         lockPaths: [_lockPath()],
-        overriddenPackages: {},
         generatedPatchesDir: patchesDir,
       );
       final patch = result.firstWhere((s) => s['type'] == 'patch');
@@ -264,7 +266,6 @@ void main() {
       );
       final result = await r.resolve(
         lockPaths: [_lockPath()],
-        overriddenPackages: {},
         generatedPatchesDir: p.join(tmpDir.path, 'patches'),
       );
       for (final src in result) {
@@ -286,7 +287,6 @@ void main() {
       );
       final result = await r.resolve(
         lockPaths: [_lockPath()],
-        overriddenPackages: {},
         generatedPatchesDir: p.join(tmpDir.path, 'patches'),
       );
       final patch = result.firstWhere((s) => s['type'] == 'patch');
@@ -317,7 +317,6 @@ void main() {
       );
       final result = await r.resolve(
         lockPaths: [_lockPath()],
-        overriddenPackages: {},
         generatedPatchesDir: p.join(tmpDir.path, 'patches'),
       );
       expect(result, hasLength(1));
@@ -339,12 +338,62 @@ void main() {
       final patchesDir = p.join(tmpDir.path, 'patches');
       await r.resolve(
         lockPaths: [_lockPath()],
-        overriddenPackages: {},
         generatedPatchesDir: patchesDir,
       );
       final written = File(p.join(patchesDir, 'some_package', 'fix.patch'))
           .readAsBytesSync();
       expect(written, patchBytes);
+    });
+
+    test('localForeignDeps shorthand overrides remote entry for locked version',
+        () async {
+      final r = ForeignDepsRegistry(
+        client: _mockClient(registryJson: {
+          'some_pkg': {
+            '1.0.0': {
+              'manifest': {
+                'sources': [
+                  {
+                    'type': 'file',
+                    'url': 'https://remote.com/old.so',
+                    'dest': r'$PUB_DEV'
+                  }
+                ]
+              }
+            }
+          }
+        }),
+        cacheDir: cacheDir,
+      );
+      // Shorthand: manifest key directly, version resolved from lock.
+      // Use a lock file that has some_pkg at 1.0.0 — we write a temp one.
+      final lockFile = File(p.join(tmpDir.path, 'test.lock'))
+        ..writeAsStringSync('''
+packages:
+  some_pkg:
+    dependency: "direct main"
+    source: hosted
+    version: "1.0.0"
+''');
+      final result = await r.resolve(
+        lockPaths: [lockFile.path],
+        localForeignDeps: {
+          'some_pkg': {
+            'manifest': {
+              'sources': [
+                {
+                  'type': 'file',
+                  'url': 'https://local.com/new.so',
+                  'dest': r'$PUB_DEV'
+                }
+              ]
+            }
+          }
+        },
+        generatedPatchesDir: p.join(tmpDir.path, 'patches'),
+      );
+      expect(result, hasLength(1));
+      expect(result.first['url'], 'https://local.com/new.so');
     });
   });
 }

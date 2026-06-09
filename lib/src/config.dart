@@ -3,75 +3,6 @@ import 'package:path/path.dart' as p;
 import 'package:yaml/yaml.dart';
 import 'utils/log.dart';
 
-/// A project-level patch entry: applies a patch file to a specific pub package.
-class PatchEntry {
-  final String package;
-  final String? version;
-  final String path;
-  final String? destSubpath;
-
-  /// Extra flags forwarded to the `patch` command via the flatpak-builder
-  /// patch source `options` field (e.g. `["--ignore-whitespace"]`).
-  final List<String> options;
-
-  /// When true, `flutpak generate` normalises the patch file to CRLF line
-  /// endings in `generated/patches/`. Use when the pub.dev archive for the
-  /// package ships sources with CRLF line endings (e.g. `objectbox_flutter_libs`
-  /// ≥ 5.3.2). When false (default) the patch is normalised to LF. In both
-  /// cases `--binary` is added to the flatpak-builder patch source options so
-  /// that `patch(1)` preserves line endings exactly as written.
-  ///
-  /// Ignored when [useGit] is true.
-  final bool crlf;
-
-  /// When true, the generated flatpak-builder patch source includes
-  /// `use-git: true`, which causes flatpak-builder to apply the patch via
-  /// `git apply` instead of `patch -p1`. More robust for patches in git
-  /// extended format (e.g. produced by `git diff`).
-  ///
-  /// Compatible with [crlf]: when both are set, the patch file is normalised
-  /// to CRLF before `git apply` runs — useful when the patch is stored with
-  /// LF in the repo but the target file has CRLF line endings.
-  /// Mutually exclusive with [options] (options are forwarded to `patch -p1`
-  /// only and are ignored when `git apply` is used instead).
-  final bool useGit;
-
-  const PatchEntry({
-    required this.package,
-    this.version,
-    required this.path,
-    this.destSubpath,
-    this.options = const [],
-    this.crlf = false,
-    this.useGit = false,
-  });
-
-  /// Resolves the dest path for this patch given the package version.
-  String dest(String resolvedVersion) {
-    final base = '.pub-cache/hosted/pub.dev/$package-$resolvedVersion';
-    return destSubpath != null ? '$base/$destSubpath' : base;
-  }
-
-  factory PatchEntry.fromYaml(Map yaml) {
-    final options = (yaml['options'] as List?)?.cast<String>() ?? [];
-    final hasLegacyKey = yaml.containsKey('strip-trailing-cr');
-    if (hasLegacyKey) {
-      logWarn('patches[${yaml['package']}]: strip-trailing-cr is deprecated, '
-          'use crlf: true instead.');
-    }
-    return PatchEntry(
-      package: yaml['package'] as String,
-      version: yaml['version'] as String?,
-      path: yaml['path'] as String,
-      destSubpath: yaml['dest-subpath'] as String?,
-      options: options,
-      crlf:
-          yaml['crlf'] as bool? ?? yaml['strip-trailing-cr'] as bool? ?? false,
-      useGit: yaml['use-git'] as bool? ?? false,
-    );
-  }
-}
-
 /// Developer info for metainfo `<developer>` element.
 class DeveloperConfig {
   /// Display name shown in software centres.
@@ -181,6 +112,11 @@ class ManifestConfig {
   /// Duplicates are silently dropped; mandatory args always appear first.
   final List<String> finishArgs;
 
+  /// Subdirectory within the source tree where the build is performed.
+  /// Passed verbatim as `subdir:` on the app module. Useful when the Flutter
+  /// project lives in a subdirectory of the git repository.
+  final String? subdir;
+
   const ManifestConfig({
     required this.appId,
     required this.runtimeVersion,
@@ -192,6 +128,7 @@ class ManifestConfig {
     this.env = const {},
     this.sources = const [],
     this.finishArgs = const [],
+    this.subdir,
   });
 
   factory ManifestConfig.fromYaml(Map yaml) {
@@ -231,6 +168,7 @@ class ManifestConfig {
           .map((e) => _deepConvertYaml(e) as Map<String, dynamic>)
           .toList(),
       finishArgs: finishArgsRaw,
+      subdir: yaml['subdir'] as String?,
     );
   }
 }
@@ -242,18 +180,20 @@ class FlatpakGenConfig {
   /// metainfo) live inside this directory unless overridden by per-file paths.
   final String output;
 
-  /// Lock file paths after env-var substitution at config-load time.
-  /// Paths that still contain `\$FLUTTER_ROOT` (because the env var was not set)
-  /// are preserved and resolved lazily via [effectivePubLocks].
+  /// Lock file paths.
   final List<String> pubLocks;
-  final String? flutterSdk;
+
+  /// Git ref (tag, branch, or commit SHA) for the Flutter SDK.
+  /// When set, engine version files are fetched from GitHub raw API — no
+  /// local Flutter installation needed. When null, flutter sources are skipped.
+  final String? flutterRef;
+
   final String? patchPath;
 
-  /// Optional path to a file storing the pinned Flutter version string.
-  final String? flutterVersionFile;
-
-  /// Project-level patch entries applied to specific pub packages.
-  final List<PatchEntry> patches;
+  /// Local foreign dependency overrides in the same format as the remote
+  /// `foreign_deps.json` registry. Deep-merged on top of the remote registry
+  /// before resolution. See `ForeignDepsRegistry.resolve()`.
+  final Map<String, dynamic> localForeignDeps;
 
   /// Project-level icon entries passed to the manifest generator.
   /// When empty, [effectiveIcons()] returns the default 256x256
@@ -261,9 +201,10 @@ class FlatpakGenConfig {
   final List<IconEntry> icons;
 
   /// Paths to extra module YAML files injected before the app module at
-  /// generate time. Each file may contain a single module map or a list of
-  /// module maps.
-  final List<String> extraModules;
+  /// generate time. Each element is either a [String] path to a YAML file
+  /// (which may contain a single module map or a list of module maps) or a
+  /// [Map] inline module definition in standard Flatpak manifest format.
+  final List<Object> extraModules;
 
   /// Git repository URL for the app source entry.
   final String? repoUrl;
@@ -290,12 +231,11 @@ class FlatpakGenConfig {
   const FlatpakGenConfig({
     required this.output,
     required this.pubLocks,
-    this.flutterSdk,
+    this.flutterRef,
     this.patchPath,
-    this.flutterVersionFile,
-    this.patches = const [],
+    this.localForeignDeps = const {},
     this.icons = const [],
-    this.extraModules = const [],
+    this.extraModules = const <Object>[],
     this.repoUrl,
     this.disableSubmodules = false,
     this.metainfoPath,
@@ -323,38 +263,12 @@ class FlatpakGenConfig {
         ]
       : icons;
 
-  /// Returns lock paths with any remaining `\$FLUTTER_ROOT` placeholders
-  /// substituted by [sdkPath]. Use this instead of [pubLocks] whenever
-  /// the effective SDK path is known (e.g. from the `--sdk` CLI flag).
-  List<String> effectivePubLocks(String? sdkPath) {
-    if (sdkPath == null) return pubLocks;
-    return pubLocks
-        .map((l) => l.replaceAll(r'$FLUTTER_ROOT', sdkPath))
-        .toList();
-  }
-
   factory FlatpakGenConfig.fromYaml(Map yaml) {
-    String resolve(String s) => s.replaceAllMapped(
-          RegExp(r'\$(\w+)'),
-          (m) => Platform.environment[m.group(1)!] ?? m.group(0)!,
-        );
-
-    // Returns null if any \$VAR placeholder remains after substitution.
-    // Used only for flutterSdk to avoid PathNotFoundException crashes.
-    String? tryResolve(String s) {
-      final result = resolve(s);
-      return RegExp(r'\$[A-Za-z_]\w*').hasMatch(result) ? null : result;
-    }
-
     final pub = yaml['pub'] as Map? ?? {};
     final flutter = yaml['flutter'] as Map? ?? {};
 
     final rawLocks =
         (pub['locks'] as List?)?.cast<String>() ?? ['pubspec.lock'];
-
-    final patchesRaw = yaml['patches'] as List? ?? [];
-    final patchEntries =
-        patchesRaw.map((e) => PatchEntry.fromYaml(e as Map)).toList();
 
     final output = yaml['output'] as String? ?? 'flatpak';
 
@@ -373,37 +287,35 @@ class FlatpakGenConfig {
       iconsList = const [];
     }
 
-    // Determine if a Flutter SDK is configured (either via flutter.sdk or
-    // FLUTTER_ROOT env var) to decide the default flutter_version_file path.
-    final flutterSdkPresent =
-        flutter['sdk'] != null || Platform.environment['FLUTTER_ROOT'] != null;
+    final extraModules = (yaml['modules'] as List?)?.map((e) {
+          if (e is String) return e as Object;
+          if (e is Map) return _deepConvertYaml(e) as Object;
+          throw ArgumentError(
+              'modules: each entry must be a string path or a module map, got ${e.runtimeType}');
+        }).toList() ??
+        const <Object>[];
 
-    final extraModules =
-        (yaml['modules'] as List?)?.cast<String>() ?? const <String>[];
+    if (flutter['sdk'] != null) {
+      logWarn('flutter.sdk is deprecated; use flutter.ref instead.');
+    }
+
+    final localForeignDeps =
+        _deepConvertYaml(yaml['foreign-deps'] as Map? ?? {})
+            as Map<String, dynamic>;
 
     return FlatpakGenConfig(
       output: output,
-      // Substitute env vars that ARE set; keep \$FLUTTER_ROOT literally when
-      // not set — effectivePubLocks() resolves it with the CLI --sdk value.
-      pubLocks: rawLocks.map(resolve).toList(),
-      // tryResolve returns null when \$FLUTTER_ROOT is unset, preventing a
-      // crash in FlutterSdkGenerator when the literal path is used.
-      flutterSdk: flutter['sdk'] != null
-          ? tryResolve(flutter['sdk'] as String)
-          : Platform.environment['FLUTTER_ROOT'],
+      pubLocks: rawLocks,
+      flutterRef: flutter['ref'] as String?,
       patchPath: flutter['patch'] as String?,
-      flutterVersionFile: yaml['flutter-version-file'] as String? ??
-          (flutterSdkPresent ? p.join(output, 'flutter.version') : null),
-      patches: patchEntries,
+      localForeignDeps: localForeignDeps,
       icons: iconsList,
       extraModules: extraModules,
       repoUrl: yaml['repo-url'] as String?,
       disableSubmodules: yaml['disable-submodules'] as bool? ?? false,
       metainfoPath: yaml['metainfo-path'] as String?,
       desktopEntryPath: yaml['desktop-entry-path'] as String?,
-      manifest: yaml['manifest'] != null
-          ? ManifestConfig.fromYaml(yaml['manifest'] as Map)
-          : null,
+      manifest: yaml['app-id'] != null ? ManifestConfig.fromYaml(yaml) : null,
       foreignDepsRef: yaml['foreign-deps-ref'] as String?,
     );
   }
@@ -440,15 +352,7 @@ class FlatpakGenConfig {
 
     return FlatpakGenConfig(
       output: 'flatpak',
-      pubLocks: [
-        'pubspec.lock',
-        if (Platform.environment['FLUTTER_ROOT'] != null)
-          p.join(
-            Platform.environment['FLUTTER_ROOT']!,
-            'packages/flutter_tools/pubspec.lock',
-          ),
-      ],
-      flutterSdk: Platform.environment['FLUTTER_ROOT'],
+      pubLocks: ['pubspec.lock'],
     );
   }
 

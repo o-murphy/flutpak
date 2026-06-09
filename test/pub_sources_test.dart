@@ -8,7 +8,8 @@ import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 
 /// Fake SHA-256 (64 hex chars) returned by the mock API.
-const _fakeSha256 = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+const _fakeSha256 =
+    'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 
 http.Client _mockPubDevClient() => MockClient((request) async {
       expect(request.url.host, 'pub.dev');
@@ -25,7 +26,8 @@ void main() {
       p.join(Directory.current.path, 'test', 'fixtures', 'simple.lock');
 
   group('PubSourcesGenerator', () {
-    test('generates two entries per hosted package (archive + inline)', () async {
+    test('generates two entries per hosted package (archive + inline)',
+        () async {
       final gen = PubSourcesGenerator(
         lockFilePaths: [lockFile],
         client: _mockPubDevClient(),
@@ -45,13 +47,13 @@ void main() {
         client: _mockPubDevClient(),
       );
       final sources = await gen.generate();
-      final yaml = sources.whereType<ArchiveSource>().firstWhere(
-          (s) => s.url.contains('/yaml/versions/'));
+      final yaml = sources
+          .whereType<ArchiveSource>()
+          .firstWhere((s) => s.url.contains('/yaml/versions/'));
 
       expect(yaml.toJson(), {
         'type': 'archive',
-        'url':
-            'https://pub.dev/packages/yaml/versions/3.1.2.tar.gz',
+        'url': 'https://pub.dev/packages/yaml/versions/3.1.2.tar.gz',
         'sha256': _fakeSha256,
         'dest': '.pub-cache/hosted/pub.dev/yaml-3.1.2',
         'strip-components': 0,
@@ -64,8 +66,9 @@ void main() {
         client: _mockPubDevClient(),
       );
       final sources = await gen.generate();
-      final yamlHash = sources.whereType<InlineSource>().firstWhere(
-          (s) => s.destFilename.contains('yaml-'));
+      final yamlHash = sources
+          .whereType<InlineSource>()
+          .firstWhere((s) => s.destFilename.contains('yaml-'));
 
       expect(yamlHash.toJson(), {
         'type': 'inline',

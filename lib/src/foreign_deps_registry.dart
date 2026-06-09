@@ -5,6 +5,7 @@ import 'package:crypto/crypto.dart';
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
 import 'package:yaml/yaml.dart';
+import 'generators/manifest_generator.dart' show convertPatchToCrlf;
 import 'utils/log.dart';
 
 /// Resolves package dependencies from the flutpak foreign_deps registry,
@@ -14,6 +15,9 @@ import 'utils/log.dart';
 /// (archives, patches, files). On a `generate` run the registry is fetched
 /// from GitHub and any packages found in the project's lock files are resolved
 /// into flatpak source maps ready for `generated-sources.json`.
+///
+/// Local overrides from `config.foreign_deps` (see [FlatpakGenConfig.localForeignDeps])
+/// are deep-merged on top of the remote registry before resolution.
 class ForeignDepsRegistry {
   final String ref;
   final http.Client _client;
@@ -65,21 +69,28 @@ class ForeignDepsRegistry {
 
   /// Resolves registry entries for packages found in [lockPaths].
   ///
-  /// Packages in [overriddenPackages] are skipped (local `patches:` wins).
+  /// [localForeignDeps] entries are deep-merged on top of the remote registry
+  /// before resolution — local package+version entries override remote ones.
+  /// An entry with an empty `sources: []` suppresses the remote entry.
+  ///
   /// For each resolved package version:
-  ///   - `type: patch` sources are downloaded to
-  ///     `[generatedPatchesDir]/<original-path>` as raw bytes (no line-ending
-  ///     conversion), and their `path` field is rewritten to
-  ///     `patches/<original-path>` so flatpak-builder can find them relative
-  ///     to the manifest directory.
+  ///   - `type: patch` sources with a remote URL are downloaded to
+  ///     `[generatedPatchesDir]/<original-path>` as raw bytes.
+  ///   - `type: patch` sources without a URL are copied from
+  ///     `[projectPatchesDir]/<path>` when that directory exists, otherwise
+  ///     fetched from the registry base URL.
+  ///   - If `crlf: true` is set on a patch source, the file is normalised to
+  ///     CRLF line endings after downloading/copying. The `crlf` key is always
+  ///     stripped from the output map (not valid for flatpak-builder).
   ///   - All other source types have placeholder substitution applied and are
   ///     included as-is.
   ///
   /// Returns source maps ready to append to `generated-sources.json`.
   Future<List<Map<String, dynamic>>> resolve({
     required List<String> lockPaths,
-    required Set<String> overriddenPackages,
     required String generatedPatchesDir,
+    Map<String, dynamic> localForeignDeps = const {},
+    String? projectPatchesDir,
   }) async {
     final Map<String, dynamic> registry;
     try {
@@ -90,14 +101,21 @@ class ForeignDepsRegistry {
     }
 
     final lockedVersions = _readLockedVersions(lockPaths);
+
+    // Deep-merge local overrides on top of remote registry.
+    final merged = _deepMergeRegistry(
+      remote: registry,
+      local: localForeignDeps,
+      lockedVersions: lockedVersions,
+    );
+
     final result = <Map<String, dynamic>>[];
 
-    for (final package in registry.keys) {
-      if (overriddenPackages.contains(package)) continue;
+    for (final package in merged.keys) {
       final version = lockedVersions[package];
       if (version == null) continue;
 
-      final packageMap = registry[package];
+      final packageMap = merged[package];
       if (packageMap is! Map) continue;
       final versionEntry = packageMap[version];
       if (versionEntry is! Map) continue;
@@ -106,16 +124,35 @@ class ForeignDepsRegistry {
       final sources = manifest['sources'];
       if (sources is! List) continue;
 
+      // Empty sources list → local override suppresses this registry entry.
+      if (sources.isEmpty) continue;
+
       for (final rawSource in sources) {
         if (rawSource is! Map) continue;
         var source = _deepConvert(rawSource);
         source = resolvePlaceholders(source, package, version);
 
         if (source['type'] == 'patch') {
+          final crlf = source['crlf'] as bool? ?? false;
+          source = Map<String, dynamic>.from(source)..remove('crlf');
+
           final origPath = source['path'] as String;
-          final url = baseUrl + origPath;
+          final url = source['url'] as String?;
           final localFile = p.join(generatedPatchesDir, origPath);
-          await _downloadFile(url, localFile);
+
+          if (url != null) {
+            await _downloadFile(url, localFile, crlf: crlf);
+          } else {
+            final srcFile = projectPatchesDir != null
+                ? p.join(projectPatchesDir, origPath)
+                : null;
+            if (srcFile != null && File(srcFile).existsSync()) {
+              _copyLocalPatch(srcFile, localFile, crlf: crlf);
+            } else {
+              await _downloadFile(baseUrl + origPath, localFile, crlf: crlf);
+            }
+          }
+
           source = Map<String, dynamic>.from(source);
           source['path'] = 'patches/$origPath';
         }
@@ -156,7 +193,9 @@ class ForeignDepsRegistry {
 
   /// Downloads [url] bytes to [localPath], using [_cacheDir] as a
   /// content-addressed cache keyed by URL SHA-256.
-  Future<void> _downloadFile(String url, String localPath) async {
+  /// Normalises line endings when [crlf] is true.
+  Future<void> _downloadFile(String url, String localPath,
+      {bool crlf = false}) async {
     final cacheKey = sha256.convert(utf8.encode(url)).toString();
     final cacheFile = File(p.join(_cacheDir.path, cacheKey));
 
@@ -173,9 +212,69 @@ class ForeignDepsRegistry {
       cacheFile.writeAsBytesSync(bytes);
     }
 
-    File(localPath)
-      ..createSync(recursive: true)
-      ..writeAsBytesSync(bytes);
+    File(localPath).createSync(recursive: true);
+    if (crlf) {
+      File(localPath).writeAsStringSync(convertPatchToCrlf(utf8.decode(bytes)));
+    } else {
+      File(localPath).writeAsBytesSync(bytes);
+    }
+  }
+
+  /// Copies a local patch file to [destPath], normalising line endings.
+  void _copyLocalPatch(String srcPath, String destPath, {bool crlf = false}) {
+    final src = File(srcPath);
+    if (!src.existsSync()) {
+      logWarn('foreign-deps: local patch not found: $srcPath');
+      return;
+    }
+    File(destPath).createSync(recursive: true);
+    if (crlf) {
+      File(destPath)
+          .writeAsStringSync(convertPatchToCrlf(src.readAsStringSync()));
+    } else {
+      File(destPath).writeAsBytesSync(src.readAsBytesSync());
+    }
+  }
+
+  /// Deep-merges [local] entries on top of [remote].
+  ///
+  /// Local entries with a direct `manifest:` key (shorthand — no version)
+  /// have their version resolved from [lockedVersions].
+  /// Versioned entries (`"1.2.3": { manifest: ... }`) merge directly.
+  static Map<String, dynamic> _deepMergeRegistry({
+    required Map<String, dynamic> remote,
+    required Map<String, dynamic> local,
+    required Map<String, String> lockedVersions,
+  }) {
+    final result = <String, dynamic>{};
+    for (final e in remote.entries) {
+      result[e.key] = _deepConvert(e.value);
+    }
+    for (final entry in local.entries) {
+      final package = entry.key;
+      final value = entry.value;
+      if (value is! Map) continue;
+
+      if (value.containsKey('manifest')) {
+        // Shorthand format: resolve version from lock file.
+        final version = lockedVersions[package];
+        if (version == null) continue;
+        final existing = (result[package] as Map<String, dynamic>?) ?? {};
+        result[package] = <String, dynamic>{
+          ...existing,
+          version: _deepConvert(value),
+        };
+      } else {
+        // Versioned format: merge each version entry.
+        final existing =
+            Map<String, dynamic>.from(result[package] as Map? ?? {});
+        for (final ve in value.entries) {
+          existing[ve.key as String] = _deepConvert(ve.value);
+        }
+        result[package] = existing;
+      }
+    }
+    return result;
   }
 }
 

@@ -21,13 +21,7 @@ void main() {
   // (e.g. "output: flatpak") resolve relative to the temp dir.
   // The script path is absolute so dart can find it regardless of CWD.
   Future<_Result> runGenerate(List<String> extra) => _runCli(
-        [
-          'generate',
-          '--no-sources',
-          '--config',
-          p.join(tmp.path, 'flutpak.yaml'),
-          ...extra
-        ],
+        ['generate', '--config', p.join(tmp.path, 'flutpak.yaml'), ...extra],
         workingDirectory: tmp.path,
       );
 
@@ -37,10 +31,9 @@ void main() {
     setUp(() {
       writeFile('flutpak.yaml', '''
 output: flatpak
-manifest:
-  app-id: io.example.App
-  runtime-version: "25.08"
-  command: app
+app-id: io.example.App
+runtime-version: "25.08"
+command: app
 ''');
     });
 

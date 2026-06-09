@@ -12,15 +12,27 @@ void main() {
           'locks': ['pubspec.lock', 'packages/a7p/pubspec.lock'],
         },
         'flutter': {
-          'sdk': '/home/user/flutter',
+          'ref': '3.44.1',
           'patch': 'flatpak/patches/flutter/shared.sh.patch',
         },
       });
 
       expect(cfg.output, 'flatpak');
       expect(cfg.pubLocks, ['pubspec.lock', 'packages/a7p/pubspec.lock']);
-      expect(cfg.flutterSdk, '/home/user/flutter');
+      expect(cfg.flutterRef, '3.44.1');
       expect(cfg.patchPath, 'flatpak/patches/flutter/shared.sh.patch');
+    });
+
+    test('parses flutter.ref tag', () {
+      final cfg = FlatpakGenConfig.fromYaml({
+        'flutter': {'ref': '3.44.1'},
+      });
+      expect(cfg.flutterRef, '3.44.1');
+    });
+
+    test('flutterRef is null when flutter.ref absent', () {
+      final cfg = FlatpakGenConfig.fromYaml({});
+      expect(cfg.flutterRef, isNull);
     });
 
     test('defaults output when missing', () {
@@ -33,98 +45,43 @@ void main() {
       expect(cfg.pubLocks, contains('pubspec.lock'));
     });
 
-    test('resolves \$ENV variables in paths', () {
-      final cfg = FlatpakGenConfig.fromYaml({
-        'flutter': {'sdk': '\$HOME/flutter'},
-      });
-      expect(cfg.flutterSdk, isNotNull);
-      expect(cfg.flutterSdk, isNot(isEmpty));
-    });
-
-    test('flutterSdk is null when \$VAR cannot be resolved', () {
-      // Use a variable name that is guaranteed not to be set.
-      final cfg = FlatpakGenConfig.fromYaml({
-        'flutter': {'sdk': r'$FLUTPAK_TEST_UNSET_VAR_XYZ/flutter'},
-      });
-      expect(cfg.flutterSdk, isNull);
-    });
-
-    test('pubLocks preserves unresolvable \$VAR paths for late resolution', () {
-      // Paths with unresolvable \$VAR are kept so effectivePubLocks() can
-      // substitute them later using the effective SDK path.
-      final cfg = FlatpakGenConfig.fromYaml({
-        'pub': {
-          'locks': [
-            'pubspec.lock',
-            r'$FLUTPAK_TEST_UNSET_VAR_XYZ/packages/flutter_tools/pubspec.lock',
-          ],
-        },
-      });
-      expect(cfg.pubLocks, hasLength(2));
-      expect(cfg.pubLocks.last, contains(r'$FLUTPAK_TEST_UNSET_VAR_XYZ'));
-    });
-
-    test('effectivePubLocks substitutes \$FLUTTER_ROOT with sdkPath', () {
-      // Bypass fromYaml (which eagerly substitutes $FLUTTER_ROOT from the
-      // environment) so the literal placeholder is preserved for the test.
-      final cfg = FlatpakGenConfig(
-        output: 'flatpak',
-        pubLocks: [
-          'pubspec.lock',
-          r'$FLUTTER_ROOT/packages/flutter_tools/pubspec.lock',
-        ],
-      );
-      final effective = cfg.effectivePubLocks('/home/user/flutter');
-      expect(effective, [
-        'pubspec.lock',
-        '/home/user/flutter/packages/flutter_tools/pubspec.lock',
-      ]);
-    });
-
-    test('effectivePubLocks returns pubLocks unchanged when sdkPath is null',
-        () {
-      final cfg = FlatpakGenConfig.fromYaml({
-        'pub': {
-          'locks': ['pubspec.lock'],
-        },
-      });
-      expect(cfg.effectivePubLocks(null), cfg.pubLocks);
-    });
-
     test('reads flutter patch from flutter.patch key', () {
       final cfg = FlatpakGenConfig.fromYaml({
         'flutter': {
-          'sdk': '/flutter',
           'patch': 'patches/flutter/shared.sh.patch',
         },
       });
       expect(cfg.patchPath, 'patches/flutter/shared.sh.patch');
     });
 
-    test('parses patches list', () {
+    test('parses foreign-deps into localForeignDeps', () {
       final cfg = FlatpakGenConfig.fromYaml({
-        'patches': [
-          {
-            'package': 'objectbox_flutter_libs',
-            'path': 'flatpak/patches/objectbox.patch',
-            'dest-subpath': 'linux',
-          },
-        ],
+        'foreign-deps': {
+          'sqlite3_flutter_libs': {
+            'manifest': {
+              'sources': [
+                {'type': 'patch', 'path': 'patches/sqlite3.patch', 'crlf': true}
+              ]
+            }
+          }
+        },
       });
-      expect(cfg.patches, hasLength(1));
-      expect(cfg.patches.first.package, 'objectbox_flutter_libs');
-      expect(cfg.patches.first.path, 'flatpak/patches/objectbox.patch');
-      expect(cfg.patches.first.destSubpath, 'linux');
+      expect(cfg.localForeignDeps, contains('sqlite3_flutter_libs'));
+      final entry = cfg.localForeignDeps['sqlite3_flutter_libs'] as Map;
+      expect(entry['manifest'], isNotNull);
+    });
+
+    test('localForeignDeps defaults to empty map', () {
+      final cfg = FlatpakGenConfig.fromYaml({});
+      expect(cfg.localForeignDeps, isEmpty);
     });
 
     test('parses manifest config (kebab-case keys)', () {
       final cfg = FlatpakGenConfig.fromYaml({
-        'manifest': {
-          'app-id': 'io.github.example.myapp',
-          'runtime-version': '25.08',
-          'command': 'myapp',
-          'sdk-extensions': ['org.freedesktop.Sdk.Extension.llvm20'],
-        },
+        'app-id': 'io.github.example.myapp',
+        'runtime-version': '25.08',
+        'command': 'myapp',
+        'sdk-extensions': ['org.freedesktop.Sdk.Extension.llvm20'],
       });
       expect(cfg.manifest, isNotNull);
       expect(cfg.manifest!.appId, 'io.github.example.myapp');
@@ -140,7 +97,7 @@ void main() {
           {'size': '256x256', 'path': 'app/share/icons/256/myapp.png'},
           {'size': '512x512', 'path': 'app/share/icons/512/myapp.png'},
         ],
-        'manifest': {'app-id': 'io.example.app'},
+        'app-id': 'io.example.app',
       });
       expect(cfg.icons, hasLength(2));
       expect(cfg.icons.first.size, '256x256');
@@ -152,7 +109,7 @@ void main() {
           'icons': [
             {'size': '512x512', 'path': 'app/share/icons/512/myapp.png'},
           ],
-          'manifest': {'app-id': 'io.example.app'},
+          'app-id': 'io.example.app',
         }),
         throwsArgumentError,
       );
@@ -160,7 +117,7 @@ void main() {
 
     test('icons empty when key absent', () {
       final cfg = FlatpakGenConfig.fromYaml({
-        'manifest': {'app-id': 'io.example.app'},
+        'app-id': 'io.example.app',
       });
       expect(cfg.icons, isEmpty);
     });
@@ -331,93 +288,6 @@ flutpak:
     });
   });
 
-  group('PatchEntry', () {
-    test('dest with destSubpath appends subpath', () {
-      final entry = PatchEntry(
-        package: 'objectbox_flutter_libs',
-        version: '5.3.1',
-        path: 'patches/objectbox.patch',
-        destSubpath: 'linux',
-      );
-      expect(entry.dest('5.3.1'),
-          '.pub-cache/hosted/pub.dev/objectbox_flutter_libs-5.3.1/linux');
-    });
-
-    test('dest without destSubpath returns package root', () {
-      final entry = PatchEntry(
-        package: 'objectbox_flutter_libs',
-        version: '5.3.1',
-        path: 'patches/objectbox.patch',
-      );
-      expect(entry.dest('5.3.1'),
-          '.pub-cache/hosted/pub.dev/objectbox_flutter_libs-5.3.1');
-    });
-
-    group('fromYaml', () {
-      test('parses crlf: true', () {
-        final entry = PatchEntry.fromYaml({
-          'package': 'objectbox_flutter_libs',
-          'path': 'patches/objectbox.patch',
-          'crlf': true,
-        });
-        expect(entry.crlf, isTrue);
-      });
-
-      test('crlf defaults to false when absent', () {
-        final entry = PatchEntry.fromYaml({
-          'package': 'foo',
-          'path': 'patches/foo.patch',
-        });
-        expect(entry.crlf, isFalse);
-      });
-
-      test('deprecated strip-trailing-cr sets crlf', () {
-        final entry = PatchEntry.fromYaml({
-          'package': 'objectbox_flutter_libs',
-          'path': 'patches/objectbox.patch',
-          'strip-trailing-cr': true,
-        });
-        expect(entry.crlf, isTrue);
-      });
-
-      test('crlf takes precedence over strip-trailing-cr', () {
-        final entry = PatchEntry.fromYaml({
-          'package': 'foo',
-          'path': 'patches/foo.patch',
-          'crlf': false,
-          'strip-trailing-cr': true,
-        });
-        expect(entry.crlf, isFalse);
-      });
-
-      test('parses options list', () {
-        final entry = PatchEntry.fromYaml({
-          'package': 'foo',
-          'path': 'patches/foo.patch',
-          'options': ['--ignore-whitespace'],
-        });
-        expect(entry.options, ['--ignore-whitespace']);
-      });
-
-      test('parses use-git: true', () {
-        final entry = PatchEntry.fromYaml({
-          'package': 'foo',
-          'path': 'patches/foo.patch',
-          'use-git': true,
-        });
-        expect(entry.useGit, isTrue);
-      });
-
-      test('use-git defaults to false when absent', () {
-        final entry = PatchEntry.fromYaml({
-          'package': 'foo',
-          'path': 'patches/foo.patch',
-        });
-        expect(entry.useGit, isFalse);
-      });
-    });
-  });
-
   group('ManifestConfig.fromYaml', () {
     test('parses build-options env and append-path (kebab-case)', () {
       final cfg = ManifestConfig.fromYaml({
@@ -473,32 +343,6 @@ flutpak:
       });
       expect(cfg.finishArgs,
           containsAll(['--filesystem=xdg-documents', '--share=network']));
-    });
-  });
-
-  group('FlatpakGenConfig flutter-version-file defaults', () {
-    test('defaults to <output>/flutter.version when flutter sdk is configured',
-        () {
-      final cfg = FlatpakGenConfig.fromYaml({
-        'output': 'flatpak',
-        'flutter': {'sdk': '/home/user/flutter'},
-      });
-      expect(cfg.flutterVersionFile, 'flatpak/flutter.version');
-    });
-
-    test('explicit flutter-version-file overrides default', () {
-      final cfg = FlatpakGenConfig.fromYaml({
-        'output': 'flatpak',
-        'flutter': {'sdk': '/home/user/flutter'},
-        'flutter-version-file': 'custom/my.version',
-      });
-      expect(cfg.flutterVersionFile, 'custom/my.version');
-    });
-
-    test('flutter-version-file is null for pure-Dart projects with no SDK', () {
-      if (Platform.environment.containsKey('FLUTTER_ROOT')) return;
-      final cfg = FlatpakGenConfig.fromYaml({'output': 'flatpak'});
-      expect(cfg.flutterVersionFile, isNull);
     });
   });
 }

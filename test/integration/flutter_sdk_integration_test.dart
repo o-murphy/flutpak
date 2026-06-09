@@ -15,8 +15,22 @@ void main() {
       late List<FlatpakSource> sources;
 
       setUpAll(() async {
+        // Resolve the current Flutter ref from the local SDK so we can pass
+        // it to FlutterSdkGenerator without needing a pre-known version.
+        final result = Process.runSync(
+          'git',
+          ['describe', '--tags', '--exact-match', 'HEAD'],
+          workingDirectory: flutterRoot,
+        );
+        final flutterRef = result.exitCode == 0
+            ? (result.stdout as String).trim()
+            : (Process.runSync('git', ['rev-parse', 'HEAD'],
+                        workingDirectory: flutterRoot)
+                    .stdout as String)
+                .trim();
+
         final gen = FlutterSdkGenerator(
-          sdkPath: flutterRoot!,
+          flutterRef: flutterRef,
           cache: _FakeCache(),
         );
         sources = await gen.generate();
@@ -51,7 +65,6 @@ void main() {
             .firstWhere((s) => s.url.contains('engine_stamp.json'));
         expect(stamp.dest, 'flutter/bin/cache');
       });
-
     },
   );
 }

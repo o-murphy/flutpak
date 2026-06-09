@@ -6,6 +6,10 @@ inputs:
     description: 'Flutter SDK version (e.g., "3.41.6", "stable", "beta")'
     required: false
     default: "stable"
+  flutter-version-file:
+    description: 'Path to a file containing the Flutter version (e.g. .flutter-version). Takes precedence over flutter-version.'
+    required: false
+    default: ""
   cache:
     description: "Enable caching for Flutter SDK"
     required: false
@@ -24,11 +28,23 @@ runs:
       shell: bash
       run: echo "flutter-path=$RUNNER_TEMP/flutter" >> $GITHUB_OUTPUT
 
+    - name: Resolve effective version
+      id: effective
+      shell: bash
+      run: |
+        FILE="${{ inputs.flutter-version-file }}"
+        if [ -n "$FILE" ] && [ -f "$FILE" ]; then
+          VERSION=$(tr -d '[:space:]' < "$FILE")
+        else
+          VERSION="${{ steps.effective.outputs.version }}"
+        fi
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+
     - name: Resolve version and clone depth
       id: resolve-version
       shell: bash
       run: |
-        VERSION="${{ inputs.flutter-version }}"
+        VERSION="${{ steps.effective.outputs.version }}"
         case "$VERSION" in
           stable|beta|latest)
             echo "branch=${VERSION/latest/stable}" >> $GITHUB_OUTPUT
