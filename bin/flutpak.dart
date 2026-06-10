@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:args/command_runner.dart';
+import 'package:flutpak/src/commands/cache_command.dart';
 import 'package:flutpak/src/commands/generate_command.dart';
 import 'package:flutpak/src/commands/init_command.dart';
 import 'package:flutpak/src/commands/sdk_mod_command.dart';
@@ -24,7 +25,8 @@ Future<void> main(List<String> args) async {
   )
     ..addCommand(InitCommand())
     ..addCommand(GenerateCommand())
-    ..addCommand(SdkModCommand());
+    ..addCommand(SdkModCommand())
+    ..addCommand(CacheCommand());
 
   try {
     await runner.run(args);

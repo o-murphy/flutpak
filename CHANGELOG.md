@@ -7,7 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.8.0] — 2026-06-09
+## [0.8.0] — 2026-06-10
+
+### Breaking Changes
+
+- **`generated-sources.json` renamed to `pubspec-sources.json`** — the pub and
+  foreign-deps sources file is now named `pubspec-sources.json` in all generated
+  output. Update your Flathub submission manifest's `!include` reference and any
+  scripts that reference this filename by name.
+
+- **Flutter SDK moved to a standalone module** — when `flutter.ref` is set,
+  `generate` no longer embeds Flutter SDK sources inside `pubspec-sources.json`.
+  Instead it produces a separate `flutter-sdk-<version>.json` module (analogous
+  to `rustup-<version>.json`) that installs Flutter to `/var/lib/flutter`. The
+  cache-stamp `cp` build-commands are no longer emitted in the app module; they
+  live inside the flutter-sdk module. Re-run `flutpak init --force` to regenerate
+  a clean template.
 
 ### Added
 
@@ -25,7 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Injects `CARGO_HOME`, `RUSTUP_HOME`, and `<rustup-path>/bin` in the app
     module's `build-options.env` / `append-path`.
   - Appends `cargo-sources.json` to the app module's `sources` list after
-    `generated-sources.json`.
+    `pubspec-sources.json`.
 
 - **`rust:` config section** in `flutpak.yaml`:
   ```yaml
@@ -64,12 +79,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`foreign_deps/cargokit/run_build_tool.sh.patch`** — adds `--offline` to
   `pub get` in cargokit's `run_build_tool.sh`; required for Flatpak offline builds.
 
+- **Flutter SDK as standalone module** — when `flutter.ref` is set, `generate`
+  produces a separate `flutter-sdk-<version>.json` module. The module uses
+  `buildsystem: simple` and installs the Flutter SDK to `/var/lib/flutter`. It is
+  inserted before all other extra modules in the generated manifest. The app
+  module's `append-path` references `/var/lib/flutter/bin`.
+
+- **`FlutterSdkRegistry`** — before generating a flutter-sdk module from
+  scratch, `generate` checks for a pre-built `flutter-sdk-<version>.json` in the
+  flutpak repository. Lookup order:
+  1. `~/.cache/flutpak/flutter_sdk/flutter-sdk-<version>.json` (local cache)
+  2. `flutter_sdk/flutter-sdk-<version>.json` on the `main` branch of the
+     flutpak GitHub repo (raw URL)
+  3. Fallback to generation when not available
+
+  Pre-built modules are cached locally after the first fetch for subsequent runs.
+
+- **`flutter-sdk-ref` config field** — optional git ref (branch or tag) of the
+  flutpak repo from which pre-built flutter-sdk modules are fetched. Defaults to
+  `'main'` when unset.
+  ```yaml
+  flutter-sdk-ref: main   # optional; default: main
+  ```
+
+- **`flutpak cache clear`** — new subcommand that deletes the entire
+  `~/.cache/flutpak/` directory (SHA-256 download cache and cached flutter-sdk
+  modules).
+
 ### Fixed
 
 - **`extraPubspecPaths` not wired into pub sources** — `cargokit/build_tool/pubspec.lock`
   paths extracted by the foreign deps registry were collected but never passed to
   `generateSourcesJson`. Cargokit build tool Dart dependencies were missing from
-  `generated-sources.json`. Fixed by extracting `buildLockPaths` as a top-level
+  `pubspec-sources.json`. Fixed by extracting `buildLockPaths` as a top-level
   testable function that explicitly merges `extraPubspecPaths` into `allPubLockPaths`.
 
 ### Demo

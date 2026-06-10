@@ -40,7 +40,7 @@ command: app
     test('does not write any files', () async {
       final result = await runGenerate(['--dry-run']);
       expect(result.exitCode, 0, reason: result.stderr);
-      expect(fileExists('flatpak/generated/generated-sources.json'), isFalse);
+      expect(fileExists('flatpak/generated/pubspec-sources.json'), isFalse);
       expect(fileExists('flatpak/generated/io.example.App.yml'), isFalse);
     });
 

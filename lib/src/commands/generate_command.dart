@@ -5,6 +5,7 @@ import 'package:path/path.dart' as p;
 import 'package:yaml/yaml.dart';
 import 'package:yaml_edit/yaml_edit.dart';
 import '../config.dart';
+import '../flutter_sdk_registry.dart';
 import '../foreign_deps_registry.dart';
 import '../generators/cargo_sources.dart';
 import '../generators/flutter_sdk.dart';
@@ -18,7 +19,7 @@ import 'command_utils.dart';
 ///
 /// Reads `<output>/<app_id>.yml` as the template, validates it, substitutes
 /// `__FLATPAK_TAG__` / `__FLATPAK_COMMIT__` placeholders, generates
-/// `generated-sources.json`, copies patches, and writes the final manifest to
+/// `pubspec-sources.json`, copies patches, and writes the final manifest to
 /// `<output>/generated/<app_id>.yml`.
 class GenerateCommand extends Command<void> {
   @override
@@ -26,7 +27,7 @@ class GenerateCommand extends Command<void> {
   @override
   final description =
       'Substitute tag/commit placeholders in the template manifest, generate\n'
-      'generated-sources.json, and copy everything into generated/.';
+      'pubspec-sources.json, and copy everything into generated/.';
 
   GenerateCommand() {
     argParser
@@ -120,7 +121,7 @@ class GenerateCommand extends Command<void> {
 
     // ── Output paths ──────────────────────────────────────────────────────
     final generatedDir = p.join(outputDir, 'generated');
-    final sourcesPath = p.join(generatedDir, 'generated-sources.json');
+    final sourcesPath = p.join(generatedDir, 'pubspec-sources.json');
     final generatedManifestPath =
         p.join(generatedDir, '${manifestCfg.appId}.yml');
     final generatedPatchesDir = p.join(generatedDir, 'patches');
@@ -180,23 +181,53 @@ class GenerateCommand extends Command<void> {
     // ── Generate sources ──────────────────────────────────────────────────
     String? generatedCargoSourcesPath;
     String? rustupModule;
+    String? flutterSdkModule;
     final effectiveRustupPath = cfg.rustupPath ?? '/var/lib/rustup';
     File? toolsLockFile;
 
     try {
       if (flutterGen != null) {
-        // Fetch flutter_tools pubspec.lock so its deps appear in generated-sources.json.
+        // Fetch flutter_tools pubspec.lock so its deps appear in pubspec-sources.json.
         final toolsLockContent = await flutterGen.fetchFlutterToolsLock();
         toolsLockFile = File(p.join(generatedDir, 'flutter_tools.lock'))
           ..createSync(recursive: true)
           ..writeAsStringSync(toolsLockContent);
         allLockPaths = [...allPubLockPaths, toolsLockFile.path];
+
+        final flutterVersion = await flutterGen.fetchFlutterVersion();
+        final sdkModuleFilename = 'flutter-sdk-$flutterVersion.json';
+        final sdkRegistry = FlutterSdkRegistry(
+          ref: cfg.flutterSdkRef ?? 'main',
+        );
+
+        // Try pre-built module from registry (cached or remote).
+        String? moduleJson = await sdkRegistry.fetchPrebuilt(flutterVersion);
+
+        if (moduleJson == null) {
+          logInfo(
+              'flutter-sdk: generating for $flutterVersion (not in registry)');
+          final sdkSources = await flutterGen.generate();
+          final sdkModule = {
+            'name': 'flutter-sdk',
+            'buildsystem': 'simple',
+            'build-commands': FlutterSdkGenerator.buildCommands(),
+            'sources': sdkSources.map((s) => s.toJson()).toList(),
+          };
+          moduleJson = jsonEncode(sdkModule);
+          sdkRegistry.cacheLocally(flutterVersion, moduleJson);
+        }
+
+        File(p.join(generatedDir, sdkModuleFilename))
+          ..createSync(recursive: true)
+          ..writeAsStringSync(moduleJson);
+        flutterSdkModule = sdkModuleFilename;
+        logInfo('✓  flutter SDK module → $sdkModuleFilename');
+        sdkRegistry.dispose();
       }
 
-      await generateSourcesJson(
+      await generatePubSourcesJson(
         lockPaths: allLockPaths,
         outputPath: sourcesPath,
-        flutterGen: flutterGen,
         foreignDepSources: foreignDepSources,
       );
 
@@ -249,6 +280,7 @@ class GenerateCommand extends Command<void> {
       extraModules: cfg.extraModules,
       sourcesPath: sourcesPath,
       cargoSourcesPath: generatedCargoSourcesPath,
+      flutterSdkModule: flutterSdkModule,
       rustupModule: rustupModule,
       rustupPath: effectiveRustupPath,
       tag: tag,
@@ -327,6 +359,7 @@ String injectGeneratedContent({
   required List<Object> extraModules,
   required String sourcesPath,
   String? cargoSourcesPath,
+  String? flutterSdkModule,
   String? rustupModule,
   String? rustupPath,
   required String? tag,
@@ -377,7 +410,7 @@ String injectGeneratedContent({
   }
 
   // ── Append sources ────────────────────────────────────────────────────
-  // Order: generated-sources.json → manifest.sources → cargo-sources.json
+  // Order: pubspec-sources.json → manifest.sources → cargo-sources.json
   srcList.add(p.basename(sourcesPath));
   for (final src in manifestCfg.sources) {
     srcList.add(Map<String, dynamic>.from(src));
@@ -442,6 +475,11 @@ String injectGeneratedContent({
   }
   if (rustupModule != null) {
     editor.insertIntoList(['modules'], insertIdx, rustupModule as Object);
+  }
+  // Flutter SDK must be first — cargokit's build tool depends on the Flutter
+  // install being present. Insert after rustup so it displaces rustup to idx+1.
+  if (flutterSdkModule != null) {
+    editor.insertIntoList(['modules'], insertIdx, flutterSdkModule as Object);
   }
 
   return editor.toString();

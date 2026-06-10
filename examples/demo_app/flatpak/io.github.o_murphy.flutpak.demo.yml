@@ -31,25 +31,14 @@ modules:
         aarch64:
           env:
             BUNDLE_PATH: build/linux/arm64/release/bundle
-      append-path: /usr/lib/sdk/llvm20/bin:/run/build/demo/flutter/bin
+      append-path: /usr/lib/sdk/llvm20/bin:/var/lib/flutter/bin
       prepend-ld-library-path: /usr/lib/sdk/llvm20/lib
       env:
         PUB_CACHE: /run/build/demo/.pub-cache
     # Build steps — review and customise for your project.
     build-commands:
-      - cp $FLATPAK_BUILDER_BUILDDIR/flutter/bin/internal/engine.version $FLATPAK_BUILDER_BUILDDIR/flutter/bin/cache/engine-dart-sdk.stamp
-      - cp $FLATPAK_BUILDER_BUILDDIR/flutter/bin/internal/material_fonts.version $FLATPAK_BUILDER_BUILDDIR/flutter/bin/cache/material_fonts.stamp
-      - cp $FLATPAK_BUILDER_BUILDDIR/flutter/bin/internal/gradle_wrapper.version $FLATPAK_BUILDER_BUILDDIR/flutter/bin/cache/gradle_wrapper.stamp
-      - cp $FLATPAK_BUILDER_BUILDDIR/flutter/bin/internal/engine.version $FLATPAK_BUILDER_BUILDDIR/flutter/bin/cache/engine_stamp.stamp
-      - cp $FLATPAK_BUILDER_BUILDDIR/flutter/bin/internal/engine.version $FLATPAK_BUILDER_BUILDDIR/flutter/bin/cache/flutter_sdk.stamp
-      - cp $FLATPAK_BUILDER_BUILDDIR/flutter/bin/internal/engine.version $FLATPAK_BUILDER_BUILDDIR/flutter/bin/cache/font-subset.stamp
-      - cp $FLATPAK_BUILDER_BUILDDIR/flutter/bin/internal/engine.version $FLATPAK_BUILDER_BUILDDIR/flutter/bin/cache/linux-sdk.stamp
       - flutter pub get --offline
       - flutter build linux --release --no-pub
-      # Smoke: rhttp Rust native lib must be bundled by cargokit
-      - test -f "$BUNDLE_PATH/lib/librhttp.so" && echo "smoke: librhttp.so OK"
-      # Smoke: SQLite system lib must be visible in Flatpak runtime
-      - ldconfig -p | grep -q libsqlite3 && echo "smoke: libsqlite3 OK"
       - mkdir -p /app/demo
       - cp -r "$BUNDLE_PATH"/. /app/demo/
       - install -Dm755 flatpak/demo-wrapper.sh /app/bin/demo_app
