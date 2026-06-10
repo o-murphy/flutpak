@@ -2,7 +2,6 @@ name: Flutter SDK Module Update
 run-name: "Flutter SDK Module Update — ${{ inputs.flutter-version || 'auto' }}"
 
 on:
-  pull_request:
   schedule:
     - cron: "0 6 * * *"   # daily at 06:00 UTC
   workflow_dispatch:
@@ -11,6 +10,11 @@ on:
         description: "Flutter version to generate (e.g. 3.44.2). Leave empty to auto-detect latest stable."
         required: false
         default: ""
+      force:
+        description: "Force regeneration even if module already exists or PR is open."
+        type: boolean
+        required: false
+        default: false
 
 concurrency:
   group: flutter-sdk-module-update
