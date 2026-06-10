@@ -67,17 +67,19 @@ jobs:
           MODULE_FILE="modules/flutter-sdk/flutter-sdk-${VERSION}.json"
           echo "file=$MODULE_FILE" >> "$GITHUB_OUTPUT"
 
-          if [ -f "$MODULE_FILE" ]; then
-            echo "exists=true" >> "$GITHUB_OUTPUT"
-            echo "Module $MODULE_FILE already exists in main — nothing to do."
-            exit 0
-          fi
+          if [ "${{ inputs.force }}" != "true" ]; then
+            if [ -f "$MODULE_FILE" ]; then
+              echo "exists=true" >> "$GITHUB_OUTPUT"
+              echo "Module $MODULE_FILE already exists in main — nothing to do."
+              exit 0
+            fi
 
-          OPEN_PR=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number' 2>/dev/null)
-          if [ -n "$OPEN_PR" ]; then
-            echo "exists=true" >> "$GITHUB_OUTPUT"
-            echo "PR #${OPEN_PR} already open for $BRANCH — nothing to do."
-            exit 0
+            OPEN_PR=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number' 2>/dev/null)
+            if [ -n "$OPEN_PR" ]; then
+              echo "exists=true" >> "$GITHUB_OUTPUT"
+              echo "PR #${OPEN_PR} already open for $BRANCH — nothing to do."
+              exit 0
+            fi
           fi
 
           echo "exists=false" >> "$GITHUB_OUTPUT"
@@ -111,7 +113,9 @@ jobs:
           git checkout -b "$BRANCH"
           git add modules/flutter-sdk/
           git commit -m "feat: add Flutter SDK module for ${VERSION}"
-          git push origin "$BRANCH"
+          FORCE_FLAG=""
+          [ "${{ inputs.force }}" = "true" ] && FORCE_FLAG="--force"
+          git push $FORCE_FLAG origin "$BRANCH"
 
           gh label create "automated"   --color "#0075ca" --force || true
           gh label create "flutter-sdk" --color "#7057ff" --force || true
