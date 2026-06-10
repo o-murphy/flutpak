@@ -1,0 +1,11 @@
+version = 3
+
+[[package]]
+name = "libc"
+version = "0.2.172"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ab8b3df399b4cf5f7ad60dc59b8f6dcca8a37ed38b5a6b741a2891c22e9e9d3b"
+
+[[package]]
+name = "myapp"
+version = "0.1.0"

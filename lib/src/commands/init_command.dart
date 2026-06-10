@@ -73,8 +73,7 @@ class InitCommand extends Command<void> {
     }
 
     final hasFlutter = flutterRef != null;
-    final sourcesPath =
-        p.join(outputDir, 'generated', 'generated-sources.json');
+    final sourcesPath = p.join(outputDir, 'generated', 'pubspec-sources.json');
     final generator = ManifestGenerator(
       cfg: manifestCfg,
       generatedSourcesPath: sourcesPath,

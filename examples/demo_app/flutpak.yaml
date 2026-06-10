@@ -1,8 +1,13 @@
 output: flatpak
 
-
 flutter:
   ref: 3.44.1
+
+rust:
+  version: 1.85.0
+  rustup-path: /var/lib/rustup
+
+foreign-deps-ref: feat/rust-based-deps
 
 repo-url: https://github.com/o-murphy/flutpak.git
 
@@ -10,3 +15,6 @@ app-id: io.github.o_murphy.flutpak.demo
 runtime-version: '25.08'
 command: demo_app
 subdir: examples/demo_app
+
+finish-args:
+  - --share=network

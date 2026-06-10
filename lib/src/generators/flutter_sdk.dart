@@ -112,7 +112,7 @@ class FlutterSdkGenerator {
         await _fetchText('material_fonts.version', subdir: 'bin/internal');
     final gradleHash =
         await _fetchText('gradle_wrapper.version', subdir: 'bin/internal');
-    final flutterVersion = await _fetchFlutterVersion();
+    final flutterVersion = await fetchFlutterVersion();
     final flutterCommit = await _resolveCommit();
 
     logInfo(
@@ -229,7 +229,7 @@ class FlutterSdkGenerator {
   ///
   /// For a semver tag like "3.44.1" the tag itself is the version; for other
   /// refs the `version` file is fetched from GitHub.
-  Future<String> _fetchFlutterVersion() async {
+  Future<String> fetchFlutterVersion() async {
     final url = '$_rawBase/$flutterRef/version';
     final response = await _client.get(Uri.parse(url));
     if (response.statusCode == 200) return response.body.trim();

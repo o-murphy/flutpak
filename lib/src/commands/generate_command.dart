@@ -1,12 +1,16 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:args/command_runner.dart';
 import 'package:path/path.dart' as p;
 import 'package:yaml/yaml.dart';
 import 'package:yaml_edit/yaml_edit.dart';
 import '../config.dart';
+import '../flutter_sdk_registry.dart';
 import '../foreign_deps_registry.dart';
+import '../generators/cargo_sources.dart';
 import '../generators/flutter_sdk.dart';
 import '../generators/manifest_generator.dart';
+import '../generators/rustup_generator.dart';
 import '../utils/log.dart';
 import '../utils/sources_util.dart';
 import 'command_utils.dart';
@@ -15,7 +19,7 @@ import 'command_utils.dart';
 ///
 /// Reads `<output>/<app_id>.yml` as the template, validates it, substitutes
 /// `__FLATPAK_TAG__` / `__FLATPAK_COMMIT__` placeholders, generates
-/// `generated-sources.json`, copies patches, and writes the final manifest to
+/// `pubspec-sources.json`, copies patches, and writes the final manifest to
 /// `<output>/generated/<app_id>.yml`.
 class GenerateCommand extends Command<void> {
   @override
@@ -23,7 +27,7 @@ class GenerateCommand extends Command<void> {
   @override
   final description =
       'Substitute tag/commit placeholders in the template manifest, generate\n'
-      'generated-sources.json, and copy everything into generated/.';
+      'pubspec-sources.json, and copy everything into generated/.';
 
   GenerateCommand() {
     argParser
@@ -117,7 +121,7 @@ class GenerateCommand extends Command<void> {
 
     // ── Output paths ──────────────────────────────────────────────────────
     final generatedDir = p.join(outputDir, 'generated');
-    final sourcesPath = p.join(generatedDir, 'generated-sources.json');
+    final sourcesPath = p.join(generatedDir, 'pubspec-sources.json');
     final generatedManifestPath =
         p.join(generatedDir, '${manifestCfg.appId}.yml');
     final generatedPatchesDir = p.join(generatedDir, 'patches');
@@ -130,19 +134,31 @@ class GenerateCommand extends Command<void> {
 
     // ── Resolve foreign deps from registry ───────────────────────────────
     List<Map<String, dynamic>> foreignDepSources = const [];
+    List<String> foreignCargoLockPaths = const [];
+    List<String> foreignExtraPubspecPaths = const [];
+    // registry is kept alive until the outer finally so CargoSourcesGenerator
+    // can read the extracted Cargo.lock files before dispose() deletes them.
+    ForeignDepsRegistry? registry;
     if (!noForeignDeps) {
-      final registry = ForeignDepsRegistry(ref: cfg.foreignDepsRef);
-      try {
-        foreignDepSources = await registry.resolve(
-          lockPaths: effectiveLocks,
-          localForeignDeps: cfg.localForeignDeps,
-          generatedPatchesDir: generatedPatchesDir,
-          projectPatchesDir: p.join(outputDir, 'patches'),
-        );
-      } finally {
-        registry.dispose();
-      }
+      registry = ForeignDepsRegistry(ref: cfg.foreignDepsRef);
+      final depsResult = await registry.resolve(
+        lockPaths: effectiveLocks,
+        localForeignDeps: cfg.localForeignDeps,
+        generatedPatchesDir: generatedPatchesDir,
+        projectPatchesDir: p.join(outputDir, 'patches'),
+      );
+      foreignDepSources = depsResult.sources;
+      foreignCargoLockPaths = depsResult.cargoLockPaths;
+      foreignExtraPubspecPaths = depsResult.extraPubspecPaths;
     }
+
+    final (:allPubLockPaths, :allCargoLockPaths) = buildLockPaths(
+      effectiveLocks: effectiveLocks,
+      extraPubspecPaths: foreignExtraPubspecPaths,
+      cargoLockPaths: foreignCargoLockPaths,
+      rustLocks: cfg.rustLocks,
+      baseDir: baseDir,
+    );
 
     // ── Build Flutter SDK generator if ref is configured ─────────────────
     final flutterRef = flutterRefOverride ?? cfg.flutterRef;
@@ -152,7 +168,7 @@ class GenerateCommand extends Command<void> {
           'Pass --flutter <ref> or add flutter.ref to flutpak.yaml.');
     }
     FlutterSdkGenerator? flutterGen;
-    var allLockPaths = effectiveLocks;
+    var allLockPaths = allPubLockPaths;
     if (flutterRef != null) {
       flutterGen = FlutterSdkGenerator(
         flutterRef: flutterRef,
@@ -163,24 +179,91 @@ class GenerateCommand extends Command<void> {
     }
 
     // ── Generate sources ──────────────────────────────────────────────────
+    String? generatedCargoSourcesPath;
+    String? rustupModule;
+    String? flutterSdkModule;
+    final effectiveRustupPath = cfg.rustupPath ?? '/var/lib/rustup';
+    File? toolsLockFile;
+
     try {
       if (flutterGen != null) {
-        // Fetch flutter_tools pubspec.lock so its deps appear in generated-sources.json.
+        // Fetch flutter_tools pubspec.lock so its deps appear in pubspec-sources.json.
         final toolsLockContent = await flutterGen.fetchFlutterToolsLock();
-        final toolsLockFile = File(p.join(generatedDir, 'flutter_tools.lock'))
+        toolsLockFile = File(p.join(generatedDir, 'flutter_tools.lock'))
           ..createSync(recursive: true)
           ..writeAsStringSync(toolsLockContent);
-        allLockPaths = [...effectiveLocks, toolsLockFile.path];
+        allLockPaths = [...allPubLockPaths, toolsLockFile.path];
+
+        final flutterVersion = await flutterGen.fetchFlutterVersion();
+        final sdkModuleFilename = 'flutter-sdk-$flutterVersion.json';
+        final sdkRegistry = FlutterSdkRegistry(
+          ref: cfg.flutterSdkRef ?? 'main',
+        );
+
+        // Try pre-built module from registry (cached or remote).
+        String? moduleJson = await sdkRegistry.fetchPrebuilt(flutterVersion);
+
+        if (moduleJson == null) {
+          logInfo(
+              'flutter-sdk: generating for $flutterVersion (not in registry)');
+          final sdkSources = await flutterGen.generate();
+          final sdkModule = {
+            'name': 'flutter-sdk',
+            'buildsystem': 'simple',
+            'build-commands': FlutterSdkGenerator.buildCommands(),
+            'sources': sdkSources.map((s) => s.toJson()).toList(),
+          };
+          moduleJson = jsonEncode(sdkModule);
+          sdkRegistry.cacheLocally(flutterVersion, moduleJson);
+        }
+
+        File(p.join(generatedDir, sdkModuleFilename))
+          ..createSync(recursive: true)
+          ..writeAsStringSync(moduleJson);
+        flutterSdkModule = sdkModuleFilename;
+        logInfo('✓  flutter SDK module → $sdkModuleFilename');
+        sdkRegistry.dispose();
       }
 
-      await generateSourcesJson(
+      await generatePubSourcesJson(
         lockPaths: allLockPaths,
         outputPath: sourcesPath,
-        flutterGen: flutterGen,
         foreignDepSources: foreignDepSources,
       );
+
+      // ── Generate Rust/Cargo artifacts ─────────────────────────────────
+      if (allCargoLockPaths.isNotEmpty) {
+        final effectiveRustVersion = cfg.rustVersion ?? '1.85.0';
+
+        final cargoSources =
+            await CargoSourcesGenerator.generate(allCargoLockPaths);
+        generatedCargoSourcesPath = p.join(generatedDir, 'cargo-sources.json');
+        File(generatedCargoSourcesPath)
+          ..createSync(recursive: true)
+          ..writeAsStringSync(jsonEncode(cargoSources));
+        logInfo('✓  cargo sources → cargo-sources.json');
+
+        final rustupGen = RustupGenerator(
+          rustVersion: effectiveRustVersion,
+          rustupPath: effectiveRustupPath,
+        );
+        try {
+          final rustupModuleMap = await rustupGen.generateModule();
+          final rustupModuleFilename = 'rustup-$effectiveRustVersion.json';
+          final rustupModulePath = p.join(generatedDir, rustupModuleFilename);
+          File(rustupModulePath)
+            ..createSync(recursive: true)
+            ..writeAsStringSync(jsonEncode(rustupModuleMap));
+          rustupModule = rustupModuleFilename;
+          logInfo('✓  rustup module → $rustupModuleFilename');
+        } finally {
+          rustupGen.dispose();
+        }
+      }
     } finally {
+      registry?.dispose();
       flutterGen?.dispose();
+      toolsLockFile?.deleteSync();
     }
 
     if (commit == null) {
@@ -191,11 +274,15 @@ class GenerateCommand extends Command<void> {
     var generatedContent = stripTemplateGuidance(templateContent);
 
     // ── Inject tag/commit, modules, and sources via yaml_edit ────────────
-    generatedContent = _injectGeneratedContent(
+    generatedContent = injectGeneratedContent(
       content: generatedContent,
       manifestCfg: manifestCfg,
       extraModules: cfg.extraModules,
       sourcesPath: sourcesPath,
+      cargoSourcesPath: generatedCargoSourcesPath,
+      flutterSdkModule: flutterSdkModule,
+      rustupModule: rustupModule,
+      rustupPath: effectiveRustupPath,
       tag: tag,
       commit: commit,
     );
@@ -258,106 +345,164 @@ class GenerateCommand extends Command<void> {
       exit(1);
     }
   }
+}
 
-  /// Injects tag/commit, modules, manifest.sources, generated-sources.json,
-  /// and patches into the manifest YAML using yaml_edit.
-  ///
-  /// - tag and commit are set on the git source entry.
-  /// - modules file contents are inserted before the app module.
-  /// - generated-sources.json, manifest.sources, and patch sources are appended
-  ///   to the app module's sources list.
-  String _injectGeneratedContent({
-    required String content,
-    required ManifestConfig manifestCfg,
-    required List<Object> extraModules,
-    required String sourcesPath,
-    required String? tag,
-    required String? commit,
-  }) {
-    final editor = YamlEditor(content);
-    final yamlTree = loadYaml(content);
+/// Injects tag/commit, modules, sources, and Rust/Cargo artifacts into the
+/// manifest YAML using yaml_edit.
+///
+/// The whole app module map is replaced in a single editor.update() to avoid
+/// the yaml_edit 2.x crash when creating new keys in block-sequence elements.
+/// Source appends happen after that replacement so they land in the right place.
+String injectGeneratedContent({
+  required String content,
+  required ManifestConfig manifestCfg,
+  required List<Object> extraModules,
+  required String sourcesPath,
+  String? cargoSourcesPath,
+  String? flutterSdkModule,
+  String? rustupModule,
+  String? rustupPath,
+  required String? tag,
+  required String? commit,
+}) {
+  final editor = YamlEditor(content);
+  final yamlTree = loadYaml(content);
 
-    final modules = yamlTree['modules'];
-    if (modules is! List) {
-      logWarn(
-          'modules key not found or not a list in template — skipping injection');
-      return content;
-    }
-
-    final appName = manifestCfg.appId.split('.').last;
-    final appModuleIdx =
-        modules.toList().indexWhere((m) => m is Map && m['name'] == appName);
-    if (appModuleIdx < 0) {
-      logWarn(
-          'app module "$appName" not found in template — skipping injection');
-      return content;
-    }
-
-    final appModule = modules.toList()[appModuleIdx];
-    if (appModule is! Map || appModule['sources'] is! List) {
-      logWarn(
-          'sources key not found or not a list in app module "$appName" — skipping injection');
-      return content;
-    }
-
-    // ── Set tag and commit on git source ──────────────────────────────────
-    // Both fields are always written (when commit is available). When no
-    // --tag is given, _resolveRefs returns (sha, sha) so both fields get the
-    // same SHA value.
-    //
-    // We replace the whole git source map in one editor.update() call rather
-    // than updating individual keys.  yaml_edit 2.x crashes when asked to
-    // CREATE a new key inside a map that is an element of a block sequence
-    // (the tag/commit keys are absent from fresh templates).  Replacing the
-    // entire list element avoids that code path.
-    final sourcesBase = ['modules', appModuleIdx, 'sources'];
-    final appSources = modules.toList()[appModuleIdx]['sources'];
-    if (appSources is List && (tag != null || commit != null)) {
-      final gitSrcIdx = appSources.toList().indexWhere(
-            (s) => s is Map && s['type'] == 'git',
-          );
-      if (gitSrcIdx >= 0) {
-        final existing =
-            Map<String, dynamic>.from(appSources.toList()[gitSrcIdx] as Map);
-        if (tag != null) existing['tag'] = tag;
-        if (commit != null) existing['commit'] = commit;
-        editor.update([...sourcesBase, gitSrcIdx], existing);
-      }
-    }
-
-    // ── Append to app module sources ──────────────────────────────────────
-    // Order: generated-sources.json → manifest.sources → flutter patch → pub patches
-
-    editor.appendToList(sourcesBase, p.basename(sourcesPath));
-
-    for (final src in manifestCfg.sources) {
-      editor.appendToList(sourcesBase, Map<String, dynamic>.from(src));
-    }
-
-    // ── Insert modules before app module ────────────────────────────
-    // Iterate in reverse so that sequential insertions at the same index
-    // preserve the original order from modules.
-    var insertIdx = appModuleIdx;
-    for (final mod in extraModules.reversed) {
-      if (mod is String) {
-        final f = File(mod);
-        if (!f.existsSync()) {
-          logWarn('modules: file not found: $mod');
-          continue;
-        }
-        final modYaml = loadYaml(f.readAsStringSync());
-        if (modYaml is List) {
-          for (final m in modYaml.reversed) {
-            editor.insertIntoList(['modules'], insertIdx, m);
-          }
-        } else if (modYaml is Map) {
-          editor.insertIntoList(['modules'], insertIdx, modYaml);
-        }
-      } else if (mod is Map) {
-        editor.insertIntoList(['modules'], insertIdx, mod);
-      }
-    }
-
-    return editor.toString();
+  final modules = yamlTree['modules'];
+  if (modules is! List) {
+    logWarn(
+        'modules key not found or not a list in template — skipping injection');
+    return content;
   }
+
+  final appName = manifestCfg.appId.split('.').last;
+  final appModuleIdx =
+      modules.toList().indexWhere((m) => m is Map && m['name'] == appName);
+  if (appModuleIdx < 0) {
+    logWarn('app module "$appName" not found in template — skipping injection');
+    return content;
+  }
+
+  final appModule = modules.toList()[appModuleIdx];
+  if (appModule is! Map || appModule['sources'] is! List) {
+    logWarn(
+        'sources key not found or not a list in app module "$appName" — skipping injection');
+    return content;
+  }
+
+  // Deep-convert once; ALL mutations (git source, sources list, build-options)
+  // happen in-memory on this plain map before the single editor.update() call.
+  // Mixing editor.update() with subsequent editor.appendToList() on the same
+  // module triggers a yaml_edit 2.x stale-node bug, so we build the final
+  // module in one shot.
+  final appModuleMap =
+      jsonDecode(jsonEncode(appModule)) as Map<String, dynamic>;
+  final srcList = appModuleMap['sources'] as List;
+
+  // ── Set tag and commit on git source ──────────────────────────────────
+  if (tag != null || commit != null) {
+    final gitSrcIdx = srcList.indexWhere((s) => s is Map && s['type'] == 'git');
+    if (gitSrcIdx >= 0) {
+      final src = srcList[gitSrcIdx] as Map<String, dynamic>;
+      if (tag != null) src['tag'] = tag;
+      if (commit != null) src['commit'] = commit;
+    }
+  }
+
+  // ── Append sources ────────────────────────────────────────────────────
+  // Order: pubspec-sources.json → manifest.sources → cargo-sources.json
+  srcList.add(p.basename(sourcesPath));
+  for (final src in manifestCfg.sources) {
+    srcList.add(Map<String, dynamic>.from(src));
+  }
+  if (cargoSourcesPath != null) {
+    srcList.add(p.basename(cargoSourcesPath));
+  }
+
+  // ── Merge CARGO_HOME / RUSTUP_HOME / append-path into build-options ───
+  if (cargoSourcesPath != null && rustupPath != null) {
+    final buildOptsRaw = appModuleMap['build-options'];
+    final buildOpts = buildOptsRaw is Map
+        ? Map<String, dynamic>.from(buildOptsRaw)
+        : <String, dynamic>{};
+    final envRaw = buildOpts['env'];
+    final env =
+        envRaw is Map ? Map<String, dynamic>.from(envRaw) : <String, dynamic>{};
+    final appendPath = buildOpts['append-path'] as String?;
+    // CARGO_HOME must point to the vendored-cargo directory (where config.toml
+    // lives) so cargo finds the offline vendor config.  RUSTUP_HOME is where
+    // rustup installs toolchains — these two paths must be separate.
+    final cargoHome = '/run/build/$appName/cargo';
+    appModuleMap['build-options'] = <String, dynamic>{
+      ...buildOpts,
+      'env': <String, dynamic>{
+        ...env,
+        'CARGO_HOME': cargoHome,
+        'RUSTUP_HOME': rustupPath,
+      },
+      'append-path': appendPath != null
+          ? '$appendPath:$rustupPath/bin'
+          : '$rustupPath/bin',
+    };
+  }
+
+  // Replace the whole app module in one shot.
+  editor.update(['modules', appModuleIdx], appModuleMap);
+
+  // ── Insert modules before app module ──────────────────────────────────
+  // Inserting at the same index in reverse preserves original order.
+  // rustup is inserted last (at insertIdx), so it ends up first — before
+  // extraModules — which is correct (Rust must be set up before the app).
+  var insertIdx = appModuleIdx;
+  for (final mod in extraModules.reversed) {
+    if (mod is String) {
+      final f = File(mod);
+      if (!f.existsSync()) {
+        logWarn('modules: file not found: $mod');
+        continue;
+      }
+      final modYaml = loadYaml(f.readAsStringSync());
+      if (modYaml is List) {
+        for (final m in modYaml.reversed) {
+          editor.insertIntoList(['modules'], insertIdx, m);
+        }
+      } else if (modYaml is Map) {
+        editor.insertIntoList(['modules'], insertIdx, modYaml);
+      }
+    } else if (mod is Map) {
+      editor.insertIntoList(['modules'], insertIdx, mod);
+    }
+  }
+  if (rustupModule != null) {
+    editor.insertIntoList(['modules'], insertIdx, rustupModule as Object);
+  }
+  // Flutter SDK must be first — cargokit's build tool depends on the Flutter
+  // install being present. Insert after rustup so it displaces rustup to idx+1.
+  if (flutterSdkModule != null) {
+    editor.insertIntoList(['modules'], insertIdx, flutterSdkModule as Object);
+  }
+
+  return editor.toString();
+}
+
+/// Merges effective pub locks with extra pubspec paths from the registry and
+/// cargo lock paths from the registry + explicit config entries.
+///
+/// Extracted as a top-level function so it can be tested independently.
+({List<String> allPubLockPaths, List<String> allCargoLockPaths})
+    buildLockPaths({
+  required List<String> effectiveLocks,
+  required List<String> extraPubspecPaths,
+  required List<String> cargoLockPaths,
+  required List<String> rustLocks,
+  required String baseDir,
+}) {
+  return (
+    allPubLockPaths: [...effectiveLocks, ...extraPubspecPaths],
+    allCargoLockPaths: [
+      ...cargoLockPaths,
+      ...rustLocks
+          .map((l) => p.isAbsolute(l) ? l : p.absolute(p.join(baseDir, l))),
+    ],
+  );
 }

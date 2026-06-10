@@ -196,7 +196,7 @@ void main() {
         },
         generatedPatchesDir: patchesDir,
       );
-      expect(result.every((s) {
+      expect(result.sources.every((s) {
         final dest = s['dest'] as String? ?? '';
         return !dest.contains('some_package');
       }), isTrue);
@@ -221,7 +221,7 @@ void main() {
         lockPaths: [_lockPath()],
         generatedPatchesDir: p.join(tmpDir.path, 'patches'),
       );
-      expect(result, isEmpty);
+      expect(result.sources, isEmpty);
     });
 
     test('returns empty list when registry has no matching entries', () async {
@@ -233,7 +233,7 @@ void main() {
         lockPaths: [_lockPath()],
         generatedPatchesDir: p.join(tmpDir.path, 'patches'),
       );
-      expect(result, isEmpty);
+      expect(result.sources, isEmpty);
     });
 
     test('rewrites path to patches/<path> for type:patch sources', () async {
@@ -250,7 +250,7 @@ void main() {
         lockPaths: [_lockPath()],
         generatedPatchesDir: patchesDir,
       );
-      final patch = result.firstWhere((s) => s['type'] == 'patch');
+      final patch = result.sources.firstWhere((s) => s['type'] == 'patch');
       expect(patch['path'], 'patches/some_package/fix.patch');
     });
 
@@ -268,7 +268,7 @@ void main() {
         lockPaths: [_lockPath()],
         generatedPatchesDir: p.join(tmpDir.path, 'patches'),
       );
-      for (final src in result) {
+      for (final src in result.sources) {
         final dest = src['dest'] as String?;
         if (dest != null) {
           expect(dest, isNot(contains(r'$PUB_DEV')));
@@ -289,7 +289,7 @@ void main() {
         lockPaths: [_lockPath()],
         generatedPatchesDir: p.join(tmpDir.path, 'patches'),
       );
-      final patch = result.firstWhere((s) => s['type'] == 'patch');
+      final patch = result.sources.firstWhere((s) => s['type'] == 'patch');
       expect(patch['use-git'], isTrue);
     });
 
@@ -319,9 +319,9 @@ void main() {
         lockPaths: [_lockPath()],
         generatedPatchesDir: p.join(tmpDir.path, 'patches'),
       );
-      expect(result, hasLength(1));
-      expect(result.first['dest-filename'], 'lib.so');
-      expect(result.first['only-arches'], ['x86_64']);
+      expect(result.sources, hasLength(1));
+      expect(result.sources.first['dest-filename'], 'lib.so');
+      expect(result.sources.first['only-arches'], ['x86_64']);
     });
 
     test('patch file bytes are written as-is without line ending modification',
@@ -399,8 +399,8 @@ packages:
         lockPaths: [lockFile.path],
         generatedPatchesDir: p.join(tmpDir.path, 'patches'),
       );
-      expect(result, hasLength(1));
-      expect(result.first['url'], 'https://x.com/1.2.0');
+      expect(result.sources, hasLength(1));
+      expect(result.sources.first['url'], 'https://x.com/1.2.0');
     });
 
     test('skips package when all registry versions are > installed', () async {
@@ -434,7 +434,7 @@ packages:
         lockPaths: [lockFile.path],
         generatedPatchesDir: p.join(tmpDir.path, 'patches'),
       );
-      expect(result, isEmpty);
+      expect(result.sources, isEmpty);
     });
 
     test('exact version match still works', () async {
@@ -468,8 +468,8 @@ packages:
         lockPaths: [lockFile.path],
         generatedPatchesDir: p.join(tmpDir.path, 'patches'),
       );
-      expect(result, hasLength(1));
-      expect(result.first['url'], 'https://x.com/1.0.0');
+      expect(result.sources, hasLength(1));
+      expect(result.sources.first['url'], 'https://x.com/1.0.0');
     });
 
     test('localForeignDeps shorthand overrides remote entry for locked version',
@@ -519,8 +519,362 @@ packages:
         },
         generatedPatchesDir: p.join(tmpDir.path, 'patches'),
       );
-      expect(result, hasLength(1));
-      expect(result.first['url'], 'https://local.com/new.so');
+      expect(result.sources, hasLength(1));
+      expect(result.sources.first['url'], 'https://local.com/new.so');
+    });
+  });
+
+  // ── cargo_locks extraction ────────────────────────────────────────────────
+
+  group('cargo_locks extraction', () {
+    const cargoLockContent = '''
+version = 3
+
+[[package]]
+name = "libc"
+version = "0.2.172"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "deadbeef"
+''';
+
+    /// Creates a .tar.gz archive containing rust/Cargo.lock and returns its bytes.
+    Future<Uint8List> makeArchive() async {
+      final tmp = Directory.systemTemp.createTempSync('flutpak_arch_test_');
+      try {
+        File(p.join(tmp.path, 'rust', 'Cargo.lock'))
+          ..createSync(recursive: true)
+          ..writeAsStringSync(cargoLockContent);
+        await Process.run('tar', [
+          '-czf',
+          p.join(tmp.path, 'pkg.tar.gz'),
+          '-C',
+          tmp.path,
+          'rust/Cargo.lock',
+        ]);
+        return File(p.join(tmp.path, 'pkg.tar.gz')).readAsBytesSync();
+      } finally {
+        tmp.deleteSync(recursive: true);
+      }
+    }
+
+    test('extracts Cargo.lock and returns its path in cargoLockPaths',
+        () async {
+      final archiveBytes = await makeArchive();
+
+      final lockFile = File(p.join(tmpDir.path, 'cargo.lock'))
+        ..writeAsStringSync('''
+packages:
+  mypkg:
+    dependency: "direct main"
+    source: hosted
+    version: "1.0.0"
+''');
+
+      final r = ForeignDepsRegistry(
+        client: MockClient((req) async {
+          final url = req.url.toString();
+          if (url.endsWith('foreign_deps.json')) {
+            return http.Response(
+              jsonEncode({
+                'mypkg': {
+                  '1.0.0': {
+                    'cargo_locks': [r'$PUB_DEV/rust'],
+                    'manifest': {
+                      'sources': [
+                        {
+                          'type': 'file',
+                          'url': 'https://x.com/lib.so',
+                          'dest': r'$PUB_DEV'
+                        }
+                      ]
+                    }
+                  }
+                }
+              }),
+              200,
+            );
+          }
+          if (url.contains('pub.dev/packages/mypkg/versions/1.0.0.tar.gz')) {
+            return http.Response.bytes(archiveBytes, 200);
+          }
+          return http.Response('not found', 404);
+        }),
+        cacheDir: cacheDir,
+      );
+
+      final result = await r.resolve(
+        lockPaths: [lockFile.path],
+        generatedPatchesDir: p.join(tmpDir.path, 'patches'),
+      );
+
+      expect(result.cargoLockPaths, hasLength(1));
+      expect(result.cargoLockPaths.first, endsWith('Cargo.lock'));
+      expect(
+        File(result.cargoLockPaths.first).readAsStringSync(),
+        contains('libc'),
+      );
+    });
+
+    test('cargoLockPaths is empty when no cargo_locks entries in registry',
+        () async {
+      final lockFile = File(p.join(tmpDir.path, 'plain.lock'))
+        ..writeAsStringSync('''
+packages:
+  mypkg:
+    dependency: "direct main"
+    source: hosted
+    version: "1.0.0"
+''');
+
+      final r = ForeignDepsRegistry(
+        client: _mockClient(registryJson: {
+          'mypkg': {
+            '1.0.0': {
+              'manifest': {
+                'sources': [
+                  {
+                    'type': 'file',
+                    'url': 'https://x.com/lib.so',
+                    'dest': r'$PUB_DEV'
+                  }
+                ]
+              }
+            }
+          }
+        }),
+        cacheDir: cacheDir,
+      );
+
+      final result = await r.resolve(
+        lockPaths: [lockFile.path],
+        generatedPatchesDir: p.join(tmpDir.path, 'patches'),
+      );
+
+      expect(result.cargoLockPaths, isEmpty);
+    });
+
+    test('skips entry gracefully when pub.dev archive returns 404', () async {
+      final lockFile = File(p.join(tmpDir.path, 'err.lock'))
+        ..writeAsStringSync('''
+packages:
+  badpkg:
+    dependency: "direct main"
+    source: hosted
+    version: "0.1.0"
+''');
+
+      final r = ForeignDepsRegistry(
+        client: MockClient((req) async {
+          final url = req.url.toString();
+          if (url.endsWith('foreign_deps.json')) {
+            return http.Response(
+              jsonEncode({
+                'badpkg': {
+                  '0.1.0': {
+                    'cargo_locks': [r'$PUB_DEV/rust'],
+                    'manifest': {'sources': []}
+                  }
+                }
+              }),
+              200,
+            );
+          }
+          return http.Response('not found', 404);
+        }),
+        cacheDir: cacheDir,
+      );
+
+      final result = await r.resolve(
+        lockPaths: [lockFile.path],
+        generatedPatchesDir: p.join(tmpDir.path, 'patches'),
+      );
+
+      expect(result.cargoLockPaths, isEmpty);
+    });
+  });
+
+  // ── extra_pubspecs extraction ─────────────────────────────────────────────
+
+  group('extra_pubspecs extraction', () {
+    const pubspecLockContent = '''
+packages:
+  args:
+    dependency: transitive
+    source: hosted
+    version: "2.5.0"
+''';
+
+    Future<Uint8List> makeArchive({bool includeCargo = false}) async {
+      final tmp = Directory.systemTemp.createTempSync('flutpak_arch_test_');
+      try {
+        File(p.join(tmp.path, 'cargokit', 'build_tool', 'pubspec.lock'))
+          ..createSync(recursive: true)
+          ..writeAsStringSync(pubspecLockContent);
+        final tarArgs = [
+          '-czf',
+          p.join(tmp.path, 'pkg.tar.gz'),
+          '-C',
+          tmp.path,
+          'cargokit/build_tool/pubspec.lock',
+        ];
+        if (includeCargo) {
+          File(p.join(tmp.path, 'rust', 'Cargo.lock'))
+            ..createSync(recursive: true)
+            ..writeAsStringSync('version = 3\n');
+          tarArgs.add('rust/Cargo.lock');
+        }
+        await Process.run('tar', tarArgs);
+        return File(p.join(tmp.path, 'pkg.tar.gz')).readAsBytesSync();
+      } finally {
+        tmp.deleteSync(recursive: true);
+      }
+    }
+
+    test('extracts pubspec.lock and returns its path in extraPubspecPaths',
+        () async {
+      final archiveBytes = await makeArchive();
+
+      final lockFile = File(p.join(tmpDir.path, 'pub.lock'))
+        ..writeAsStringSync('''
+packages:
+  mypkg:
+    dependency: "direct main"
+    source: hosted
+    version: "1.0.0"
+''');
+
+      final r = ForeignDepsRegistry(
+        client: MockClient((req) async {
+          final url = req.url.toString();
+          if (url.endsWith('foreign_deps.json')) {
+            return http.Response(
+              jsonEncode({
+                'mypkg': {
+                  '1.0.0': {
+                    'extra_pubspecs': [r'$PUB_DEV/cargokit/build_tool'],
+                    'manifest': {
+                      'sources': [
+                        {
+                          'type': 'file',
+                          'url': 'https://x.com/f',
+                          'dest': r'$PUB_DEV'
+                        }
+                      ]
+                    }
+                  }
+                }
+              }),
+              200,
+            );
+          }
+          if (url.contains('pub.dev/packages/mypkg/versions/1.0.0.tar.gz')) {
+            return http.Response.bytes(archiveBytes, 200);
+          }
+          return http.Response('not found', 404);
+        }),
+        cacheDir: cacheDir,
+      );
+
+      final result = await r.resolve(
+        lockPaths: [lockFile.path],
+        generatedPatchesDir: p.join(tmpDir.path, 'patches'),
+      );
+
+      expect(result.extraPubspecPaths, hasLength(1));
+      expect(result.extraPubspecPaths.first, endsWith('pubspec.lock'));
+      expect(
+        File(result.extraPubspecPaths.first).readAsStringSync(),
+        contains('args'),
+      );
+    });
+
+    test('cargo_locks and extra_pubspecs together share one archive download',
+        () async {
+      final archiveBytes = await makeArchive(includeCargo: true);
+      var downloadCount = 0;
+
+      final lockFile = File(p.join(tmpDir.path, 'both.lock'))
+        ..writeAsStringSync('''
+packages:
+  mypkg:
+    dependency: "direct main"
+    source: hosted
+    version: "2.0.0"
+''');
+
+      final r = ForeignDepsRegistry(
+        client: MockClient((req) async {
+          final url = req.url.toString();
+          if (url.endsWith('foreign_deps.json')) {
+            return http.Response(
+              jsonEncode({
+                'mypkg': {
+                  '2.0.0': {
+                    'cargo_locks': [r'$PUB_DEV/rust'],
+                    'extra_pubspecs': [r'$PUB_DEV/cargokit/build_tool'],
+                    'manifest': {'sources': []}
+                  }
+                }
+              }),
+              200,
+            );
+          }
+          if (url.contains('pub.dev/packages/mypkg/versions/2.0.0.tar.gz')) {
+            downloadCount++;
+            return http.Response.bytes(archiveBytes, 200);
+          }
+          return http.Response('not found', 404);
+        }),
+        cacheDir: cacheDir,
+      );
+
+      final result = await r.resolve(
+        lockPaths: [lockFile.path],
+        generatedPatchesDir: p.join(tmpDir.path, 'patches'),
+      );
+
+      expect(result.cargoLockPaths, hasLength(1));
+      expect(result.extraPubspecPaths, hasLength(1));
+      // Archive fetched once, second call served from cache.
+      expect(downloadCount, 1);
+    });
+
+    test('extraPubspecPaths is empty when no extra_pubspecs in registry',
+        () async {
+      final lockFile = File(p.join(tmpDir.path, 'nopub.lock'))
+        ..writeAsStringSync('''
+packages:
+  mypkg:
+    dependency: "direct main"
+    source: hosted
+    version: "1.0.0"
+''');
+
+      final r = ForeignDepsRegistry(
+        client: _mockClient(registryJson: {
+          'mypkg': {
+            '1.0.0': {
+              'manifest': {
+                'sources': [
+                  {
+                    'type': 'file',
+                    'url': 'https://x.com/f',
+                    'dest': r'$PUB_DEV'
+                  }
+                ]
+              }
+            }
+          }
+        }),
+        cacheDir: cacheDir,
+      );
+
+      final result = await r.resolve(
+        lockPaths: [lockFile.path],
+        generatedPatchesDir: p.join(tmpDir.path, 'patches'),
+      );
+
+      expect(result.extraPubspecPaths, isEmpty);
     });
   });
 }

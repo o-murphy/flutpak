@@ -228,6 +228,23 @@ class FlatpakGenConfig {
   /// Defaults to 'main' when null.
   final String? foreignDepsRef;
 
+  /// Git ref (branch/tag) of the flutpak repo from which pre-built
+  /// `flutter_sdk/flutter-sdk-{version}.json` modules are fetched.
+  /// Defaults to 'main' when null.
+  final String? flutterSdkRef;
+
+  /// Rust toolchain version for offline rustup module generation.
+  /// Corresponds to `rust.version` in YAML. Defaults to '1.85.0' at use-site.
+  final String? rustVersion;
+
+  /// RUSTUP_HOME / CARGO_HOME path inside the Flatpak sandbox.
+  /// Corresponds to `rust.rustup-path` in YAML. Defaults to '/var/lib/rustup'.
+  final String? rustupPath;
+
+  /// Explicit Cargo.lock paths (`rust.locks` in YAML), resolved against the
+  /// config directory at generate time. Combined with registry-discovered ones.
+  final List<String> rustLocks;
+
   const FlatpakGenConfig({
     required this.output,
     required this.pubLocks,
@@ -242,6 +259,10 @@ class FlatpakGenConfig {
     this.desktopEntryPath,
     this.manifest,
     this.foreignDepsRef,
+    this.flutterSdkRef,
+    this.rustVersion,
+    this.rustupPath,
+    this.rustLocks = const [],
   });
 
   /// Effective metainfo XML path (config override or default).
@@ -266,6 +287,7 @@ class FlatpakGenConfig {
   factory FlatpakGenConfig.fromYaml(Map yaml) {
     final pub = yaml['pub'] as Map? ?? {};
     final flutter = yaml['flutter'] as Map? ?? {};
+    final rust = yaml['rust'] as Map? ?? {};
 
     final rawLocks =
         (pub['locks'] as List?)?.cast<String>() ?? ['pubspec.lock'];
@@ -317,6 +339,10 @@ class FlatpakGenConfig {
       desktopEntryPath: yaml['desktop-entry-path'] as String?,
       manifest: yaml['app-id'] != null ? ManifestConfig.fromYaml(yaml) : null,
       foreignDepsRef: yaml['foreign-deps-ref'] as String?,
+      flutterSdkRef: yaml['flutter-sdk-ref'] as String?,
+      rustVersion: rust['version'] as String?,
+      rustupPath: rust['rustup-path'] as String?,
+      rustLocks: (rust['locks'] as List?)?.cast<String>() ?? const [],
     );
   }
 

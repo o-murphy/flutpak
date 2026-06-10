@@ -1,0 +1,7 @@
+[[package]]
+name = "serde"
+version = "1.0.219"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[metadata]
+"checksum serde 1.0.219 (registry+https://github.com/rust-lang/crates.io-index)" = "5f0e2d78a1e0be0a2b43bda0c8e0de08eb6d5c8fd02c37854cd3c7d5c15c5c6d"

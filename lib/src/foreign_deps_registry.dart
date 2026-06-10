@@ -9,13 +9,33 @@ import 'package:pub_semver/pub_semver.dart';
 import 'generators/manifest_generator.dart' show convertPatchToCrlf;
 import 'utils/log.dart';
 
+/// Result returned by [ForeignDepsRegistry.resolve].
+class ForeignDepsResult {
+  /// Flatpak source maps ready for `pubspec-sources.json`.
+  final List<Map<String, dynamic>> sources;
+
+  /// Paths to extracted `Cargo.lock` files for packages with `cargo_locks`
+  /// entries in the registry. Populated in phase 2.2.
+  final List<String> cargoLockPaths;
+
+  /// Paths to extracted `pubspec.lock` files for packages with
+  /// `extra_pubspecs` entries in the registry. Populated in phase 2.3.
+  final List<String> extraPubspecPaths;
+
+  const ForeignDepsResult({
+    required this.sources,
+    this.cargoLockPaths = const [],
+    this.extraPubspecPaths = const [],
+  });
+}
+
 /// Resolves package dependencies from the flutpak foreign_deps registry,
 /// compatible with the flatpak-flutter foreign_deps.json format.
 ///
 /// The registry maps pub package names to per-version source lists
 /// (archives, patches, files). On a `generate` run the registry is fetched
 /// from GitHub and any packages found in the project's lock files are resolved
-/// into flatpak source maps ready for `generated-sources.json`.
+/// into flatpak source maps ready for `pubspec-sources.json`.
 ///
 /// Local overrides from `config.foreign_deps` (see [FlatpakGenConfig.localForeignDeps])
 /// are deep-merged on top of the remote registry before resolution.
@@ -23,6 +43,7 @@ class ForeignDepsRegistry {
   final String ref;
   final http.Client _client;
   final Directory _cacheDir;
+  Directory? _extractDir;
 
   ForeignDepsRegistry({
     String? ref,
@@ -86,8 +107,8 @@ class ForeignDepsRegistry {
   ///   - All other source types have placeholder substitution applied and are
   ///     included as-is.
   ///
-  /// Returns source maps ready to append to `generated-sources.json`.
-  Future<List<Map<String, dynamic>>> resolve({
+  /// Returns source maps ready to append to `pubspec-sources.json`.
+  Future<ForeignDepsResult> resolve({
     required List<String> lockPaths,
     required String generatedPatchesDir,
     Map<String, dynamic> localForeignDeps = const {},
@@ -98,7 +119,7 @@ class ForeignDepsRegistry {
       registry = await fetchJson();
     } catch (e) {
       logWarn('foreign-deps: registry unavailable ($e) — skipping');
-      return const [];
+      return const ForeignDepsResult(sources: []);
     }
 
     final lockedVersions = _readLockedVersions(lockPaths);
@@ -111,6 +132,8 @@ class ForeignDepsRegistry {
     );
 
     final result = <Map<String, dynamic>>[];
+    final allCargoLockPaths = <String>[];
+    final allExtraPubspecPaths = <String>[];
 
     for (final package in merged.keys) {
       final version = lockedVersions[package];
@@ -120,6 +143,23 @@ class ForeignDepsRegistry {
       if (packageMap is! Map) continue;
       final (matchedVersion, versionEntry) = _matchVersion(packageMap, version);
       if (versionEntry == null) continue;
+
+      // cargo_locks — extract Cargo.lock files from the pub.dev archive.
+      final cargoLocks = versionEntry['cargo_locks'];
+      if (cargoLocks is List && cargoLocks.isNotEmpty) {
+        _extractDir ??= Directory.systemTemp.createTempSync('flutpak_extract_');
+        allCargoLockPaths.addAll(await _extractFromArchive(
+            package, version, cargoLocks, 'Cargo.lock', _extractDir!));
+      }
+
+      // extra_pubspecs — extract pubspec.lock from sub-package directories.
+      final extraPubspecs = versionEntry['extra_pubspecs'];
+      if (extraPubspecs is List && extraPubspecs.isNotEmpty) {
+        _extractDir ??= Directory.systemTemp.createTempSync('flutpak_extract_');
+        allExtraPubspecPaths.addAll(await _extractFromArchive(
+            package, version, extraPubspecs, 'pubspec.lock', _extractDir!));
+      }
+
       final manifest = versionEntry['manifest'];
       if (manifest is! Map) continue;
       final sources = manifest['sources'];
@@ -168,10 +208,101 @@ class ForeignDepsRegistry {
           'foreign-deps: $package $versionLabel — ${sources.length} source(s)');
     }
 
-    return result;
+    return ForeignDepsResult(
+      sources: result,
+      cargoLockPaths: allCargoLockPaths,
+      extraPubspecPaths: allExtraPubspecPaths,
+    );
   }
 
-  void dispose() => _client.close();
+  void dispose() {
+    _client.close();
+    try {
+      _extractDir?.deleteSync(recursive: true);
+    } catch (_) {}
+    _extractDir = null;
+  }
+
+  /// Downloads [url] bytes to the cache and returns the cache [File].
+  ///
+  /// Identical semantics to [_downloadFile] but returns the cached file
+  /// instead of copying bytes to a destination path.
+  Future<File> _fetchCached(String url) async {
+    final cacheKey = sha256.convert(utf8.encode(url)).toString();
+    final cacheFile = File(p.join(_cacheDir.path, cacheKey));
+    if (!cacheFile.existsSync()) {
+      final response = await _client.get(Uri.parse(url));
+      if (response.statusCode != 200) {
+        throw Exception('HTTP ${response.statusCode} for $url');
+      }
+      _cacheDir.createSync(recursive: true);
+      cacheFile.writeAsBytesSync(response.bodyBytes);
+    }
+    return cacheFile;
+  }
+
+  /// Downloads the pub.dev archive for [package] [version] and extracts
+  /// [filename] from each directory in [entries] into [extractDir].
+  ///
+  /// Each entry is a path string like `\$PUB_DEV/rust`; `\$PUB_DEV/` is
+  /// stripped to obtain the archive-relative directory (e.g. `rust`), and
+  /// [filename] is appended (e.g. `rust/Cargo.lock`).
+  ///
+  /// Returns the absolute paths of the successfully extracted files.
+  Future<List<String>> _extractFromArchive(
+    String package,
+    String version,
+    List<dynamic> entries,
+    String filename,
+    Directory extractDir,
+  ) async {
+    final archiveUrl =
+        'https://pub.dev/packages/$package/versions/$version.tar.gz';
+    final File archiveFile;
+    try {
+      archiveFile = await _fetchCached(archiveUrl);
+    } catch (e) {
+      logWarn(
+          'foreign-deps: could not download $package-$version archive ($e) — skipping');
+      return const [];
+    }
+
+    final extracted = <String>[];
+    for (final raw in entries) {
+      if (raw is! String) continue;
+      final relDir =
+          raw.replaceFirst(r'$PUB_DEV/', '').replaceFirst(r'$PUB_DEV', '');
+      final archivePath = relDir.isEmpty ? filename : '$relDir/$filename';
+
+      final destFile =
+          File(p.join(extractDir.path, '$package-$version', archivePath));
+      try {
+        destFile.parent.createSync(recursive: true);
+
+        final proc = await Process.run(
+          'tar',
+          ['-xzOf', archiveFile.path, archivePath],
+          stdoutEncoding: utf8,
+          stderrEncoding: utf8,
+        );
+        if (proc.exitCode != 0) {
+          logWarn(
+              'foreign-deps: $package-$version: could not extract $archivePath'
+              ' (${(proc.stderr as String).trim()}) — skipping');
+          continue;
+        }
+
+        destFile.writeAsStringSync(proc.stdout as String);
+        logInfo('foreign-deps: extracted $archivePath from $package-$version');
+        extracted.add(destFile.path);
+      } catch (e) {
+        logWarn(
+            'foreign-deps: $package-$version: failed to extract $archivePath'
+            ' ($e) — skipping');
+      }
+    }
+    return extracted;
+  }
 
   /// Replaces `\$PUB_DEV` with `.pub-cache/hosted/pub.dev/<package>-<version>`
   /// recursively in all string values of [source]. `\$APP` is left as-is.

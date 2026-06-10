@@ -33,7 +33,7 @@ ManifestGenerator _generator({
 }) =>
     ManifestGenerator(
       cfg: cfg ?? _baseConfig(),
-      generatedSourcesPath: 'flatpak/generated-sources.json',
+      generatedSourcesPath: 'flatpak/pubspec-sources.json',
       outputRelDir: outputRelDir,
       resolvedRepoUrl: resolvedRepoUrl,
       hasFlutter: hasFlutter,
@@ -113,7 +113,7 @@ void main() {
       ).generate();
 
       expect(yaml, contains('/usr/lib/sdk/llvm20/bin'));
-      expect(yaml, contains('/run/build/myapp/flutter/bin'));
+      expect(yaml, contains('/var/lib/flutter/bin'));
       expect(
           yaml, contains('prepend-ld-library-path: /usr/lib/sdk/llvm20/lib'));
     });
@@ -213,12 +213,12 @@ void main() {
       expect(yaml, isNot(contains('url:')));
     });
 
-    test('does not include generated-sources.json (injected at generate time)',
+    test('does not include pubspec-sources.json (injected at generate time)',
         () {
       final yaml = _generator(cfg: _baseConfig(command: 'myapp')).generate();
 
-      // generated-sources.json may appear in the header comment but not as a source entry
-      expect(yaml, isNot(contains('- generated-sources.json')));
+      // pubspec-sources.json may appear in the header comment but not as a source entry
+      expect(yaml, isNot(contains('- pubspec-sources.json')));
     });
 
     test('does not include patch or extra sources (injected at generate time)',
@@ -237,15 +237,15 @@ void main() {
       expect(yaml, contains('AUTO-INJECTED'));
     });
 
-    test('includes Flutter cache stamp copy commands when hasFlutter is true',
+    test('includes flutter pub get and build commands when hasFlutter is true',
         () {
       final yaml = _generator(
         cfg: _baseConfig(command: 'myapp'),
         hasFlutter: true,
       ).generate();
 
-      expect(yaml, contains('engine-dart-sdk.stamp'));
-      expect(yaml, contains('material_fonts.stamp'));
+      // Cache stamp copies are now in the flutter-sdk module, not the template.
+      expect(yaml, isNot(contains('engine-dart-sdk.stamp')));
       expect(yaml, contains('flutter pub get --offline'));
       expect(yaml, contains('flutter build linux --release --no-pub'));
     });
