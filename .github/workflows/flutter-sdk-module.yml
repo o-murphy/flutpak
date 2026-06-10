@@ -97,6 +97,9 @@ jobs:
           git commit -m "feat: add Flutter SDK module for ${VERSION}"
           git push origin "$BRANCH"
 
+          gh label create "automated"   --color "#0075ca" --force || true
+          gh label create "flutter-sdk" --color "#7057ff" --force || true
+
           gh pr create \
             --title "feat: Flutter SDK module for ${VERSION}" \
             --body "$(cat <<EOF
