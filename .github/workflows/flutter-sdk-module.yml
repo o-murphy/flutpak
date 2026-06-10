@@ -1,6 +1,7 @@
 name: Flutter SDK Module Update
 
 on:
+  pull_request:
   schedule:
     - cron: "0 6 * * *"   # daily at 06:00 UTC
   workflow_dispatch:
