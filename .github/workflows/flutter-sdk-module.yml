@@ -52,21 +52,32 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "Resolved Flutter version: $VERSION (source: ${INPUT_VERSION:+manual}${INPUT_VERSION:-auto})"
 
-      # ── Check whether module already exists ──────────────────────────────────
-      - name: Check if module already exists
+      # ── Check whether module already exists or PR is open ───────────────────
+      - name: Check if module already exists or PR is open
         id: check
         env:
           VERSION: ${{ steps.flutter.outputs.version }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          BRANCH="flutter-sdk-module/${VERSION}"
           MODULE_FILE="modules/flutter-sdk/flutter-sdk-${VERSION}.json"
-          if [ -f "$MODULE_FILE" ]; then
-            echo "exists=true"  >> "$GITHUB_OUTPUT"
-            echo "Module $MODULE_FILE already exists — nothing to do."
-          else
-            echo "exists=false" >> "$GITHUB_OUTPUT"
-            echo "Module $MODULE_FILE not found — will generate."
-          fi
           echo "file=$MODULE_FILE" >> "$GITHUB_OUTPUT"
+
+          if [ -f "$MODULE_FILE" ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "Module $MODULE_FILE already exists in main — nothing to do."
+            exit 0
+          fi
+
+          OPEN_PR=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number' 2>/dev/null)
+          if [ -n "$OPEN_PR" ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "PR #${OPEN_PR} already open for $BRANCH — nothing to do."
+            exit 0
+          fi
+
+          echo "exists=false" >> "$GITHUB_OUTPUT"
+          echo "Module not found and no open PR — will generate."
 
       # ── Build flutpak ────────────────────────────────────────────────────────
       - uses: ./.github/actions/setup-flutpak
@@ -96,7 +107,7 @@ jobs:
           git checkout -b "$BRANCH"
           git add modules/flutter-sdk/
           git commit -m "feat: add Flutter SDK module for ${VERSION}"
-          git push --force origin "$BRANCH"
+          git push origin "$BRANCH"
 
           gh label create "automated"   --color "#0075ca" --force || true
           gh label create "flutter-sdk" --color "#7057ff" --force || true
