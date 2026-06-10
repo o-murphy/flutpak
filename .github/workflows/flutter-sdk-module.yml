@@ -1,4 +1,5 @@
 name: Flutter SDK Module Update
+run-name: "Flutter SDK Module Update — ${{ inputs.flutter-version || 'auto' }}"
 
 on:
   pull_request:
@@ -95,7 +96,7 @@ jobs:
           git checkout -b "$BRANCH"
           git add modules/flutter-sdk/
           git commit -m "feat: add Flutter SDK module for ${VERSION}"
-          git push origin "$BRANCH"
+          git push --force origin "$BRANCH"
 
           gh label create "automated"   --color "#0075ca" --force || true
           gh label create "flutter-sdk" --color "#7057ff" --force || true
