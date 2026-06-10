@@ -1,81 +1,161 @@
-# Plan: Rust/Cargo підтримка в flutpak
+# Plan: Rust/Cargo Support in flutpak
 
-## Як це влаштовано у flatpak-flutter
+## How It Works in flatpak-flutter
 
-**Три окремих механізми:**
+### Three distinct mechanisms:
 
-### 1. `foreign_deps.json` — новий формат для Rust пакетів
-Записи для Cargokit-based пакетів мають два нові поля поряд із `manifest`:
+### 1. foreign_deps.json — a new format for Rust packages
+
+Entries for Cargokit-based packages have two new fields alongside `manifest`:
+
 ```json
 "rhttp": {
   "0.12.0": {
     "cargo_locks": ["$PUB_DEV/rust"],
     "extra_pubspecs": ["$PUB_DEV/cargokit/build_tool"],
     "manifest": {
-      "sources": [{ "type": "patch", "path": "cargokit/run_build_tool.sh.patch", "dest": "$PUB_DEV/cargokit" }]
+      "sources": [{
+        "type": "patch",
+        "path": "cargokit/run_build_tool.sh.patch",
+        "dest": "$PUB_DEV/cargokit"
+      }]
     }
   }
 }
 ```
-- `cargo_locks` — шляхи до `Cargo.lock` файлів (відносно директорії пакету, `$PUB_DEV` як плейсхолдер)
-- `extra_pubspecs` — додаткові Dart pubspec-и (cargokit build_tool має свій pub lock)
 
-Пакети у реєстрі: `rhttp`, `flutter_vodozemac`, `super_native_extensions`, `metadata_god`, `flutter_discord_rpc`.
+* `cargo_locks` — paths to Cargo.lock files (relative to the package directory, with `$PUB_DEV` acting as a placeholder)
+* `extra_pubspecs` — additional Dart pubspecs (cargokit build_tool has its own pub lock)
 
-### 2. `cargo_generator.py` — парсить `Cargo.lock`, генерує flatpak sources
-- Читає TOML, для кожного crates.io пакету → `archive` (.crate файл) + `inline` (`.cargo-checksum.json`)
-- Для git deps → `git` source + `shell` (cp) + `inline` Cargo.toml + `inline` checksum
-- Дописує `inline` запис із `cargo/config.toml` що встановлює vendored-sources
-- **Checksums беруться прямо з `Cargo.lock`** — мережа не потрібна для crates.io пакетів
+Packages in the registry:
 
-### 3. `rustup_generator.py` — генерує окремий Flatpak модуль для встановлення Rust
-- Скачує `channel-rust-{version}.toml` з `static.rust-lang.org` → отримує URLs і checksums
-- Генерує модуль `rustup` що встановлює toolchain офлайн під час збірки
-- `CARGO_HOME=/run/build/{app}/cargo`, `RUSTUP_HOME=/var/lib/rustup`
-- App module отримує `CARGO_HOME`/`RUSTUP_HOME` env + `{rustupPath}/bin` в `append-path`
-
-### Ключовий патч
-`cargokit/run_build_tool.sh.patch` — додає `--offline` до `pub get` в Cargokit, щоб він не ліз у мережу під час Flatpak збірки.
+* rhttp
+* flutter_vodozemac
+* super_native_extensions
+* metadata_god
+* flutter_discord_rpc
 
 ---
 
-## Отримання Cargo.lock файлів у flutpak
+### 2. cargo_generator.py — parses Cargo.lock, generates Flatpak sources
 
-**Корінна відмінність:** flatpak-flutter клонує репо і запускає `flutter pub get` локально → читає `Cargo.lock` з розпакованих пакетів. flutpak цього **не робить**.
+Reads TOML, for each crates.io package:
 
-**Рішення: завантажити pub package archive з pub.dev і витягнути `Cargo.lock` з нього.**
+* Generates archive (`.crate` file)
+* Generates inline (`.cargo-checksum.json`)
 
-flutpak вже знає точні версії всіх пакетів з `pubspec.lock`. Pub.dev публікує кожен пакет як tar.gz за детермінованою URL:
+For git dependencies:
+
+* Generates git source
+* Generates shell (`cp`)
+* Generates inline Cargo.toml
+* Generates inline checksum
+
+Appends an inline entry with `cargo/config.toml` that sets up `vendored-sources`.
+
+Checksums are fetched directly from Cargo.lock — no network connection is required for crates.io packages.
+
+---
+
+### 3. rustup_generator.py — generates a separate Flatpak module to install Rust
+
+Downloads `channel-rust-{version}.toml` from static.rust-lang.org and extracts URLs and checksums.
+
+Generates a rustup module that installs the toolchain offline during the build process.
+
+```text
+CARGO_HOME=/run/build/{app}/cargo
+RUSTUP_HOME=/var/lib/rustup
 ```
+
+The App module receives:
+
+* `CARGO_HOME`
+* `RUSTUP_HOME`
+
+environment variables, plus:
+
+```text
+{rustupPath}/bin
+```
+
+added to `append-path`.
+
+---
+
+## Key Patch
+
+### cargokit/run_build_tool.sh.patch
+
+Adds `--offline` to `pub get` in Cargokit, ensuring it doesn't access the network during the Flatpak build.
+
+---
+
+# Retrieving Cargo.lock Files in flutpak
+
+Fundamental difference:
+
+`flatpak-flutter` clones the repository and runs `flutter pub get` locally, then reads Cargo.lock from the extracted packages.
+
+`flutpak` does not do this.
+
+## Solution
+
+Download the pub package archive from pub.dev and extract Cargo.lock from it.
+
+flutpak already knows the exact versions of all packages from `pubspec.lock`.
+
+Pub.dev publishes every package as a tar.gz archive at a deterministic URL:
+
+```text
 https://pub.dev/packages/{name}/versions/{version}.tar.gz
 ```
-Це **той самий архів**, що вже потрапляє в `generated-sources.json` для flatpak-builder. flutpak завантажує його, витягує лише потрібні `Cargo.lock` файли (шляхи вказані у `cargo_locks` в реєстрі), потім обробляє.
 
-Архів кешується в `~/.cache/flutpak/` по SHA-256 URL (як вже робиться для registry fetch) — повторні запуски безплатні.
+This is the exact same archive that already ends up in `generated-sources.json` for flatpak-builder.
 
-**Переваги:**
-- Не потребує `flutter pub get` перед запуском
-- Не залежить від стану `~/.pub-cache`
-- Детерміновано — версія зафіксована в `pubspec.lock`
-- Без додаткових передумов для CI
+flutpak will:
+
+* Download it
+* Extract only the required Cargo.lock files (paths specified in the registry's `cargo_locks`)
+* Process them
+
+The archive is cached in:
+
+```text
+~/.cache/flutpak/
+```
+
+keyed by the SHA-256 of the URL (similar to how registry fetches are handled), making subsequent runs instant.
+
+### Benefits
+
+* Does not require running `flutter pub get` before execution
+* Is completely independent of the `~/.pub-cache` state
+* Is deterministic — the version is locked in `pubspec.lock`
+* Requires no additional setup for CI environments
 
 ---
 
-## Детальний план впровадження
+# Detailed Implementation Plan
 
-### Фаза 1 — Залежності та базова інфраструктура
+## Phase 1 — Dependencies and Base Infrastructure
 
-**1.1** Додати TOML-парсер до `flutpak/pubspec.yaml`:
+### 1.1 Add TOML parser dependency to flutpak/pubspec.yaml
+
 ```yaml
 dependencies:
   toml: ^0.6.0
 ```
 
-**1.2** Додати `lib/src/generators/cargo_sources.dart` — порт `cargo_generator.py`:
+### 1.2 Create `lib/src/generators/cargo_sources.dart`
+
+Port of `cargo_generator.py`.
 
 ```dart
-// Входить: список шляхів до Cargo.lock
-// Виходить: List<Map<String,dynamic>> (flatpak-builder sources format) + config.toml inline
+// Input: List of paths to Cargo.lock files
+// Output: List<Map<String, dynamic>> (flatpak-builder sources format)
+//         + config.toml inline configuration
+
 class CargoSourcesGenerator {
   static Future<List<Map<String, dynamic>>> generate(
     List<String> cargoLockPaths, {
@@ -84,14 +164,34 @@ class CargoSourcesGenerator {
 }
 ```
 
-Внутрішня логіка:
-- Parse TOML кожного `Cargo.lock`
-- Для `registry+` packages: `archive` (`https://static.crates.io/crates/{name}/{name}-{ver}.crate`, sha256 з lock) + `inline` (`.cargo-checksum.json`)
-- Для `git+` packages: `git` source + `shell` (cp) + `inline` Cargo.toml + `inline` checksum (MVP: warn + skip)
-- Дедуплікація по `(type, url, dest)`
-- Фінальний `inline` запис: `cargo/config.toml` з vendored-sources конфігом
+#### Internal logic
 
-**1.3** Додати `lib/src/generators/rustup_generator.dart` — порт `rustup_generator.py`:
+* Parse TOML content of each Cargo.lock
+* For `registry+` packages:
+
+  * archive (`https://static.crates.io/crates/{name}/{name}-{ver}.crate`)
+  * inline (`.cargo-checksum.json`)
+* For `git+` packages:
+
+  * git source
+  * shell (`cp`)
+  * inline Cargo.toml
+  * inline checksum
+
+MVP:
+
+* warn + skip git dependencies
+
+Additional behavior:
+
+* Deduplicate by `(type, url, dest)`
+* Final inline entry:
+
+  * `cargo/config.toml` containing the `vendored-sources` configuration
+
+### 1.3 Create `lib/src/generators/rustup_generator.dart`
+
+Port of `rustup_generator.py`.
 
 ```dart
 class RustupGenerator {
@@ -99,191 +199,267 @@ class RustupGenerator {
   final String rustupPath;
 
   Future<Map<String, dynamic>> generateModule() async {
-    // Fetch channel-rust-{version}.toml → отримати URLs+sha256 для rustup-init, cargo, rust-std, rustc
-    // Return повний Flatpak module map
+    // Fetch channel-rust-{version}.toml
+    // Extract URLs + sha256
+    // Return complete Flatpak module map
   }
 }
 ```
 
-### Фаза 2 — Розширення ForeignDepsRegistry
+---
 
-**2.1** У `foreign_deps_registry.dart` розширити парсинг записів.
+## Phase 2 — Extending ForeignDepsRegistry
 
-Поточна структура повернення `resolve()`:
+### 2.1 Extend entry parsing in foreign_deps_registry.dart
+
+Current structure:
+
 ```dart
 Future<List<Map<String, dynamic>>> resolve(...)
 ```
 
-Нова структура:
+New structure:
+
 ```dart
 class ForeignDepsResult {
   final List<Map<String, dynamic>> sources;
-  final List<String> cargoLockPaths;    // resolved $PUB_DEV → actual paths
-  final List<String> extraPubspecPaths; // for extra pub locks inclusion
+  final List<String> cargoLockPaths;
+  final List<String> extraPubspecPaths;
 }
 
 Future<ForeignDepsResult> resolve(...)
 ```
 
-**2.2** При резолюції кожного запису — розпізнавати поля `cargo_locks` і `extra_pubspecs`. Для кожного пакету де є `cargo_locks`:
+### 2.2 Handle cargo_locks
 
-1. Скласти URL пакету: `https://pub.dev/packages/{name}/versions/{version}.tar.gz`
-2. Завантажити архів (з кешу `~/.cache/flutpak/` якщо є)
-3. Витягнути з архіву файли за шляхами з `cargo_locks` (підставивши `$PUB_DEV` → `""`, тобто корінь архіву) у temp dir
-4. Повернути реальні шляхи до витягнутих `Cargo.lock` файлів
+For each package that contains `cargo_locks`:
 
-**2.3** Аналогічно для `extra_pubspecs` — витягнути `pubspec.lock` з відповідних підпапок архіву і включити в `extraPubspecPaths`.
+1. Build package URL:
 
-### Фаза 3 — Розширення конфігу
+```text
+https://pub.dev/packages/{name}/versions/{version}.tar.gz
+```
 
-**3.1** У `config.dart` додати до `FlatpakGenConfig`:
+2. Download archive (or use cache)
+3. Extract specified files
+4. Replace `$PUB_DEV` → archive root
+5. Return extracted Cargo.lock paths
+
+### 2.3 Handle extra_pubspecs
+
+Extract `pubspec.lock` from specified subfolders and include them in:
 
 ```dart
-/// Explicit Cargo.lock paths (rust.locks in YAML), in addition to registry-discovered ones.
-/// Paths relative to project root or absolute.
+extraPubspecPaths
+```
+
+---
+
+## Phase 3 — Configuration Extension
+
+### 3.1 Add to FlatpakGenConfig
+
+```dart
+/// Explicit Cargo.lock paths (rust.locks in YAML)
 final List<String> rustLocks;
 
-/// Rust toolchain version for rustup module generation.
-/// Defaults to '1.94.0' when Rust deps are present.
+/// Rust toolchain version
 final String? rustVersion;
 
-/// RUSTUP_HOME path inside the Flatpak environment.
-/// Defaults to '/var/lib/rustup'.
+/// RUSTUP_HOME path
 final String? rustupPath;
 ```
 
-YAML конфіг:
+### YAML format
+
 ```yaml
 rust:
-  version: "1.94.0"           # за замовчуванням
-  rustup-path: /var/lib/rustup # за замовчуванням
-  locks:                       # явні Cargo.lock (зазвичай не потрібні — авто з реєстру)
+  version: "1.94.0"
+  rustup-path: /var/lib/rustup
+
+  locks:
     - path/to/some/Cargo.lock
 ```
 
-### Фаза 4 — Інтеграція у generate command
+---
 
-**4.1** У `generate_command.dart::runWithArgs()`, після `registry.resolve()`:
+## Phase 4 — Integration into the generate Command
+
+### 4.1 After registry.resolve()
 
 ```dart
-final depsResult = await registry.resolve(
-  lockPaths: effectiveLocks,
-  localForeignDeps: cfg.localForeignDeps,
-  generatedPatchesDir: generatedPatchesDir,
-  projectPatchesDir: p.join(outputDir, 'patches'),
-  // registry.resolve() тепер сам завантажує pub архіви і витягує Cargo.lock у temp dir
-);
+final depsResult = await registry.resolve(...);
 
 final allCargoLockPaths = [
-  ...depsResult.cargoLockPaths,                                              // з реєстру (auto)
-  ...cfg.rustLocks.map((l) => p.isAbsolute(l) ? l : p.join(baseDir, l)), // explicit з config (rust.locks)
+  ...depsResult.cargoLockPaths,
+  ...cfg.rustLocks.map(
+    (l) => p.isAbsolute(l) ? l : p.join(baseDir, l),
+  ),
 ].toList();
 ```
 
-**4.2** Генерація cargo/rustup артефактів:
+### 4.2 Generate cargo/rustup artifacts
 
 ```dart
 String? generatedCargoSourcesPath;
 String? generatedRustupModulePath;
 
 if (allCargoLockPaths.isNotEmpty) {
-  final rustVersion = cfg.rustVersion ?? '1.94.0';
-  final rustupPath = cfg.rustupPath ?? '/var/lib/rustup';
-
-  // cargo sources
-  final cargoSources = await CargoSourcesGenerator.generate(allCargoLockPaths);
-  generatedCargoSourcesPath = p.join(generatedDir, 'cargo-sources.json');
-  File(generatedCargoSourcesPath)
-    ..createSync(recursive: true)
-    ..writeAsStringSync(jsonEncode(cargoSources));
-  logInfo('✓  cargo sources → cargo-sources.json');
-
-  // rustup module
-  final rustupGen = RustupGenerator(rustVersion: rustVersion, rustupPath: rustupPath);
-  final rustupModule = await rustupGen.generateModule();
-  generatedRustupModulePath = p.join(generatedDir, 'rustup-$rustVersion.json');
-  File(generatedRustupModulePath)
-    ..createSync(recursive: true)
-    ..writeAsStringSync(jsonEncode(rustupModule));
-  logInfo('✓  rustup module → rustup-$rustVersion.json');
+  ...
 }
 ```
 
-**4.3** Передати в `_injectGeneratedContent()`:
+Creates:
+
+* `cargo-sources.json`
+* `rustup-{version}.json`
+
+and logs:
+
+```text
+✓ cargo sources → cargo-sources.json
+✓ rustup module → rustup-{version}.json
+```
+
+### 4.3 Pass to `_injectGeneratedContent()`
 
 ```dart
 generatedContent = _injectGeneratedContent(
-  content: generatedContent,
-  manifestCfg: manifestCfg,
-  extraModules: cfg.extraModules,
-  sourcesPath: sourcesPath,
-  cargoSourcesPath: generatedCargoSourcesPath,      // NEW
-  rustupModulePath: generatedRustupModulePath,      // NEW
-  rustVersion: cfg.rustVersion ?? '1.94.0',         // NEW
-  rustupPath: cfg.rustupPath ?? '/var/lib/rustup',  // NEW
-  tag: tag,
-  commit: commit,
+  ...
+  cargoSourcesPath: generatedCargoSourcesPath,
+  rustupModulePath: generatedRustupModulePath,
+  rustVersion: cfg.rustVersion ?? '1.94.0',
+  rustupPath: cfg.rustupPath ?? '/var/lib/rustup',
+  ...
 );
 ```
 
-**4.4** У `_injectGeneratedContent()`:
+### 4.4 Modify `_injectGeneratedContent()`
 
-Якщо `rustupModulePath != null`:
-- Вставити rustup модуль у `modules` перед app модулем (аналогічно `extraModules`)
-- Додати `cargo-sources.json` до sources app модуля
-- Дописати/злити до `build-options.env`: `CARGO_HOME`, `RUSTUP_HOME`
-- Дописати до `build-options.append-path`: `{rustupPath}/bin`
+If `rustupModulePath != null`:
 
-### Фаза 5 — Оновлення foreign_deps у flutpak репо
+* Insert rustup module before app module
+* Add `cargo-sources.json` to app sources
+* Merge into build-options.env:
 
-**5.1** Перенести Cargokit-based записи з `flatpak-flutter/foreign_deps/foreign_deps.json` до `flutpak/foreign_deps/foreign_deps.json`:
-- `rhttp`
-- `flutter_vodozemac`
-- `super_native_extensions`
-- `metadata_god`
-- `flutter_discord_rpc`
+  * `CARGO_HOME`
+  * `RUSTUP_HOME`
+* Add to append-path:
 
-З полями `cargo_locks` та `extra_pubspecs`.
-
-**5.2** Скопіювати `cargokit/run_build_tool.sh.patch` з flatpak-flutter до `flutpak/foreign_deps/cargokit/`.
-
-### Фаза 6 — Тести
-
-**6.1** Юніт-тест для `CargoSourcesGenerator`:
-- Fixture: мінімальний `Cargo.lock` з кількома crates.io пакетами
-- Assert: коректні `archive` + `inline` + `config.toml` у виводі
-
-**6.2** Тест для `ForeignDepsRegistry`:
-- Запис з `cargo_locks` + `extra_pubspecs`
-- Assert: `ForeignDepsResult.cargoLockPaths` містить правильно розрезолвлені шляхи
-
-**6.3** Оновити `config_test.dart`:
-- Тест парсингу `rust.version`, `rust.rustup-path`, `rust.locks` з YAML
-
----
-
-## Обмеження MVP
-
-| Обмеження | Причина |
-|-----------|---------|
-| Git crate залежності (git+https) — тільки warn+skip | Потребує клонування репо під час генерації |
-| Rust toolchain версія зафіксована або explicit | `stable` динамічно не резолвиться без мережі |
-| pub.dev недоступний | `generate` потребує мережі для завантаження pub архівів (аналогічно registry fetch) |
-| Тільки `x86_64`/`aarch64` arch | Відповідає flatpak-flutter |
-
-Git crate залежності зустрічаються рідко (практично ніколи у Flutter плагінах), тому MVP без них повністю покриває реальні use cases.
-
----
-
-## Порядок реалізації (з урахуванням залежностей)
-
+```text
+{rustupPath}/bin
 ```
-Фаза 1.1 (toml dep)
-    → Фаза 1.2 (CargoSourcesGenerator)
-    → Фаза 1.3 (RustupGenerator)          // потребує HTTP, паралельно з 1.2
-→ Фаза 2 (Registry extension)             // потребує нову структуру result
-→ Фаза 3 (Config extension)
-→ Фаза 4 (Generate command)               // все разом
-→ Фаза 5 (foreign_deps оновлення)
-→ Фаза 6 (Тести)
+
+---
+
+## Phase 5 — Updating foreign_deps in the flutpak Repository
+
+### 5.1 Migrate entries
+
+From:
+
+```text
+flatpak-flutter/foreign_deps/foreign_deps.json
+```
+
+To:
+
+```text
+flutpak/foreign_deps/foreign_deps.json
+```
+
+Packages:
+
+* rhttp
+* flutter_vodozemac
+* super_native_extensions
+* metadata_god
+* flutter_discord_rpc
+
+Including:
+
+* cargo_locks
+* extra_pubspecs
+
+### 5.2 Copy patch
+
+```text
+cargokit/run_build_tool.sh.patch
+```
+
+from flatpak-flutter to:
+
+```text
+flutpak/foreign_deps/cargokit/
+```
+
+---
+
+## Phase 6 — Testing
+
+### 6.1 CargoSourcesGenerator
+
+Fixture:
+
+* minimal Cargo.lock
+* several crates.io packages
+
+Assert:
+
+* correct archive output
+* correct inline output
+* correct config.toml structure
+
+### 6.2 ForeignDepsRegistry
+
+Registry entry containing:
+
+* cargo_locks
+* extra_pubspecs
+
+Assert:
+
+```dart
+ForeignDepsResult.cargoLockPaths
+```
+
+contains correctly resolved paths.
+
+### 6.3 config_test.dart
+
+Verify parsing of:
+
+```yaml
+rust:
+  version:
+  rustup-path:
+  locks:
+```
+
+---
+
+# MVP Limitations
+
+| Limitation                                                      | Reason                                        |
+| --------------------------------------------------------------- | --------------------------------------------- |
+| Git crate dependencies (`git+https`) are skipped with a warning | Requires repository cloning during generation |
+| Rust toolchain version must be pinned or explicit               | `stable` cannot be resolved offline           |
+| pub.dev must be accessible                                      | Package archives must be downloaded           |
+| Only x86_64/aarch64 architectures                               | Matches flatpak-flutter behavior              |
+
+Git crate dependencies are highly uncommon (virtually non-existent in Flutter plugins), so excluding them from the MVP still covers real-world use cases.
+
+---
+
+# Implementation Order (Considering Dependencies)
+
+```text
+Phase 1.1 (toml dep)
+    → Phase 1.2 (CargoSourcesGenerator)
+    → Phase 1.3 (RustupGenerator)
+→ Phase 2 (Registry extension)
+→ Phase 3 (Config extension)
+→ Phase 4 (Generate command)
+→ Phase 5 (foreign_deps update)
+→ Phase 6 (Testing)
 ```
