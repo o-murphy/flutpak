@@ -1,7 +1,7 @@
 output: flatpak
 
 flutter:
-  ref: 3.44.1
+  ref: 3.44.2
 
 rust:
   version: 1.85.0

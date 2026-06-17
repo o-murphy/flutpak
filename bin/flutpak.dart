@@ -20,7 +20,7 @@ Future<void> main(List<String> args) async {
         '  flutpak init --force                   # overwrite existing template files\n'
         '  flutpak generate                       # update generated/ from existing template\n'
         '  flutpak generate --tag v0.1.14         # CI: pin tag\n'
-        '  flutpak sdk-mod --flutter 3.44.1       # standalone Flutter SDK module JSON\n'
+        '  flutpak sdk-mod --flutter 3.44.2       # standalone Flutter SDK module JSON\n'
         '  flutpak generate --dry-run             # preview what generate would do',
   )
     ..addCommand(InitCommand())

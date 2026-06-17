@@ -25,7 +25,7 @@ class SdkModCommand extends Command<void> {
       'Output: modules/flutter-sdk/flutter-sdk-{version}.json\n\n'
       'To wrap as an SDK Extension, create a thin manifest alongside it:\n'
       '  { "id": "org.freedesktop.Sdk.Extension.flutter3", "build-extension": true,\n'
-      '    "modules": [{ "!include": "modules/flutter-sdk/flutter-sdk-3.44.1.json" }] }';
+      '    "modules": [{ "!include": "modules/flutter-sdk/flutter-sdk-3.44.2.json" }] }';
 
   SdkModCommand() {
     argParser
