@@ -547,7 +547,7 @@ foreign-deps:
 | `metadata_god` | 1.1.0 | cargokit |
 | `objectbox_flutter_libs` | 5.3.1, 5.3.2 | |
 | `objectbox_sync_flutter_libs` | 5.3.1, 5.3.2 | |
-| `pdfium_flutter` | 0.1.7 | |
+| `pdfium_dart` | 0.1.2, 0.2.0, 0.2.1, 0.2.2, 0.2.3 | |
 | `powersync` | 2.1.0 | |
 | `printing` | 5.14.2 | |
 | `rhttp` | 0.12.0 | cargokit |

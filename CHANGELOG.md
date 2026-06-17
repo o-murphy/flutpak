@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.1] — 2026-06-17
+
+### Added
+
+- **Flutter SDK module for 3.44.2** — pre-built `flutter-sdk-3.44.2.json` added to
+  `modules/flutter-sdk/`.
+
+- **Automated flutter-sdk registry CI** (`.github/workflows/flutter-sdk-module.yml`) —
+  daily cron at 06:00 UTC resolves the latest Flutter stable release, runs
+  `flutpak sdk-mod`, and opens a PR when a new module JSON is not yet in the registry.
+  Can also be triggered manually (`workflow_dispatch`) with an optional explicit version
+  and `force` flag.
+
+- **`pdfium_dart` foreign deps entries** — versions 0.1.2, 0.2.0, 0.2.1, 0.2.2, 0.2.3
+  added to the registry. Each entry provides architecture-specific pdfium binary archives
+  and the `0.2.0-build.dart.patch` patch for offline Flatpak builds.
+
+### Fixed
+
+- **objectbox-c license note corrected** — the previous note incorrectly argued Mere
+  Aggregation (GPLv3 §5) as justification for GPL-3.0 app compatibility. The GPL FAQ
+  is explicit that modules linked in a shared address space form a combined work;
+  containers do not change this analysis. The note now states clearly that **GPL-3.0
+  apps cannot use `objectbox_flutter_libs` or `objectbox_sync_flutter_libs` for Flathub
+  submissions**. Permissive-licensed apps (MIT, Apache 2.0) are unaffected.
+
 ## [0.8.0] — 2026-06-10
 
 ### Breaking Changes
@@ -1074,7 +1100,8 @@ git remote.
   output files
 - MIT License
 
-[Unreleased]: https://github.com/o-murphy/flutpak/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/o-murphy/flutpak/compare/v0.8.1...HEAD
+[0.8.1]: https://github.com/o-murphy/flutpak/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/o-murphy/flutpak/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/o-murphy/flutpak/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/o-murphy/flutpak/compare/v0.6.1...v0.7.0
