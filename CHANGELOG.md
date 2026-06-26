@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.2] — 2026-06-26
+
 ### Added
 
 - **`flutter.ref` symbolic channel names** — `flutter.ref` now accepts `'stable'`,
@@ -36,6 +38,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   flutter:
     ref: stable    # or: latest / beta / 3.44.2 / main / <sha>
   ```
+- **Flutter SDK module for 3.44.3** — pre-built `flutter-sdk-3.44.4.json` added to
+  `modules/flutter-sdk/`.
+- **Flutter SDK module for 3.44.4** — pre-built `flutter-sdk-3.44.4.json` added to
+  `modules/flutter-sdk/`.
 
 ## [0.8.1] — 2026-06-17
 
@@ -1130,7 +1136,8 @@ git remote.
   output files
 - MIT License
 
-[Unreleased]: https://github.com/o-murphy/flutpak/compare/v0.8.1...HEAD
+[Unreleased]: https://github.com/o-murphy/flutpak/compare/v0.8.2...HEAD
+[0.8.2]: https://github.com/o-murphy/flutpak/compare/v0.8.1...v0.8.2
 [0.8.1]: https://github.com/o-murphy/flutpak/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/o-murphy/flutpak/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/o-murphy/flutpak/compare/v0.7.0...v0.7.1
