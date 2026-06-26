@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`flutter.ref` symbolic channel names** — `flutter.ref` now accepts `'stable'`,
+  `'latest'`, and `'beta'` in addition to explicit tags, branches, and commit SHAs.
+  The concrete version is resolved at generate time from the Flutter releases API
+  (`storage.googleapis.com/flutter_infra_release/releases/releases_linux.json`):
+
+  | Value | Resolves to |
+  |---|---|
+  | `'stable'` or omitted within `flutter:` section | latest stable release |
+  | `'latest'` / `'beta'` | latest beta (pre-release) |
+  | anything else | passed through unchanged (tag / branch / SHA) |
+
+  The resolved version is printed at generate time:
+  `flutter: stable → 3.44.4`
+
+  Flutter SDK generation is triggered whenever the `flutter:` key is present in
+  the config (even if empty) or `--flutter` is passed on the CLI. When the key is
+  absent entirely, a warning is shown and Flutter SDK sources are skipped — same
+  as before.
+
+  ```yaml
+  # Empty flutter: key → resolves latest stable automatically
+  flutter:
+
+  # Explicit channel
+  flutter:
+    ref: stable    # or: latest / beta / 3.44.2 / main / <sha>
+  ```
+
 ## [0.8.1] — 2026-06-17
 
 ### Added

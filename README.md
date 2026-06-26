@@ -281,13 +281,23 @@ projects, add the Flutter git ref (tag, branch, or commit SHA):
 ```yaml
 # flutpak.yaml
 app-id: io.github.YourOrg.YourApp
-flutter:
-  ref: "3.44.1"              # tag, "stable", "main", or commit SHA
+flutter:                     # presence of this key enables Flutter SDK generation
+  ref: "stable"              # "stable" (default), "latest"/"beta", tag, branch, or SHA
 ```
 
 `flutter.ref` tells `flutpak generate` which Flutter version to fetch engine
 artifacts for — no local Flutter installation required for source generation.
 The Flutter SDK is still needed in CI to run `flutter pub get` / `flutter build`.
+
+Flutter SDK generation is enabled by the **presence** of the `flutter:` key — even
+if it is empty. When `flutter.ref` is omitted or set to `'stable'`, the latest
+stable release is resolved automatically from the Flutter releases API. Use
+`'latest'` or `'beta'` for the latest pre-release. Explicit tags (`"3.44.2"`),
+branches (`"main"`), and commit SHAs are passed through unchanged.
+
+```yaml
+flutter:           # empty → latest stable, no extra config needed
+```
 
 > [!TIP]
 > **Sandbox permissions (`finish-args`)** — `flutpak init` writes sensible
@@ -594,8 +604,8 @@ pub:
     - pubspec.lock                 # default; add more if needed
 
 flutter:
-  ref: "3.44.1"                   # tag, branch ("stable", "main"), or commit SHA
-                                   # omit for pure-Dart projects
+  ref: "stable"                    # "stable" (default), "latest"/"beta", tag, branch, or SHA
+                                   # omit to default to latest stable
   patch: flatpak/patches/flutter/shared.sh.patch  # optional custom patch
 
 # Rust/Cargo support (cargokit-based packages). Omit for projects without Rust.
@@ -681,7 +691,7 @@ build-options:
 |---|---|---|---|
 | `output` | string | `flatpak` | Output directory for generated files |
 | `pub.locks` | list | `[pubspec.lock]` | Lock files to scan; `$ENV` vars expanded |
-| `flutter.ref` | string | — | Flutter git ref (tag, branch, or SHA). When set, engine versions fetched from GitHub API — no local Flutter install needed for `generate`. Omit for pure-Dart projects. |
+| `flutter.ref` | string | latest stable | Flutter ref. `'stable'` or omitted → latest stable; `'latest'` / `'beta'` → latest beta; explicit tag/branch/SHA → passed through unchanged. Engine versions fetched from GitHub API — no local Flutter install needed for `generate`. Flutter SDK generation is skipped when the `flutter:` key is absent entirely. |
 | `flutter.patch` | string | — | Custom patch for Flutter's `shared.sh` bootstrap script. Defaults to the built-in patch when omitted. |
 | `rust.version` | string | `1.85.0` | Rust toolchain version to install via rustup. |
 | `rust.rustup-path` | string | `/var/lib/rustup` | Path used for `CARGO_HOME` and `RUSTUP_HOME` during the Flatpak build. |
@@ -753,8 +763,9 @@ everything to `flatpak/generated/`.
 - Errors if `app-id`, `command`, or `runtime-version` in the template differ
   from config.
 - Errors if any asset file (metainfo, desktop entry, icon) does not exist.
-- When `flutter.ref` is set (or `--flutter` passed), fetches `flutter_tools/pubspec.lock`
-  from GitHub automatically and includes flutter_tools deps in `pubspec-sources.json`.
+- Always fetches `flutter_tools/pubspec.lock` from GitHub and includes flutter_tools
+  deps in `pubspec-sources.json`. The Flutter version is resolved from `flutter.ref`
+  (defaults to latest stable when omitted).
 
 | Flag | Description |
 |---|---|
@@ -1169,8 +1180,8 @@ if it is missing even when the archive is present.
 
 ### Flutter SDK sources
 
-When `flutter.ref` is set, `generate` produces a standalone
-`flutter-sdk-<version>.json` module. Before generating from scratch it checks
+`generate` always produces a standalone `flutter-sdk-<version>.json` module,
+resolving the concrete version from `flutter.ref` (defaults to latest stable). Before generating from scratch it checks
 `FlutterSdkRegistry`:
 
 1. `~/.cache/flutpak/flutter_sdk/flutter-sdk-<version>.json` (local cache)
