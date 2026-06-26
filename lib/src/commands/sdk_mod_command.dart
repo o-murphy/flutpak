@@ -47,12 +47,12 @@ class SdkModCommand extends Command<void> {
   Future<void> run() async {
     final cfg = FlatpakGenConfig.load(argResults!['config'] as String);
 
-    final flutterRef = argResults!['flutter'] as String? ?? cfg.flutterRef;
-
-    if (flutterRef == null) {
+    final flutterArg = argResults!['flutter'] as String?;
+    if (flutterArg == null && !cfg.hasFlutterSection) {
       usageException(
-          'Flutter ref required: --flutter <ref> or config flutter.ref');
+          'Flutter ref required: --flutter <ref> or add flutter: to config');
     }
+    final flutterRef = await resolveFlutterRef(flutterArg ?? cfg.flutterRef);
 
     final outputDir = p.absolute(argResults!['output'] as String);
     final patchPath = argResults!['patch'] as String? ?? cfg.patchPath;

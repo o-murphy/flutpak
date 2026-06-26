@@ -184,9 +184,14 @@ class FlatpakGenConfig {
   final List<String> pubLocks;
 
   /// Git ref (tag, branch, or commit SHA) for the Flutter SDK.
-  /// When set, engine version files are fetched from GitHub raw API — no
-  /// local Flutter installation needed. When null, flutter sources are skipped.
+  /// May also be a symbolic name: `'stable'` (default when key is present but
+  /// ref is omitted), `'latest'` / `'beta'` (latest pre-release).
   final String? flutterRef;
+
+  /// True when the `flutter:` key was explicitly present in the config YAML.
+  /// When false and no `--flutter` CLI override is given, Flutter SDK
+  /// generation is skipped with a warning.
+  final bool hasFlutterSection;
 
   final String? patchPath;
 
@@ -249,6 +254,7 @@ class FlatpakGenConfig {
     required this.output,
     required this.pubLocks,
     this.flutterRef,
+    this.hasFlutterSection = false,
     this.patchPath,
     this.localForeignDeps = const {},
     this.icons = const [],
@@ -286,6 +292,7 @@ class FlatpakGenConfig {
 
   factory FlatpakGenConfig.fromYaml(Map yaml) {
     final pub = yaml['pub'] as Map? ?? {};
+    final hasFlutterSection = yaml.containsKey('flutter');
     final flutter = yaml['flutter'] as Map? ?? {};
     final rust = yaml['rust'] as Map? ?? {};
 
@@ -329,6 +336,7 @@ class FlatpakGenConfig {
       output: output,
       pubLocks: rawLocks,
       flutterRef: flutter['ref'] as String?,
+      hasFlutterSection: hasFlutterSection,
       patchPath: flutter['patch'] as String?,
       localForeignDeps: localForeignDeps,
       icons: iconsList,

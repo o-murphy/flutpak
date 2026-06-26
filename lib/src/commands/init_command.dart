@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:args/command_runner.dart';
 import 'package:path/path.dart' as p;
 import '../config.dart';
+import '../generators/flutter_sdk.dart';
 import '../generators/manifest_generator.dart';
 import '../utils/log.dart';
 import 'command_utils.dart';
@@ -36,7 +37,10 @@ class InitCommand extends Command<void> {
     final configDir = p.dirname(configPath);
     final cfg = FlatpakGenConfig.load(configPath, configDir);
     final flutterArg = argResults!['flutter'] as String?;
-    final flutterRef = flutterArg ?? cfg.flutterRef;
+    final flutterEnabled = flutterArg != null || cfg.hasFlutterSection;
+    final flutterRef = flutterEnabled
+        ? await resolveFlutterRef(flutterArg ?? cfg.flutterRef)
+        : null;
     final force = argResults!['force'] as bool;
     final noForeignDeps = argResults!['no-foreign-deps'] as bool;
 
@@ -72,7 +76,7 @@ class InitCommand extends Command<void> {
           '(last segment of app-id); set manifest.command explicitly to override');
     }
 
-    final hasFlutter = flutterRef != null;
+    final hasFlutter = flutterEnabled;
     final sourcesPath = p.join(outputDir, 'generated', 'pubspec-sources.json');
     final generator = ManifestGenerator(
       cfg: manifestCfg,
@@ -124,7 +128,7 @@ class InitCommand extends Command<void> {
       baseDir: configDir,
       tagArg: null,
       commitArg: null,
-      flutterRefOverride: flutterArg,
+      flutterRefOverride: flutterRef,
       noForeignDeps: noForeignDeps,
       outputDir: outputDir,
     );

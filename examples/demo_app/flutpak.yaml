@@ -1,13 +1,12 @@
 output: flatpak
 
-flutter:
-  ref: 3.44.2
+flutter:  # autoresolve to latest stable release
 
 rust:
   version: 1.85.0
   rustup-path: /var/lib/rustup
 
-foreign-deps-ref: v0.8.0
+foreign-deps-ref: v0.8.1
 
 repo-url: https://github.com/o-murphy/flutpak.git
 

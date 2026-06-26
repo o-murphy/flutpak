@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
@@ -25,6 +26,44 @@ const String _infraBase =
     'https://storage.googleapis.com/flutter_infra_release';
 
 const String _rawBase = 'https://raw.githubusercontent.com/flutter/flutter';
+
+const String _releasesUrl = '$_infraBase/releases/releases_linux.json';
+
+/// Resolves a symbolic Flutter ref to a concrete version tag.
+///
+/// - `null`, `'stable'`       → latest stable release
+/// - `'latest'`, `'beta'`     → latest beta (pre-release)
+/// - anything else            → returned unchanged
+Future<String> resolveFlutterRef(String? ref, {http.Client? client}) async {
+  if (ref != null && ref != 'stable' && ref != 'latest' && ref != 'beta') {
+    return ref;
+  }
+  final channel = (ref == 'latest' || ref == 'beta') ? 'beta' : 'stable';
+  logInfo('flutter: resolving $channel from Flutter releases API...');
+  final ownClient = client == null;
+  final c = client ?? http.Client();
+  try {
+    final resp = await c.get(Uri.parse(_releasesUrl));
+    if (resp.statusCode != 200) {
+      throw Exception(
+          'Failed to fetch Flutter releases (HTTP ${resp.statusCode})');
+    }
+    final json = jsonDecode(resp.body) as Map<String, dynamic>;
+    final currentRelease = json['current_release'] as Map<String, dynamic>;
+    final hash = currentRelease[channel] as String;
+    final releases = json['releases'] as List;
+    final release = releases.firstWhere(
+      (r) => r is Map && r['hash'] == hash,
+      orElse: () =>
+          throw Exception('Release not found for $channel hash=$hash'),
+    ) as Map<String, dynamic>;
+    final version = release['version'] as String;
+    logInfo('flutter: $channel → $version');
+    return version;
+  } finally {
+    if (ownClient) c.close();
+  }
+}
 
 /// Patch content to replace `pub upgrade` with `pub get --offline` inside
 /// Flutter's shared.sh bootstrap function.  Applied automatically when no
