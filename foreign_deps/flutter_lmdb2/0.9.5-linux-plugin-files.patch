@@ -1,9 +1,9 @@
 diff --git a/linux/CMakeLists.txt b/linux/CMakeLists.txt
 new file mode 100644
-index 0000000..c307358
+index 0000000..eacd4fb
 --- /dev/null
 +++ b/linux/CMakeLists.txt
-@@ -0,0 +1,76 @@
+@@ -0,0 +1,83 @@
 +# The Flutter tooling requires that developers have CMake 3.10 or later
 +# installed. You should not increase this version, as doing so will cause
 +# the plugin to fail to compile for some customers of the plugin.
@@ -67,6 +67,13 @@ index 0000000..c307358
 +set_target_properties(lmdb_native PROPERTIES
 +  OUTPUT_NAME "lmdb"
 +)
++
++# mdb.c uses pthread_mutex/pthread_key (thread-specific data + mutexes) —
++# link explicitly rather than relying on it being pulled in transitively by
++# something else in the process (Threads::Threads is the portable way to
++# get -lpthread/-pthread regardless of platform threading model).
++find_package(Threads REQUIRED)
++target_link_libraries(lmdb_native PRIVATE Threads::Threads)
 +
 +# ----------------------------------------------------------------------
 +

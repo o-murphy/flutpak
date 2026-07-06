@@ -34,13 +34,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   commit hash) rather than a prebuilt-binary download, following the same
   "vendor source, no prebuilt binaries" principle as the parent `ob-dump`
   project this pairs with — and a `pubspec.yaml` patch uncommenting the
-  `linux:` plugin platform block. Verified empirically end-to-end: built a
-  scratch Flutter app depending on `flutter_lmdb2`, ran
-  `flutter build linux --release`, confirmed `liblmdb.so` was compiled and
-  bundled into `build/linux/x64/release/bundle/lib/` alongside `libapp.so`,
-  then copied only `bundle/` to an isolated directory and confirmed `LMDB`
-  opened successfully — zero network access, zero prebuilt binaries, at
-  any step.
+  `linux:` plugin platform block. The new `lmdb_native` CMake target also
+  links `Threads::Threads` (`find_package(Threads REQUIRED)`) explicitly —
+  `mdb.c` uses `pthread_mutex`/pthread-specific data, and relying on it
+  being pulled in transitively (which happens to work on this development
+  machine, since glibc ≥ 2.34 merges pthread into `libc.so.6`) isn't
+  portable to older glibc or non-glibc Flatpak runtimes. Verified
+  empirically end-to-end: built a scratch Flutter app depending on
+  `flutter_lmdb2`, ran `flutter build linux --release`, confirmed
+  `liblmdb.so` was compiled and bundled into
+  `build/linux/x64/release/bundle/lib/` alongside `libapp.so` with zero
+  undefined symbols (`ldd -r`), then copied only `bundle/` to an isolated
+  directory and confirmed `LMDB` opened successfully — zero network
+  access, zero prebuilt binaries, at any step.
 
 ## [0.8.2] — 2026-06-26
 

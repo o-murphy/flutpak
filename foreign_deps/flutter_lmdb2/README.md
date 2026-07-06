@@ -36,7 +36,14 @@ Two patches, applied together:
   prebuilt-binary download) — and registers the result via the
   `flutter_lmdb2_bundled_libraries` `PARENT_SCOPE` variable, the same convention
   `objectbox_flutter_libs`'s own (working) `linux/CMakeLists.txt` uses to get Flutter's
-  build to copy a library into `build/linux/<arch>/release/bundle/lib/`.
+  build to copy a library into `build/linux/<arch>/release/bundle/lib/`. Also links
+  `Threads::Threads` (`find_package(Threads REQUIRED)`) explicitly against the new
+  `lmdb_native` target — `mdb.c` uses `pthread_mutex`/pthread-specific data, and while
+  glibc ≥ 2.34 merges pthread into `libc.so.6` (making this a no-op on this
+  development machine, confirmed via `ldd -r` showing zero undefined symbols either
+  way), relying on that instead of linking explicitly isn't portable to older glibc
+  or non-glibc runtimes — Flathub's own base runtime shouldn't be assumed to match
+  whatever happens to be on the machine this was developed on.
 
 - **`0.9.5-pubspec.yaml.patch`** uncomments the `linux:` plugin platform block so
   Flutter's tooling actually picks up the new `linux/` directory.
