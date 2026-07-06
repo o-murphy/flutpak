@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`dart_lmdb2` foreign deps entry (0.9.12)** — patches
+  `LMDBNative._resolveLibraryPath()` (`lib/src/lmdb_native.dart`), which
+  locates the native LMDB library via `Isolate.resolvePackageUriSync()` on
+  Linux/Windows. That API only works in JIT mode (`dart run`/`flutter run`);
+  a compiled AOT release build throws `Unsupported operation` immediately on
+  the first LMDB open, confirmed empirically with a real
+  `flutter build linux --release` run in an isolated directory (no source
+  project, no pub cache — the same shape a Flatpak install has). This is not
+  Flatpak-specific; it breaks every compiled Flutter Linux/Windows release
+  build using `dart_lmdb2`, regardless of prebuilt-vs-source-built native
+  library. The patch tries `resolvePackageUriSync` first (unchanged dev-time
+  behaviour), then falls back to a path next to the running executable
+  (`<exe_dir>/lib/<libName>`, matching Flutter's own native-library bundling
+  convention) on `UnsupportedError`.
+
+- **`flutter_lmdb2` foreign deps entry (0.9.5)** — `flutter_lmdb2` has no
+  Linux (or Windows) support at all as published: both platforms are
+  commented out in its own `pubspec.yaml`, and there is no `linux/`
+  directory. Two patches add it: a new `linux/CMakeLists.txt` (+ a minimal
+  no-op GObject plugin, same shape as every other no-op Linux Flutter
+  plugin) that **compiles `liblmdb.so` from source** — `LMDB/lmdb.git` at
+  tag `LMDB_0.9.31`, fetched via a plain `git` source (pinned by tag and
+  commit hash) rather than a prebuilt-binary download, following the same
+  "vendor source, no prebuilt binaries" principle as the parent `ob-dump`
+  project this pairs with — and a `pubspec.yaml` patch uncommenting the
+  `linux:` plugin platform block. Verified empirically end-to-end: built a
+  scratch Flutter app depending on `flutter_lmdb2`, ran
+  `flutter build linux --release`, confirmed `liblmdb.so` was compiled and
+  bundled into `build/linux/x64/release/bundle/lib/` alongside `libapp.so`,
+  then copied only `bundle/` to an isolated directory and confirmed `LMDB`
+  opened successfully — zero network access, zero prebuilt binaries, at
+  any step.
+
 ## [0.8.2] — 2026-06-26
 
 ### Added
