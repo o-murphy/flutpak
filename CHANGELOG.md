@@ -8,7 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-
+- **Flutter SDK module for 3.44.5** — pre-built `flutter-sdk-3.44.5.json` added to
+  `modules/flutter-sdk/`.
 - **`dart_lmdb2` foreign deps entry (0.9.12)** — patches
   `LMDBNative._resolveLibraryPath()` (`lib/src/lmdb_native.dart`), which
   locates the native LMDB library via `Isolate.resolvePackageUriSync()` on
@@ -23,7 +24,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   behaviour), then falls back to a path next to the running executable
   (`<exe_dir>/lib/<libName>`, matching Flutter's own native-library bundling
   convention) on `UnsupportedError`.
-
 - **`flutter_lmdb2` foreign deps entry (0.9.5)** — `flutter_lmdb2` has no
   Linux (or Windows) support at all as published: both platforms are
   commented out in its own `pubspec.yaml`, and there is no `linux/`
@@ -57,11 +57,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The concrete version is resolved at generate time from the Flutter releases API
   (`storage.googleapis.com/flutter_infra_release/releases/releases_linux.json`):
 
-  | Value | Resolves to |
-  |---|---|
-  | `'stable'` or omitted within `flutter:` section | latest stable release |
-  | `'latest'` / `'beta'` | latest beta (pre-release) |
-  | anything else | passed through unchanged (tag / branch / SHA) |
+  | Value                                           | Resolves to                                   |
+  | ----------------------------------------------- | --------------------------------------------- |
+  | `'stable'` or omitted within `flutter:` section | latest stable release                         |
+  | `'latest'` / `'beta'`                           | latest beta (pre-release)                     |
+  | anything else                                   | passed through unchanged (tag / branch / SHA) |
 
   The resolved version is printed at generate time:
   `flutter: stable → 3.44.4`
@@ -166,13 +166,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Foreign deps registry — 5 cargokit packages added** (alphabetical order):
 
-  | Package | Version |
-  |---|---|
-  | `flutter_discord_rpc` | 1.0.0 |
-  | `flutter_vodozemac` | 0.5.0 |
-  | `metadata_god` | 1.1.0 |
-  | `rhttp` | 0.12.0 |
-  | `super_native_extensions` | 0.8.24 |
+  | Package                   | Version |
+  | ------------------------- | ------- |
+  | `flutter_discord_rpc`     | 1.0.0   |
+  | `flutter_vodozemac`       | 0.5.0   |
+  | `metadata_god`            | 1.1.0   |
+  | `rhttp`                   | 0.12.0  |
+  | `super_native_extensions` | 0.8.24  |
 
   Each entry specifies `cargo_locks` (for `Cargo.lock` extraction from the
   pub.dev archive) and `extra_pubspecs` (for `cargokit/build_tool/pubspec.lock`),
