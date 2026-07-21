@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.3] — 2026-07-21
+
+### Fixed
+- Flutter action version resolver
+
 ### Added
 - **Flutter SDK module for 3.44.7** — pre-built `flutter-sdk-3.44.7.json` added to
   `modules/flutter-sdk/`.
@@ -1181,7 +1186,8 @@ git remote.
   output files
 - MIT License
 
-[Unreleased]: https://github.com/o-murphy/flutpak/compare/v0.8.2...HEAD
+[Unreleased]: https://github.com/o-murphy/flutpak/compare/v0.8.3...HEAD
+[0.8.3]: https://github.com/o-murphy/flutpak/compare/v0.8.2...v0.8.3
 [0.8.2]: https://github.com/o-murphy/flutpak/compare/v0.8.1...v0.8.2
 [0.8.1]: https://github.com/o-murphy/flutpak/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/o-murphy/flutpak/compare/v0.7.1...v0.8.0
