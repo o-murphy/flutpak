@@ -583,7 +583,7 @@ flutpak generate --no-foreign-deps
 
 ```yaml
 # flutpak.yaml
-foreign-deps-ref: v0.6.1   # tag, branch, or SHA; default: main
+foreign-deps-ref: v0.8.3   # tag, branch, or SHA; default: main
 ```
 
 ---
