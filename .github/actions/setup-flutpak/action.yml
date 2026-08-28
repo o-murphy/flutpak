@@ -24,6 +24,12 @@ runs:
       uses: dart-lang/setup-dart@v1
       with:
         sdk: stable
+        # setup-dart registers its problem matcher via a path relative to the
+        # calling action's directory. Since this action is itself a composite
+        # action wrapping setup-dart, that path resolves to our own directory
+        # instead of setup-dart's, and the matcher file can't be found
+        # (https://github.com/actions/runner/issues/1490). Disable it here.
+        problem-matcher: false
 
     - name: Build and install flutpak
       shell: bash
