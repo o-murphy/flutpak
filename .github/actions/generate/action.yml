@@ -55,9 +55,10 @@ runs:
   using: composite
   steps:
     - name: Set up Dart SDK
-      uses: dart-lang/setup-dart@v1
+      uses: dart-lang/setup-dart@v1.8.0
       with:
         sdk: stable
+        problem-matcher: false
 
     - name: Build and install flutpak
       shell: bash
