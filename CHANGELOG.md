@@ -7,13 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Flutter SDK module for 3.47.3** — pre-built `flutter-sdk-3.47.3.json` added to
+  `modules/flutter-sdk/`.
+
 ## [0.8.4] — 2026-08-29
 
 ### Fixed
 - `generate action`, `setup-flutpak` action got explicit `problem-matcher: false` for `dart-lang/setup-dart@v1.8.0`
 
 ### Added
-
 - **Flutter SDK module for 3.47.2** — pre-built `flutter-sdk-3.47.2.json` added to
   `modules/flutter-sdk/`.
 - **Flutter SDK module for 3.47.1** — pre-built `flutter-sdk-3.47.1.json` added to
