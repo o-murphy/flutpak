@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Flutter SDK module for 3.47.4** — pre-built `flutter-sdk-3.47.4.json` added to
+  `modules/flutter-sdk/`.
 - **Flutter SDK module for 3.47.3** — pre-built `flutter-sdk-3.47.3.json` added to
   `modules/flutter-sdk/`.
 
