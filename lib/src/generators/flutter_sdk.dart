@@ -88,6 +88,16 @@ index d78e0cd..b8eb978 100644
 /// written when no explicit [patchPath] is provided.
 const String defaultSharedShPatchPath = 'patches/flutter/shared.sh.patch';
 
+/// Pre-built/cached SDK modules reference the built-in patch by a path relative
+/// to the module file. Writes it under [generatedDir] when [moduleJson]
+/// references it, so flatpak-builder can find it.
+void ensureBuiltinSharedShPatch(String moduleJson, String generatedDir) {
+  if (!moduleJson.contains(defaultSharedShPatchPath)) return;
+  File(p.join(generatedDir, defaultSharedShPatchPath))
+    ..createSync(recursive: true)
+    ..writeAsStringSync(builtinSharedShPatch);
+}
+
 /// Generates Flutter SDK [FlatpakSource] entries by fetching metadata from
 /// the Flutter GitHub repository at [flutterRef].
 ///

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutpak/flutpak.dart';
 import 'package:http/http.dart' as http;
 import 'package:test/test.dart';
@@ -9,6 +10,25 @@ const _gradleHash = 'fd5c1f2c013565a3bea56ada6df9d2b8e96d56aa';
 const _lockContent = 'packages:\n  args:\n    version: "2.5.0"\n';
 
 void main() {
+  group('ensureBuiltinSharedShPatch (#57)', () {
+    late Directory tmp;
+    setUp(() => tmp = Directory.systemTemp.createTempSync('flutpak_patch_'));
+    tearDown(() => tmp.deleteSync(recursive: true));
+
+    test('writes the patch next to a module that references it', () {
+      ensureBuiltinSharedShPatch(
+          '{"path":"$defaultSharedShPatchPath"}', tmp.path);
+      final f = File('${tmp.path}/$defaultSharedShPatchPath');
+      expect(f.existsSync(), isTrue);
+      expect(f.readAsStringSync(), builtinSharedShPatch);
+    });
+
+    test('writes nothing when the module does not reference it', () {
+      ensureBuiltinSharedShPatch('{"sources":[]}', tmp.path);
+      expect(Directory('${tmp.path}/patches').existsSync(), isFalse);
+    });
+  });
+
   group('FlutterSdkGenerator — artifact list', () {
     late List<FlatpakSource> sources;
 

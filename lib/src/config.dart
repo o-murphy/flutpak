@@ -234,7 +234,7 @@ class FlatpakGenConfig {
   final String? foreignDepsRef;
 
   /// Git ref (branch/tag) of the flutpak repo from which pre-built
-  /// `flutter_sdk/flutter-sdk-{version}.json` modules are fetched.
+  /// `modules/flutter-sdk/flutter-sdk-{version}.json` modules are fetched.
   /// Defaults to 'main' when null.
   final String? flutterSdkRef;
 

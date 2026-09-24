@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.5-beta.1] — 2026-09-24
+
+### Fixed
+- `generate` now writes `patches/flutter/shared.sh.patch` next to the Flutter SDK module
+  when the module comes from the pre-built registry/cache (flatpak-builder failed with
+  "Can't find file at patches/flutter/shared.sh.patch", #57).
+- Flutter SDK registry fetched pre-built modules from `flutter_sdk/` instead of
+  `modules/flutter-sdk/`, so remote lookups always 404'd.
+
 ### Added
 - **Flutter SDK module for 3.47.5** — pre-built `flutter-sdk-3.47.5.json` added to
   `modules/flutter-sdk/`.
@@ -1211,7 +1220,9 @@ git remote.
   output files
 - MIT License
 
-[Unreleased]: https://github.com/o-murphy/flutpak/compare/v0.8.3...HEAD
+[Unreleased]: https://github.com/o-murphy/flutpak/compare/v0.8.5-beta.1...HEAD
+[0.8.5-beta.1]: https://github.com/o-murphy/flutpak/compare/v0.8.4...v0.8.5-beta.1
+[0.8.4]: https://github.com/o-murphy/flutpak/compare/v0.8.3...v0.8.4
 [0.8.3]: https://github.com/o-murphy/flutpak/compare/v0.8.2...v0.8.3
 [0.8.2]: https://github.com/o-murphy/flutpak/compare/v0.8.1...v0.8.2
 [0.8.1]: https://github.com/o-murphy/flutpak/compare/v0.8.0...v0.8.1
