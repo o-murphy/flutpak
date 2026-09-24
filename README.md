@@ -564,10 +564,10 @@ foreign-deps:
 | `pdfium_dart`                 | 0.1.2, 0.2.0, 0.2.1, 0.2.2, 0.2.3                     |          |
 | `powersync`                   | 2.1.0                                                 |          |
 | `printing`                    | 5.14.2                                                |          |
-| `rhttp`                       | 0.12.0                                                | cargokit |
+| `rhttp`                       | 0.12.0, 0.18.0                                        | cargokit |
 | `simple_secure_storage_linux` | 0.2.5                                                 |          |
 | `sqlcipher_flutter_libs`      | 0.6.8                                                 |          |
-| `sqlite3`                     | 2.9.4, 3.0.0, 3.3.0                                   |          |
+| `sqlite3`                     | 2.9.4, 3.0.0, 3.3.0, 3.6.0                            |          |
 | `sqlite3_flutter_libs`        | 0.5.30, 0.5.32, 0.5.34, 0.5.39, 0.5.41, 0.5.42, 0.6.0 |          |
 | `super_native_extensions`     | 0.8.24                                                | cargokit |
 

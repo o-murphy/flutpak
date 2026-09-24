@@ -12,6 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   missing on a fresh clone) instead of only warning and producing an incomplete
   `pubspec-sources.json`; run `flutter pub get` first (#57).
 
+### Added
+- Foreign deps registry: `sqlite3` 3.6.0 (prebuilt `libsqlite3` from the `sqlite3-3.6.0`
+  release, placed in the hash-named `download-<sha8>` hook cache dir — no patches needed)
+  and `rhttp` 0.18.0.
+
 ### Changed
 - `examples/demo_app`: bumped `sqlite3` to `^3.6.0` and `rhttp` to `^0.18.0`; analyzer now
   excludes `build/**` and `linux/**`.
