@@ -153,6 +153,7 @@ class GenerateCommand extends Command<void> {
         localForeignDeps: cfg.localForeignDeps,
         generatedPatchesDir: generatedPatchesDir,
         projectPatchesDir: p.join(outputDir, 'patches'),
+        appDir: manifestCfg.subdir ?? '.',
       );
       foreignDepSources = depsResult.sources;
       foreignCargoLockPaths = depsResult.cargoLockPaths;

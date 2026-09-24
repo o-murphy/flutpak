@@ -113,6 +113,7 @@ class ForeignDepsRegistry {
     required String generatedPatchesDir,
     Map<String, dynamic> localForeignDeps = const {},
     String? projectPatchesDir,
+    String? appDir,
   }) async {
     final Map<String, dynamic> registry;
     try {
@@ -171,7 +172,7 @@ class ForeignDepsRegistry {
       for (final rawSource in sources) {
         if (rawSource is! Map) continue;
         var source = _deepConvert(rawSource);
-        source = resolvePlaceholders(source, package, version);
+        source = resolvePlaceholders(source, package, version, appDir: appDir);
 
         if (source['type'] == 'patch') {
           final crlf = source['crlf'] as bool? ?? false;
@@ -305,24 +306,37 @@ class ForeignDepsRegistry {
   }
 
   /// Replaces `\$PUB_DEV` with `.pub-cache/hosted/pub.dev/<package>-<version>`
-  /// recursively in all string values of [source]. `\$APP` is left as-is.
+  /// recursively in all string values of [source]. `\$APP` is replaced with
+  /// [appDir] (the app's directory inside the module sources) when given,
+  /// otherwise left as-is.
   Map<String, dynamic> resolvePlaceholders(
     Map<String, dynamic> source,
     String package,
-    String version,
-  ) {
+    String version, {
+    String? appDir,
+  }) {
     final pubDev = '.pub-cache/hosted/pub.dev/$package-$version';
-    return _substituteMap(source, pubDev);
+    return _substituteMap(source, pubDev, appDir);
   }
 
-  Map<String, dynamic> _substituteMap(Map<String, dynamic> m, String pubDev) =>
-      {for (final e in m.entries) e.key: _substituteValue(e.value, pubDev)};
+  Map<String, dynamic> _substituteMap(
+          Map<String, dynamic> m, String pubDev, String? appDir) =>
+      {
+        for (final e in m.entries)
+          e.key: _substituteValue(e.value, pubDev, appDir)
+      };
 
-  dynamic _substituteValue(dynamic value, String pubDev) {
-    if (value is String) return value.replaceAll(r'$PUB_DEV', pubDev);
-    if (value is Map<String, dynamic>) return _substituteMap(value, pubDev);
+  dynamic _substituteValue(dynamic value, String pubDev, String? appDir) {
+    if (value is String) {
+      var out = value.replaceAll(r'$PUB_DEV', pubDev);
+      if (appDir != null) out = out.replaceAll(r'$APP', appDir);
+      return out;
+    }
+    if (value is Map<String, dynamic>) {
+      return _substituteMap(value, pubDev, appDir);
+    }
     if (value is List) {
-      return value.map((e) => _substituteValue(e, pubDev)).toList();
+      return value.map((e) => _substituteValue(e, pubDev, appDir)).toList();
     }
     return value;
   }

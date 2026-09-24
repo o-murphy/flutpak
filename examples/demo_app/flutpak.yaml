@@ -3,7 +3,7 @@ output: flatpak
 flutter:  # autoresolve to latest stable release
 
 rust:
-  version: 1.85.0
+  version: 1.88.0
   rustup-path: /var/lib/rustup
 
 foreign-deps-ref: fix-error-with-no-lock-file
