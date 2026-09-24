@@ -145,6 +145,20 @@ class PubSourcesGenerator {
     throw StateError('unreachable');
   }
 
+  /// Whether at least one of [lockFilePaths] (env vars and globs resolved
+  /// like in [generate]) points to an existing file.
+  static bool anyLockExists(List<String> lockFilePaths) {
+    for (final raw in lockFilePaths) {
+      final pattern = _resolveEnv(raw);
+      if (pattern.contains('*')) {
+        if (Glob(pattern).listSync().any((e) => e is File)) return true;
+      } else if (File(pattern).existsSync()) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   static String _resolveEnv(String s) => s.replaceAllMapped(
         RegExp(r'\$(\w+)'),
         (m) => Platform.environment[m.group(1)!] ?? m.group(0)!,

@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- `generate` now exits with an error when no pub lock file is found (e.g. `pubspec.lock`
+  missing on a fresh clone) instead of only warning and producing an incomplete
+  `pubspec-sources.json`; run `flutter pub get` first (#57).
+
+### Changed
+- `examples/demo_app`: bumped `sqlite3` to `^3.6.0` and `rhttp` to `^0.18.0`; analyzer now
+  excludes `build/**` and `linux/**`.
+
 ## [0.8.5] — 2026-09-24
 
 ### Fixed
