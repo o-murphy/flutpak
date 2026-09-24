@@ -82,6 +82,16 @@ void main() {
       expect(result['dest'], r'$APP/build');
     });
 
+    test('replaces \$APP when appDir is given', () {
+      final result = registry.resolvePlaceholders(
+        {'dest': r'$APP/.dart_tool'},
+        'my_pkg',
+        '1.0.0',
+        appDir: 'examples/demo_app',
+      );
+      expect(result['dest'], 'examples/demo_app/.dart_tool');
+    });
+
     test('handles nested maps recursively', () {
       final result = registry.resolvePlaceholders(
         {

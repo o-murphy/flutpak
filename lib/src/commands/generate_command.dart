@@ -10,6 +10,7 @@ import '../foreign_deps_registry.dart';
 import '../generators/cargo_sources.dart';
 import '../generators/flutter_sdk.dart';
 import '../generators/manifest_generator.dart';
+import '../generators/pub_sources.dart';
 import '../generators/rustup_generator.dart';
 import '../utils/log.dart';
 import '../utils/sources_util.dart';
@@ -132,6 +133,12 @@ class GenerateCommand extends Command<void> {
       return p.absolute(p.join(baseDir, l));
     }).toList();
 
+    if (!PubSourcesGenerator.anyLockExists(effectiveLocks)) {
+      logError('pubspec.lock not found: ${effectiveLocks.join(', ')}');
+      logError('  Run `flutter pub get` first to resolve dependencies.');
+      exit(1);
+    }
+
     // ── Resolve foreign deps from registry ───────────────────────────────
     List<Map<String, dynamic>> foreignDepSources = const [];
     List<String> foreignCargoLockPaths = const [];
@@ -146,6 +153,7 @@ class GenerateCommand extends Command<void> {
         localForeignDeps: cfg.localForeignDeps,
         generatedPatchesDir: generatedPatchesDir,
         projectPatchesDir: p.join(outputDir, 'patches'),
+        appDir: manifestCfg.subdir ?? '.',
       );
       foreignDepSources = depsResult.sources;
       foreignCargoLockPaths = depsResult.cargoLockPaths;

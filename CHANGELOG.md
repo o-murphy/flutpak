@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- `generate` now exits with an error when no pub lock file is found (e.g. `pubspec.lock`
+  missing on a fresh clone) instead of only warning and producing an incomplete
+  `pubspec-sources.json`; run `flutter pub get` first (#57).
+- Foreign deps registry: `$APP` in a source `dest` is now replaced with the app directory
+  (`subdir` from `flutpak.yaml`, or `.`) instead of being emitted literally. Previously the
+  prebuilt `libsqlite3` landed in a literal `$APP/` directory, so the `sqlite3` build hook
+  missed the cache and tried to download from github.com inside the network-less sandbox.
+
+### Added
+- Foreign deps registry: `sqlite3` 3.6.0 (prebuilt `libsqlite3` from the `sqlite3-3.6.0`
+  release, placed in the hash-named `download-<sha8>` hook cache dir — no patches needed)
+  and `rhttp` 0.18.0.
+
+### Changed
+- `examples/demo_app`: bumped `sqlite3` to `^3.6.0` and `rhttp` to `^0.18.0`; analyzer now
+  excludes `build/**` and `linux/**`; Rust toolchain raised to 1.88.0 (`cookie_store` and
+  `time` from the `rhttp` 0.18.0 lock file require rustc 1.88).
+
 ## [0.8.5] — 2026-09-24
 
 ### Fixed

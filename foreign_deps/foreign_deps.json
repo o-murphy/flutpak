@@ -537,6 +537,23 @@
                     }
                 ]
             }
+        },
+        "0.18.0": {
+            "cargo_locks": [
+                "$PUB_DEV/rust"
+            ],
+            "extra_pubspecs": [
+                "$PUB_DEV/cargokit/build_tool"
+            ],
+            "manifest": {
+                "sources": [
+                    {
+                        "type": "patch",
+                        "path": "cargokit/run_build_tool.sh.patch",
+                        "dest": "$PUB_DEV/cargokit"
+                    }
+                ]
+            }
         }
     },
     "simple_secure_storage_linux": {
@@ -662,6 +679,32 @@
                         "type": "patch",
                         "path": "sqlite3/assets.dart.patch",
                         "dest": "$PUB_DEV"
+                    }
+                ]
+            }
+        },
+        "3.6.0": {
+            "manifest": {
+                "sources": [
+                    {
+                        "type": "file",
+                        "only-arches": [
+                            "x86_64"
+                        ],
+                        "url": "https://github.com/simolus3/sqlite3.dart/releases/download/sqlite3-3.6.0/libsqlite3.x64.linux.so",
+                        "sha256": "4b98690121dbd05d5a4df3375d0e9ed7a339d8b26ca2e573bd663976b9b0f9af",
+                        "dest": "$APP/.dart_tool/hooks_runner/shared/sqlite3/build/download-4b986901",
+                        "dest-filename": "libsqlite3.so"
+                    },
+                    {
+                        "type": "file",
+                        "only-arches": [
+                            "aarch64"
+                        ],
+                        "url": "https://github.com/simolus3/sqlite3.dart/releases/download/sqlite3-3.6.0/libsqlite3.arm64.linux.so",
+                        "sha256": "22e86bfa14edd930a4fafb85879d17e67f2fadfb080ece709fb08d76e62eba11",
+                        "dest": "$APP/.dart_tool/hooks_runner/shared/sqlite3/build/download-22e86bfa",
+                        "dest-filename": "libsqlite3.so"
                     }
                 ]
             }
