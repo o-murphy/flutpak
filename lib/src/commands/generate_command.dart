@@ -224,6 +224,8 @@ class GenerateCommand extends Command<void> {
         File(p.join(generatedDir, sdkModuleFilename))
           ..createSync(recursive: true)
           ..writeAsStringSync(moduleJson);
+
+        ensureBuiltinSharedShPatch(moduleJson, generatedDir);
         flutterSdkModule = sdkModuleFilename;
         logInfo('✓  flutter SDK module → $sdkModuleFilename');
         sdkRegistry.dispose();

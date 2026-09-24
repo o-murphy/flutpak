@@ -83,7 +83,7 @@ void main() {
       expect(
         reg.moduleUrl('3.44.1'),
         'https://raw.githubusercontent.com/o-murphy/flutpak/feat/test'
-        '/flutter_sdk/flutter-sdk-3.44.1.json',
+        '/modules/flutter-sdk/flutter-sdk-3.44.1.json',
       );
       reg.dispose();
     });

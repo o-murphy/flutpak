@@ -30,7 +30,7 @@ class FlutterSdkRegistry {
 
   String moduleUrl(String flutterVersion) =>
       'https://raw.githubusercontent.com/o-murphy/flutpak/$ref'
-      '/flutter_sdk/flutter-sdk-$flutterVersion.json';
+      '/modules/flutter-sdk/flutter-sdk-$flutterVersion.json';
 
   /// Returns cached or remotely fetched pre-built module JSON, or null if
   /// not available (HTTP 404, network error — caller should fall back to

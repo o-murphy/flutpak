@@ -3,3 +3,4 @@ pubspec.lock
 build/
 .git
 test/fixtures/flutter_sdk/.git
+.vscode/
