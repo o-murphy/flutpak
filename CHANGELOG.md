@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.6] — 2026-09-24
+
 ### Fixed
 - `generate` now exits with an error when no pub lock file is found (e.g. `pubspec.lock`
   missing on a fresh clone) instead of only warning and producing an incomplete
@@ -1239,7 +1241,8 @@ git remote.
   output files
 - MIT License
 
-[Unreleased]: https://github.com/o-murphy/flutpak/compare/v0.8.5...HEAD
+[Unreleased]: https://github.com/o-murphy/flutpak/compare/v0.8.6...HEAD
+[0.8.6]: https://github.com/o-murphy/flutpak/compare/v0.8.5...v0.8.6
 [0.8.5]: https://github.com/o-murphy/flutpak/compare/v0.8.4...v0.8.5
 [0.8.4]: https://github.com/o-murphy/flutpak/compare/v0.8.3...v0.8.4
 [0.8.3]: https://github.com/o-murphy/flutpak/compare/v0.8.2...v0.8.3
