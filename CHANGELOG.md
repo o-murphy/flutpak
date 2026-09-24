@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.8.5-beta.1] — 2026-09-24
+## [0.8.5] — 2026-09-24
 
 ### Fixed
 - `generate` now writes `patches/flutter/shared.sh.patch` next to the Flutter SDK module
@@ -1220,8 +1220,8 @@ git remote.
   output files
 - MIT License
 
-[Unreleased]: https://github.com/o-murphy/flutpak/compare/v0.8.5-beta.1...HEAD
-[0.8.5-beta.1]: https://github.com/o-murphy/flutpak/compare/v0.8.4...v0.8.5-beta.1
+[Unreleased]: https://github.com/o-murphy/flutpak/compare/v0.8.5...HEAD
+[0.8.5]: https://github.com/o-murphy/flutpak/compare/v0.8.4...v0.8.5
 [0.8.4]: https://github.com/o-murphy/flutpak/compare/v0.8.3...v0.8.4
 [0.8.3]: https://github.com/o-murphy/flutpak/compare/v0.8.2...v0.8.3
 [0.8.2]: https://github.com/o-murphy/flutpak/compare/v0.8.1...v0.8.2
