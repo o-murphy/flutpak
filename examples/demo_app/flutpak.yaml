@@ -6,7 +6,7 @@ rust:
   version: 1.85.0
   rustup-path: /var/lib/rustup
 
-foreign-deps-ref: v0.8.1
+foreign-deps-ref: fix-error-with-no-lock-file
 
 repo-url: https://github.com/o-murphy/flutpak.git
 
