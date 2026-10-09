@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="203.25" height="28" role="img" aria-label="POWERED BY: FLUTPAK">
+  <title>POWERED BY: FLUTPAK</title>
+  <g shape-rendering="crispEdges">
+    <rect width="120.5" height="28" fill="#black" />
+    <rect x="120.5" width="82.75" height="28" fill="#02569b" />
+  </g>
+  <g fill="#fff" text-anchor="middle" font-family="Verdana,Geneva,DejaVu Sans,sans-serif"
+    text-rendering="geometricPrecision" font-size="100">
+    <svg x="9" y="7" width="14" height="14" viewBox="0 0 24 24">
+      <title>flutpak</title>
+      <path fill="#02569b" fill-rule="evenodd" d="M12 0c-.556 0-1.111.144-1.61.432l-7.603 4.39a3.217 3.217 0 0 0-1.61 2.788v8.78c0 1.151.612 2.212 1.61 2.788l7.603 4.39a3.217 3.217 0 0 0 3.22 0l7.603-4.39a3.217 3.217 0 0 0 1.61-2.788V7.61a3.217 3.217 0 0 0-1.61-2.788L13.61.432A3.218 3.218 0 0 0 12 0Z
+       M12.0084 4.8 L4.8 12 L7.02 14.22 L16.4304 4.8078 L12.0162 4.8078 Z
+       M12.0168 11.4432 L8.1342 15.318 L12.0162 19.2 L16.44 19.2 L12.564 15.3192 L16.44 11.4432 L12.018 11.4432 Z" />
+    </svg>
+    <text transform="scale(.1)" x="687.5" y="175" textLength="795">POWERED BY</text><text transform="scale(.1)"
+      x="1618.75" y="175" textLength="587.5" font-weight="bold">FLUTPAK</text>
+  </g>
+</svg>

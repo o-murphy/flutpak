@@ -1,4 +1,5 @@
-# flutpak
+# <img src="./logo/logo-02569B.svg" width="24" height="24" /> flutpak
+
 
 [![Pub Version]][Pub]
 [![Development Status]][Repo]
@@ -15,6 +16,12 @@ Dart CLI tool that automates Flatpak packaging for Flutter applications.
 Describe your config once in `flutpak.yaml`, run `flutpak init` once to
 scaffold your template manifest, then run `flutpak generate` on every CI
 build to produce a fully-substituted, `flatpak-builder`-ready output.
+
+
+## Projects using `flatpak`
+- [**jrpn**](https://github.com/zathras/jrpn) - A Calculator Simulators Inspired by the HP-15C/HP-16C "Computer Scientist", see it [jrpn15@flathub](https://flathub.org/en/apps/com.jovial.jrpn15) / [jrpn16/@flathub](https://flathub.org/en/apps/com.jovial.jrpn15)
+- [**ebalistyka**](https://github.com/o-murphy/ebalistyka) - A high performance cross-platform ballistic calculator
+
 
 ## Highlights
 
@@ -144,7 +151,8 @@ The template manifest: [`examples/demo_app/flatpak/io.github.o_murphy.flutpak.de
 
 ## Table of Contents
 
-- [flutpak](#flutpak)
+- [ flutpak](#-flutpak)
+  - [Projects using `flatpak`](#projects-using-flatpak)
   - [Highlights](#highlights)
   - [flutpak vs flatpak-flutter](#flutpak-vs-flatpak-flutter)
     - [What they share](#what-they-share)
