@@ -126,14 +126,16 @@ features added in v0.6.0:
 - **`--config` with a subdirectory path** — the workflow passes
   `--config examples/demo_app/flutpak.yaml`; all paths are resolved relative
   to the config file's directory.
-- **Rust/Cargo via cargokit** — the demo uses `rhttp ^0.12.0` (Rust HTTP client
+- **Rust/Cargo via cargokit** — the demo uses `rhttp ^0.18.0` (Rust HTTP client
   via cargokit); `flutpak generate` resolves the `Cargo.lock`, generates
   `cargo-sources.json`, and injects a `rustup` offline-installer module. Smoke
   checks in the template verify `librhttp.so` is bundled and `libsqlite3` is
   visible from the Flatpak runtime.
-- **SQLite** — the demo uses `sqlite3_flutter_libs ^0.6.0`; `0.6.0` links
-  against the system SQLite provided by `org.freedesktop.Platform` (no extra
-  sources needed). For local `flutter run`, install `libsqlite3-dev`.
+- **SQLite** — the demo uses `sqlite3 ^3.7.0`, whose build hook downloads a
+  prebuilt `libsqlite3.so`. Offline Flatpak builds get it from the foreign deps
+  registry (`sqlite3` `3.7.0`), which pre-places the release asset in the
+  hook's shared cache. The `sqlite3_flutter_libs 0.6.0+eol` dependency is now a
+  no-op kept only for compatibility.
 
 The demo app config: [`examples/demo_app/flutpak.yaml`](examples/demo_app/flutpak.yaml)
 The template manifest: [`examples/demo_app/flatpak/io.github.o_murphy.flutpak.demo.yml`](examples/demo_app/flatpak/io.github.o_murphy.flutpak.demo.yml)
@@ -567,7 +569,7 @@ foreign-deps:
 | `rhttp`                       | 0.12.0, 0.18.0                                        | cargokit |
 | `simple_secure_storage_linux` | 0.2.5                                                 |          |
 | `sqlcipher_flutter_libs`      | 0.6.8                                                 |          |
-| `sqlite3`                     | 2.9.4, 3.0.0, 3.3.0, 3.6.0                            |          |
+| `sqlite3`                     | 2.9.4, 3.0.0, 3.3.0, 3.6.0, 3.7.0                     |          |
 | `sqlite3_flutter_libs`        | 0.5.30, 0.5.32, 0.5.34, 0.5.39, 0.5.41, 0.5.42, 0.6.0 |          |
 | `super_native_extensions`     | 0.8.24                                                | cargokit |
 
