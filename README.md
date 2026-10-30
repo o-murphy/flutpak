@@ -138,9 +138,9 @@ features added in v0.6.0:
   `cargo-sources.json`, and injects a `rustup` offline-installer module. Smoke
   checks in the template verify `librhttp.so` is bundled and `libsqlite3` is
   visible from the Flatpak runtime.
-- **SQLite** — the demo uses `sqlite3 ^3.7.0`, whose build hook downloads a
+- **SQLite** — the demo uses `sqlite3 ^3.8.0`, whose build hook downloads a
   prebuilt `libsqlite3.so`. Offline Flatpak builds get it from the foreign deps
-  registry (`sqlite3` `3.7.0`), which pre-places the release asset in the
+  registry (`sqlite3` `3.8.0`), which pre-places the release asset in the
   hook's shared cache. The `sqlite3_flutter_libs 0.6.0+eol` dependency is now a
   no-op kept only for compatibility.
 
@@ -246,7 +246,7 @@ The repository ships a composite action that compiles and installs `flutpak`
 automatically. See [CI/CD integration](#cicd-integration) for full usage.
 
 ```yaml
-- uses: o-murphy/flutpak/.github/actions/setup-flutpak@v0.8.6
+- uses: o-murphy/flutpak/.github/actions/setup-flutpak@v0.8.7
 ```
 
 ### From source
@@ -894,7 +894,7 @@ Reads the committed template, resolves the tag and commit SHA, sets `tag:` and
 ### `setup-flutpak` action
 
 ```yaml
-- uses: o-murphy/flutpak/.github/actions/setup-flutpak@v0.8.6
+- uses: o-murphy/flutpak/.github/actions/setup-flutpak@v0.8.7
   # Builds from the same ref as the 'uses:' directive by default.
   # Pin to a specific release:
   # with:
@@ -911,7 +911,7 @@ The repository also ships a `flutter` composite action with
 (x86_64) and `ubuntu-24.04-arm` (aarch64) runners:
 
 ```yaml
-- uses: o-murphy/flutpak/.github/actions/flutter@v0.8.6
+- uses: o-murphy/flutpak/.github/actions/flutter@v0.8.7
   with:
     flutter-version: stable   # or read from flatpak/flutter.version
     cache: true
@@ -938,7 +938,7 @@ and sources as a workflow artifact. Flutter is still needed in CI for
 GitHub via `flutter-ref`.
 
 ```yaml
-- uses: o-murphy/flutpak/.github/actions/generate@v0.8.6
+- uses: o-murphy/flutpak/.github/actions/generate@v0.8.7
   with:
     tag: ${{ inputs.tag }}      # or pass 'commit:' for non-tag builds
     # commit: ${{ github.sha }} # used when 'tag' is empty
@@ -963,7 +963,7 @@ Installs `org.flatpak.Builder`, lints the manifest, builds via `flathub-build`,
 lints the repo, exports a `.flatpak` bundle, and optionally uploads it.
 
 ```yaml
-- uses: o-murphy/flutpak/.github/actions/build-flatpak@v0.8.6
+- uses: o-murphy/flutpak/.github/actions/build-flatpak@v0.8.7
   id: build
   with:
     manifest: flatpak/generated/<app-id>.yml
@@ -1013,7 +1013,7 @@ jobs:
         with:
           fetch-depth: 0          # required for --tag to resolve the commit
 
-      - uses: o-murphy/flutpak/.github/actions/flutter@v0.8.6
+      - uses: o-murphy/flutpak/.github/actions/flutter@v0.8.7
         id: flutter
         with:
           flutter-version: stable
@@ -1021,7 +1021,7 @@ jobs:
 
       - run: flutter pub get
 
-      - uses: o-murphy/flutpak/.github/actions/generate@v0.8.6
+      - uses: o-murphy/flutpak/.github/actions/generate@v0.8.7
         with:
           tag: ${{ github.ref_name }}
           metainfo-path: app/share/metainfo/<app-id>.metainfo.xml
@@ -1039,7 +1039,7 @@ jobs:
           name: flatpak-generated
           path: flatpak/generated
 
-      - uses: o-murphy/flutpak/.github/actions/build-flatpak@v0.8.6
+      - uses: o-murphy/flutpak/.github/actions/build-flatpak@v0.8.7
         id: build
         with:
           manifest: flatpak/generated/<app-id>.yml
@@ -1069,9 +1069,9 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: o-murphy/flutpak/.github/actions/setup-flutpak@v0.8.6
+      - uses: o-murphy/flutpak/.github/actions/setup-flutpak@v0.8.7
 
-      - uses: o-murphy/flutpak/.github/actions/flutter@v0.8.6
+      - uses: o-murphy/flutpak/.github/actions/flutter@v0.8.7
         with:
           flutter-version: stable
           cache: true

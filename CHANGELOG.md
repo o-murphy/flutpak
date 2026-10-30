@@ -7,12 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.7] — 2026-09-30
+
+### Changed
+- `examples/demo_app`: bumped `sqlite3` to `^3.8.0`.
+
 ### Added
+- Foreign deps registry: `printing` 5.15.1 (reuses the pdfium prebuilt/CMake patch) and
+  `flutter_discord_rpc` 1.1.0 (cargokit patch), `flutter_vodozemac` 0.9.0, `super_native_extensions`
+  0.9.1, `fvp` 0.39.1 (mdk-sdk v0.39.0), `pdfium_dart` 0.4.1 (pdfium chromium/8125),
+  `flutter_webrtc` 1.6.3 (per-arch `libwebrtc` m150.7871.07 zips) and `powersync` 2.5.0
+  (core extension v0.5.3).
 - **Flutter SDK module for 3.47.6** — pre-built `flutter-sdk-3.47.6.json` added to
   `modules/flutter-sdk/`.
 - **Flutter SDK module for 3.47.7** — pre-built `flutter-sdk-3.47.7.json` added to
   `modules/flutter-sdk/`.
 - **Flutter SDK module for 3.47.8** — pre-built `flutter-sdk-3.47.8.json` added to
+  `modules/flutter-sdk/`.
+- **Flutter SDK module for 3.47.9** — pre-built `flutter-sdk-3.47.9.json` added to
   `modules/flutter-sdk/`.
 
 ## [0.8.6] — 2026-09-24
@@ -1249,7 +1261,8 @@ git remote.
   output files
 - MIT License
 
-[Unreleased]: https://github.com/o-murphy/flutpak/compare/v0.8.6...HEAD
+[Unreleased]: https://github.com/o-murphy/flutpak/compare/v0.8.7...HEAD
+[0.8.7]: https://github.com/o-murphy/flutpak/compare/v0.8.6...v0.8.7
 [0.8.6]: https://github.com/o-murphy/flutpak/compare/v0.8.5...v0.8.6
 [0.8.5]: https://github.com/o-murphy/flutpak/compare/v0.8.4...v0.8.5
 [0.8.4]: https://github.com/o-murphy/flutpak/compare/v0.8.3...v0.8.4
