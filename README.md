@@ -562,24 +562,24 @@ foreign-deps:
 | Package                       | Versions                                              | Notes    |
 | ----------------------------- | ----------------------------------------------------- | -------- |
 | `audiotags`                   | 1.4.5                                                 |          |
-| `flutter_discord_rpc`         | 1.0.0                                                 | cargokit |
+| `flutter_discord_rpc`         | 1.0.0, 1.1.0                                          | cargokit |
 | `flutter_new_pipe_extractor`  | 0.1.0                                                 |          |
-| `flutter_vodozemac`           | 0.5.0                                                 | cargokit |
-| `flutter_webrtc`              | 1.3.0                                                 |          |
-| `fvp`                         | 0.35.0                                                |          |
+| `flutter_vodozemac`           | 0.5.0, 0.9.0                                         | cargokit |
+| `flutter_webrtc`              | 1.3.0, 1.6.3                                         |          |
+| `fvp`                         | 0.35.0, 0.39.1                                       |          |
 | `media_kit_libs_linux`        | 1.2.1                                                 |          |
 | `metadata_god`                | 1.1.0                                                 | cargokit |
 | `objectbox_flutter_libs`      | 5.3.1, 5.3.2                                          |          |
 | `objectbox_sync_flutter_libs` | 5.3.1, 5.3.2                                          |          |
-| `pdfium_dart`                 | 0.1.2, 0.2.0, 0.2.1, 0.2.2, 0.2.3                     |          |
-| `powersync`                   | 2.1.0                                                 |          |
-| `printing`                    | 5.14.2                                                |          |
+| `pdfium_dart`                 | 0.1.2, 0.2.0, 0.2.1, 0.2.2, 0.2.3, 0.4.1             |          |
+| `powersync`                   | 2.1.0, 2.5.0                                         |          |
+| `printing`                    | 5.14.2, 5.15.1                                        |          |
 | `rhttp`                       | 0.12.0, 0.18.0                                        | cargokit |
 | `simple_secure_storage_linux` | 0.2.5                                                 |          |
 | `sqlcipher_flutter_libs`      | 0.6.8                                                 |          |
 | `sqlite3`                     | 2.9.4, 3.0.0, 3.3.0, 3.6.0, 3.7.0, 3.8.0              |          |
 | `sqlite3_flutter_libs`        | 0.5.30, 0.5.32, 0.5.34, 0.5.39, 0.5.41, 0.5.42, 0.6.0 |          |
-| `super_native_extensions`     | 0.8.24                                                | cargokit |
+| `super_native_extensions`     | 0.8.24, 0.9.1                                        | cargokit |
 
 For the full list see [`foreign_deps/foreign_deps.json`](foreign_deps/foreign_deps.json).
 

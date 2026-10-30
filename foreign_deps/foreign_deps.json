@@ -43,6 +43,23 @@
                     }
                 ]
             }
+        },
+        "1.1.0": {
+            "cargo_locks": [
+                "$PUB_DEV"
+            ],
+            "extra_pubspecs": [
+                "$PUB_DEV/cargokit/build_tool"
+            ],
+            "manifest": {
+                "sources": [
+                    {
+                        "type": "patch",
+                        "path": "cargokit/run_build_tool.sh.patch",
+                        "dest": "$PUB_DEV/cargokit"
+                    }
+                ]
+            }
         }
     },
     "flutter_lmdb2": {
@@ -113,6 +130,23 @@
                     }
                 ]
             }
+        },
+        "0.9.0": {
+            "cargo_locks": [
+                "$PUB_DEV/rust"
+            ],
+            "extra_pubspecs": [
+                "$PUB_DEV/cargokit/build_tool"
+            ],
+            "manifest": {
+                "sources": [
+                    {
+                        "type": "patch",
+                        "path": "cargokit/run_build_tool.sh.patch",
+                        "dest": "$PUB_DEV/cargokit"
+                    }
+                ]
+            }
         }
     },
     "flutter_webrtc": {
@@ -127,6 +161,30 @@
                     }
                 ]
             }
+        },
+        "1.6.3": {
+            "manifest": {
+                "sources": [
+                    {
+                        "type": "file",
+                        "only-arches": [
+                            "x86_64"
+                        ],
+                        "url": "https://github.com/webrtc-sdk/libwebrtc/releases/download/libwebrtc.m150.7871.07/libwebrtc-linux-x64-release.zip",
+                        "sha256": "ef380526cf9616848bc0b97b24990cbf2ad851c209d5dce93cc3ebb9d3789fbc",
+                        "dest": "$PUB_DEV/third_party/downloads"
+                    },
+                    {
+                        "type": "file",
+                        "only-arches": [
+                            "aarch64"
+                        ],
+                        "url": "https://github.com/webrtc-sdk/libwebrtc/releases/download/libwebrtc.m150.7871.07/libwebrtc-linux-arm64-release.zip",
+                        "sha256": "887de0a1da6c9b8807da9fe2fc237e03ac5fcc3df4142a5f8889d66baa24bf08",
+                        "dest": "$PUB_DEV/third_party/downloads"
+                    }
+                ]
+            }
         }
     },
     "fvp": {
@@ -137,6 +195,18 @@
                         "type": "archive",
                         "url": "https://github.com/wang-bin/mdk-sdk/releases/download/v0.35.0/mdk-sdk-linux.tar.xz",
                         "sha256": "3ca102c26b3f246258b1822f51653450148bc25b188a4630dc81a57965e56ed8",
+                        "dest": "$PUB_DEV/linux/mdk-sdk"
+                    }
+                ]
+            }
+        },
+        "0.39.1": {
+            "manifest": {
+                "sources": [
+                    {
+                        "type": "archive",
+                        "url": "https://github.com/wang-bin/mdk-sdk/releases/download/v0.39.0/mdk-sdk-linux.tar.xz",
+                        "sha256": "8a66c5ab23a5e357511e01ff9d369a68dce6470076303136a619bbe120518479",
                         "dest": "$PUB_DEV/linux/mdk-sdk"
                     }
                 ]
@@ -457,6 +527,30 @@
                     }
                 ]
             }
+        },
+        "0.4.1": {
+            "manifest": {
+                "sources": [
+                    {
+                        "type": "archive",
+                        "only-arches": [
+                            "x86_64"
+                        ],
+                        "url": "https://github.com/bblanchon/pdfium-binaries/releases/download/chromium%2F8125/pdfium-linux-x64.tgz",
+                        "sha256": "e1c3ce6e270cb5e0c20816b379ad9f2c1309972697c505f508de92bf5e7d6659",
+                        "dest": "$APP/.dart_tool/hooks_runner/shared/pdfium_dart/build/chromium_8125/linux-x64/"
+                    },
+                    {
+                        "type": "archive",
+                        "only-arches": [
+                            "aarch64"
+                        ],
+                        "url": "https://github.com/bblanchon/pdfium-binaries/releases/download/chromium%2F8125/pdfium-linux-arm64.tgz",
+                        "sha256": "8b8818f2ec57d1b213d952ca6d7f0ffeca9d0110487d0e20ad83ba918bc92efa",
+                        "dest": "$APP/.dart_tool/hooks_runner/shared/pdfium_dart/build/chromium_8125/linux-arm64/"
+                    }
+                ]
+            }
         }
     },
     "powersync": {
@@ -481,6 +575,32 @@
                         "url": "https://github.com/powersync-ja/powersync-sqlite-core/releases/download/v0.4.13/libpowersync_aarch64.linux.so",
                         "sha256": "53a4250821a317705a864e3b4dc2e4cdaacc24ebc1cfe37bdf99148b024c9144",
                         "dest": "$APP/.dart_tool/hooks_runner/shared/powersync/build/download-53a42508",
+                        "dest-filename": "libpowersync_core.so"
+                    }
+                ]
+            }
+        },
+        "2.5.0": {
+            "manifest": {
+                "sources": [
+                    {
+                        "type": "file",
+                        "only-arches": [
+                            "x86_64"
+                        ],
+                        "url": "https://github.com/powersync-ja/powersync-sqlite-core/releases/download/v0.5.3/libpowersync_x64.linux.so",
+                        "sha256": "a6de0c79151ad6243ca18633f0df10bed32b692095fdf0f01ebdac6eb01d2edf",
+                        "dest": "$APP/.dart_tool/hooks_runner/shared/powersync/build/download-a6de0c79",
+                        "dest-filename": "libpowersync_core.so"
+                    },
+                    {
+                        "type": "file",
+                        "only-arches": [
+                            "aarch64"
+                        ],
+                        "url": "https://github.com/powersync-ja/powersync-sqlite-core/releases/download/v0.5.3/libpowersync_aarch64.linux.so",
+                        "sha256": "f27b1cadce2210541903ba2f4e9652782c9e14c913cde4f67c463cec00d46d14",
+                        "dest": "$APP/.dart_tool/hooks_runner/shared/powersync/build/download-f27b1cad",
                         "dest-filename": "libpowersync_core.so"
                     }
                 ]
@@ -514,6 +634,37 @@
                     {
                         "type": "patch",
                         "path": "printing/5.14.2-CMakeLists.txt.patch",
+                        "dest": "$PUB_DEV"
+                    }
+                ]
+            }
+        },
+        "5.15.1": {
+            "manifest": {
+                "sources": [
+                    {
+                        "type": "archive",
+                        "only-arches": [
+                            "x86_64"
+                        ],
+                        "url": "https://github.com/bblanchon/pdfium-binaries/releases/download/chromium%2F7520/pdfium-linux-x64.tgz",
+                        "sha256": "e737634cca16ba28b760077b915b469bea076b71f208769c56fb96ee138e876f",
+                        "dest": "$APP/build/linux/x64/release/pdfium-src/",
+                        "strip-components": 0
+                    },
+                    {
+                        "type": "archive",
+                        "only-arches": [
+                            "aarch64"
+                        ],
+                        "url": "https://github.com/bblanchon/pdfium-binaries/releases/download/chromium%2F7520/pdfium-linux-arm64.tgz",
+                        "sha256": "ee3998f311195bf9cecb3936b2ce3dd621e873277c36f1ca05de36f2646c07d4",
+                        "dest": "$APP/build/linux/arm64/release/pdfium-src/",
+                        "strip-components": 0
+                    },
+                    {
+                        "type": "patch",
+                        "path": "printing/5.15.1-CMakeLists.txt.patch",
                         "dest": "$PUB_DEV"
                     }
                 ]
@@ -941,6 +1092,23 @@
     },
     "super_native_extensions": {
         "0.8.24": {
+            "cargo_locks": [
+                "$PUB_DEV/rust"
+            ],
+            "extra_pubspecs": [
+                "$PUB_DEV/cargokit/build_tool"
+            ],
+            "manifest": {
+                "sources": [
+                    {
+                        "type": "patch",
+                        "path": "cargokit/run_build_tool.sh.patch",
+                        "dest": "$PUB_DEV/cargokit"
+                    }
+                ]
+            }
+        },
+        "0.9.1": {
             "cargo_locks": [
                 "$PUB_DEV/rust"
             ],
