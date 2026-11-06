@@ -12,6 +12,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Without it the `sqlite3` build hook tried to download the library inside the network-less
   sandbox (`Failed host lookup: 'github.com'`).
 
+### Fixed
+- `build-flatpak` action: the Flatpak is now built by calling `flatpak-builder` directly with
+  `--disable-rofiles-fuse` instead of `flathub-build`. On `ubuntu-26.04` runners `rofiles-fuse`
+  failed before any compilation (`fusermount: file descriptor 4 is not a socket`); the build now
+  works on both `ubuntu-24.04` and `ubuntu-26.04`. The other `flathub-build` flags are kept
+  (`--sandbox`, `--ccache`, `--install-deps-from=flathub`, `--mirror-screenshots-url`, ...).
+
+- `build-flatpak` action: the target architecture now falls back to `uname -m` when `flatpak`
+  is not installed yet. On arm64 runners it used to fall back to `x86_64`, so exporting the
+  bundle failed with `Refspec 'app/<id>/x86_64/master' not found`.
+
+### Changed
+- Demo workflow builds the Flatpak on `ubuntu-24.04`, `ubuntu-26.04` and their `-arm` variants.
+
 ## [0.8.7] — 2026-09-30
 
 ### Changed

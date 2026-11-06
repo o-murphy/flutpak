@@ -116,7 +116,7 @@ is gated on a real Flatpak build.
 The CI pipeline runs the full cycle:
 
 1. `flutpak generate --commit <sha>` — generates the manifest and sources
-2. `flatpak-builder` via `flathub-build` — builds and lints the Flatpak
+2. `flatpak-builder` (Flathub flags + `--disable-rofiles-fuse`) — builds and lints the Flatpak
 3. `flatpak install` + smoke test — installs the app and verifies it starts
 
 The demo is intentionally built from the **same git repository** it lives in
@@ -959,7 +959,7 @@ GitHub via `flutter-ref`.
 
 ### `build-flatpak` action
 
-Installs `org.flatpak.Builder`, lints the manifest, builds via `flathub-build`,
+Installs `org.flatpak.Builder`, lints the manifest, builds via `flatpak-builder` (Flathub flags, `--disable-rofiles-fuse`),
 lints the repo, exports a `.flatpak` bundle, and optionally uploads it.
 
 ```yaml
@@ -1132,14 +1132,19 @@ building to catch manifest errors early.
 
 ### 3. Build with flathub-build
 
-`flathub-build` is the same script Flathub CI uses. It runs `flatpak-builder`
-with `--sandbox`, `--install-deps-from=flathub`, `--repo=repo`, and other
-Flathub-specific flags.
+The `build-flatpak` action runs `flatpak-builder` with the same flags as Flathub's
+`flathub-build` script (`--sandbox`, `--install-deps-from=flathub`, `--repo=repo`, ...),
+plus `--disable-rofiles-fuse`. `flathub-build` itself cannot disable `rofiles-fuse`, which
+fails on `ubuntu-26.04` runners (`fusermount: file descriptor 4 is not a socket`).
 
 ```bash
-dbus-run-session flatpak run --command=flathub-build \
-  org.flatpak.Builder \
-  flatpak/generated/<app-id>.yml
+dbus-run-session flatpak run \
+  --filesystem=host \
+  --env=FLATPAK_USER_DIR="$HOME/.local/share/flatpak" \
+  --command=flatpak-builder org.flatpak.Builder \
+  --force-clean --sandbox --disable-rofiles-fuse --user \
+  --install-deps-from=flathub --ccache --repo=repo \
+  builddir flatpak/generated/<app-id>.yml
 ```
 
 ### 4. Lint the built repo

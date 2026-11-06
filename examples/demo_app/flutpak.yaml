@@ -6,7 +6,7 @@ rust:
   version: 1.88.0
   rustup-path: /var/lib/rustup
 
-foreign-deps-ref: 9b8c194d9cea4143fecbc43e0622ba6dabbaf8b5
+foreign-deps-ref: f95beb503124c18907791a791e9662d1826c3b64
 
 repo-url: https://github.com/o-murphy/flutpak.git
 
