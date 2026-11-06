@@ -40,8 +40,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # 24.04 (LTS) and ubuntu-latest (26.04): the build must work on both.
-        os: [ubuntu-24.04, ubuntu-latest]
+        # The build must work on both Ubuntu releases and both architectures.
+        # Explicit labels: `ubuntu-latest` is migrating from 24.04 to 26.04.
+        os: [ubuntu-24.04, ubuntu-26.04, ubuntu-24.04-arm, ubuntu-26.04-arm]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7

@@ -20,7 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`--sandbox`, `--ccache`, `--install-deps-from=flathub`, `--mirror-screenshots-url`, ...).
 
 ### Changed
-- Demo workflow builds the Flatpak on both `ubuntu-24.04` and `ubuntu-latest`.
+- Demo workflow builds the Flatpak on `ubuntu-24.04`, `ubuntu-26.04` and their `-arm` variants.
 
 ## [0.8.7] — 2026-09-30
 
