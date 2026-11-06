@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.8] — 2026-11-06
+
 ### Added
 - Foreign deps registry: `sqlite3` 3.9.0 (prebuilt `libsqlite3` x64/arm64 from `sqlite3-3.9.0`).
   Without it the `sqlite3` build hook tried to download the library inside the network-less
@@ -18,7 +20,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   failed before any compilation (`fusermount: file descriptor 4 is not a socket`); the build now
   works on both `ubuntu-24.04` and `ubuntu-26.04`. The other `flathub-build` flags are kept
   (`--sandbox`, `--ccache`, `--install-deps-from=flathub`, `--mirror-screenshots-url`, ...).
-
 - `build-flatpak` action: the target architecture now falls back to `uname -m` when `flatpak`
   is not installed yet. On arm64 runners it used to fall back to `x86_64`, so exporting the
   bundle failed with `Refspec 'app/<id>/x86_64/master' not found`.
@@ -1280,7 +1281,8 @@ git remote.
   output files
 - MIT License
 
-[Unreleased]: https://github.com/o-murphy/flutpak/compare/v0.8.7...HEAD
+[Unreleased]: https://github.com/o-murphy/flutpak/compare/v0.8.8...HEAD
+[0.8.8]: https://github.com/o-murphy/flutpak/compare/v0.8.7...v0.8.8
 [0.8.7]: https://github.com/o-murphy/flutpak/compare/v0.8.6...v0.8.7
 [0.8.6]: https://github.com/o-murphy/flutpak/compare/v0.8.5...v0.8.6
 [0.8.5]: https://github.com/o-murphy/flutpak/compare/v0.8.4...v0.8.5
