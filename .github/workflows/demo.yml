@@ -35,9 +35,14 @@ jobs:
           artifact-name: flatpak-generated
 
   build:
-    name: Build Flatpak
+    name: Build Flatpak (${{ matrix.os }})
     needs: generate
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 24.04 (LTS) and ubuntu-latest (26.04): the build must work on both.
+        os: [ubuntu-24.04, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
 
@@ -50,7 +55,7 @@ jobs:
         with:
           manifest: flatpak/generated/io.github.o_murphy.flutpak.demo.yml
           app-id: io.github.o_murphy.flutpak.demo
-          artifact-name: demo-flatpak
+          artifact-name: demo-flatpak-${{ matrix.os }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install app from local repo

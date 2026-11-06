@@ -33,28 +33,41 @@ lint_flatpak_manifest() {
     manifest "$(realpath "$manifest_path")"
 }
 
+# Builds the manifest with flatpak-builder directly (not via `flathub-build`).
+#
+# `flathub-build` hardcodes its flatpak-builder arguments and cannot disable
+# rofiles-fuse. On runners where the host fusermount is incompatible with the
+# sandboxed rofiles-fuse (observed on ubuntu-26.04: "fusermount: file descriptor
+# 4 is not a socket"), the build then fails before compiling anything.
+# `--disable-rofiles-fuse` makes flatpak-builder copy instead of hardlink, so it
+# works the same on ubuntu-24.04 and ubuntu-26.04 (and on desktops).
+#
+# The remaining flags mirror those of `flathub-build` so the output is unchanged.
 build_flatpak() {
   local manifest="${1:?Usage: build_flatpak <manifest.yml>}"
-  _dbus_run flatpak run --command=flathub-build org.flatpak.Builder \
-    "$(realpath "$manifest")"
-}
-
-# Local-only variant: calls flatpak-builder directly with --disable-rofiles-fuse.
-# flathub-build doesn't support that flag, causing fusermount to fail on desktops.
-build_flatpak_local() {
-  local manifest="${1:?Usage: build_flatpak_local <manifest.yml>}"
   _dbus_run flatpak run \
     --filesystem=host \
     --env=FLATPAK_USER_DIR="$HOME/.local/share/flatpak" \
     --command=flatpak-builder \
     org.flatpak.Builder \
+    --verbose \
     --force-clean \
+    --sandbox \
+    --disable-rofiles-fuse \
+    --override-source-date-epoch 1321009871 \
     --user \
     --install-deps-from=flathub \
-    --disable-rofiles-fuse \
+    --ccache \
+    --mirror-screenshots-url=https://dl.flathub.org/media \
+    --compose-url-policy=full \
     --repo=repo \
     builddir \
     "$(realpath "$manifest")"
+}
+
+# Kept for backward compatibility: identical to build_flatpak.
+build_flatpak_local() {
+  build_flatpak "$@"
 }
 
 lint_flatpak_repo() {
