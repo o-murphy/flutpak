@@ -13,7 +13,7 @@ inputs:
   arch:
     description: >
       Target architecture (x86_64 or aarch64).
-      Auto-detected from 'flatpak --default-arch' if not set.
+      Auto-detected from `flatpak --default-arch` (or `uname -m` if flatpak is not installed yet) if not set.
     required: false
     default: ""
   bundle:
@@ -58,7 +58,7 @@ runs:
         INPUT_APP_ID: ${{ inputs.app-id }}
       run: |
         ARCH="$INPUT_ARCH"
-        [ -z "$ARCH" ] && ARCH="$(flatpak --default-arch 2>/dev/null || echo x86_64)"
+        [ -z "$ARCH" ] && ARCH="$(flatpak --default-arch 2>/dev/null || uname -m)"
         echo "arch=$ARCH" >> "$GITHUB_OUTPUT"
 
         BUNDLE="$INPUT_BUNDLE"

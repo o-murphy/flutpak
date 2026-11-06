@@ -19,6 +19,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   works on both `ubuntu-24.04` and `ubuntu-26.04`. The other `flathub-build` flags are kept
   (`--sandbox`, `--ccache`, `--install-deps-from=flathub`, `--mirror-screenshots-url`, ...).
 
+- `build-flatpak` action: the target architecture now falls back to `uname -m` when `flatpak`
+  is not installed yet. On arm64 runners it used to fall back to `x86_64`, so exporting the
+  bundle failed with `Refspec 'app/<id>/x86_64/master' not found`.
+
 ### Changed
 - Demo workflow builds the Flatpak on `ubuntu-24.04`, `ubuntu-26.04` and their `-arm` variants.
 
