@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Foreign deps registry: `sqlite3` 3.9.0 (prebuilt `libsqlite3` x64/arm64 from `sqlite3-3.9.0`).
+  Without it the `sqlite3` build hook tried to download the library inside the network-less
+  sandbox (`Failed host lookup: 'github.com'`).
+
 ## [0.8.7] — 2026-09-30
 
 ### Changed
