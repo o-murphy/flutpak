@@ -7,9 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] — 2026-11-13
+
 ### Added
 - **Flutter SDK module for 3.50.0** — pre-built `flutter-sdk-3.50.0.json` added to
   `modules/flutter-sdk/`.
+
+### Fixed
+- `generate`: the `flutter_tools` pubspec.lock fallback now handles Flutter releases that declare a
+  `workspace:` (3.50+). Workspace member pubspecs (`packages/flutter_tools/packages/*`) are fetched
+  and placed next to `pubspec.yaml` before `dart pub get`. Before, it failed with
+  `No workspace packages matching packages/flutter_tools_core`.
 
 ## [0.8.8] — 2026-11-06
 
