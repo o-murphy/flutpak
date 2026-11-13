@@ -250,15 +250,62 @@ class FlutterSdkGenerator {
           'Failed to fetch flutter_tools/pubspec.lock for ref=$flutterRef '
           '(HTTP ${yamlResp.statusCode})');
     }
-    return _generateLockFromPubspecYaml(yamlResp.body);
+    // Newer Flutter releases (e.g. 3.50+) declare a `workspace:` in
+    // flutter_tools/pubspec.yaml whose members live under
+    // packages/flutter_tools/. `dart pub get` needs those member pubspecs
+    // present at the same relative paths, so fetch them too.
+    final members = _parseWorkspaceMembers(yamlResp.body);
+    final memberPubspecs = <String, String>{};
+    for (final member in members) {
+      final memberUrl =
+          '$_rawBase/$flutterRef/packages/flutter_tools/$member/pubspec.yaml';
+      final memberResp = await _client.get(Uri.parse(memberUrl));
+      if (memberResp.statusCode != 200) {
+        throw Exception(
+            'Failed to fetch workspace member $member/pubspec.yaml for '
+            'ref=$flutterRef (HTTP ${memberResp.statusCode})');
+      }
+      memberPubspecs['$member/pubspec.yaml'] = memberResp.body;
+    }
+    return _generateLockFromPubspecYaml(yamlResp.body, memberPubspecs);
   }
 
-  /// Writes [pubspecYaml] to a temp directory, runs `dart pub get`, and
-  /// returns the content of the generated `pubspec.lock`.
-  Future<String> _generateLockFromPubspecYaml(String pubspecYaml) async {
+  /// Extracts the relative member paths from a `workspace:` list in
+  /// [pubspecYaml]. Returns an empty list when there is no workspace.
+  static List<String> _parseWorkspaceMembers(String pubspecYaml) {
+    final members = <String>[];
+    var inWorkspace = false;
+    for (final line in pubspecYaml.split('\n')) {
+      if (RegExp(r'^workspace:\s*$').hasMatch(line)) {
+        inWorkspace = true;
+        continue;
+      }
+      if (!inWorkspace) continue;
+      final item = RegExp(r'^\s+-\s+(\S+)\s*$').firstMatch(line);
+      if (item != null) {
+        members.add(item.group(1)!);
+      } else if (line.trim().isNotEmpty && !line.startsWith(' ')) {
+        break; // next top-level key
+      }
+    }
+    return members;
+  }
+
+  /// Writes [pubspecYaml] (and any [extraFiles], keyed by relative path) to a
+  /// temp directory, runs `dart pub get`, and returns the content of the
+  /// generated `pubspec.lock`.
+  Future<String> _generateLockFromPubspecYaml(
+    String pubspecYaml, [
+    Map<String, String> extraFiles = const {},
+  ]) async {
     final tmpDir = Directory.systemTemp.createTempSync('flutpak_tools_');
     try {
       File(p.join(tmpDir.path, 'pubspec.yaml')).writeAsStringSync(pubspecYaml);
+      for (final entry in extraFiles.entries) {
+        File(p.join(tmpDir.path, entry.key))
+          ..createSync(recursive: true)
+          ..writeAsStringSync(entry.value);
+      }
       final result = await Process.run(
         'dart',
         ['pub', 'get'],
