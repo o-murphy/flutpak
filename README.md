@@ -18,7 +18,7 @@ scaffold your template manifest, then run `flutpak generate` on every CI
 build to produce a fully-substituted, `flatpak-builder`-ready output.
 
 
-## Projects using `flatpak`
+## Projects using `flutpak`
 - [**jrpn**](https://github.com/zathras/jrpn) - A Calculator Simulators Inspired by the HP-15C/HP-16C "Computer Scientist", see it [jrpn15@flathub](https://flathub.org/en/apps/com.jovial.jrpn15) / [jrpn16/@flathub](https://flathub.org/en/apps/com.jovial.jrpn15)
 - [**ebalistyka**](https://github.com/o-murphy/ebalistyka) - A high performance cross-platform ballistic calculator
 
