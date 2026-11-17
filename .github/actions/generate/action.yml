@@ -55,7 +55,7 @@ runs:
   using: composite
   steps:
     - name: Set up Dart SDK
-      uses: dart-lang/setup-dart@v1.8.1
+      uses: dart-lang/setup-dart@v1.8.2
       with:
         sdk: stable
         problem-matcher: false
