@@ -1,0 +1,18 @@
+# Generated fixture for path-dependency tests (not from pub get)
+packages:
+  shared:
+    dependency: "direct main"
+    description:
+      path: "../packages/shared"
+      relative: true
+    source: path
+    version: "0.0.0"
+  path:
+    dependency: "direct main"
+    description:
+      name: path
+      sha256: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    source: hosted
+    version: "1.9.0"
+sdks:
+  dart: ">=3.3.0 <4.0.0"

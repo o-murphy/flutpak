@@ -10,6 +10,7 @@ import '../foreign_deps_registry.dart';
 import '../generators/cargo_sources.dart';
 import '../generators/flutter_sdk.dart';
 import '../generators/manifest_generator.dart';
+import '../generators/path_dependencies.dart';
 import '../generators/pub_sources.dart';
 import '../generators/rustup_generator.dart';
 import '../utils/log.dart';
@@ -136,6 +137,24 @@ class GenerateCommand extends Command<void> {
     if (!PubSourcesGenerator.anyLockExists(effectiveLocks)) {
       logError('pubspec.lock not found: ${effectiveLocks.join(', ')}');
       logError('  Run `flutter pub get` first to resolve dependencies.');
+      exit(1);
+    }
+
+    // Path dependencies must not be silently dropped. In-repo path packages
+    // come with the git checkout; out-of-repo or absolute paths fail clearly.
+    final appDir = (manifestCfg.subdir == null || manifestCfg.subdir!.isEmpty)
+        ? baseDir
+        : p.normalize(p.isAbsolute(manifestCfg.subdir!)
+            ? manifestCfg.subdir!
+            : p.join(baseDir, manifestCfg.subdir!));
+    try {
+      validatePathDependencies(
+        lockFilePaths: effectiveLocks,
+        appDir: appDir,
+        repoRoot: resolveRepoRoot(baseDir),
+      );
+    } on PathDependencyException catch (e) {
+      logError(e.message);
       exit(1);
     }
 

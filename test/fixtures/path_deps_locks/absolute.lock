@@ -1,0 +1,10 @@
+packages:
+  abs_pkg:
+    dependency: "direct main"
+    description:
+      path: "/tmp/some-absolute-package"
+      relative: false
+    source: path
+    version: "0.0.0"
+sdks:
+  dart: ">=3.3.0 <4.0.0"

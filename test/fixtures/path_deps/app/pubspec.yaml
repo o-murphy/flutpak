@@ -1,0 +1,7 @@
+name: path_deps_app
+publish_to: none
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+dependencies:
+  shared:
+    path: ../packages/shared
