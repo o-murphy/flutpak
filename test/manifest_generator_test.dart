@@ -161,6 +161,15 @@ void main() {
       expect(yaml, contains('org.freedesktop.Sdk.Extension.llvm22'));
     });
 
+    test('auto-injects llvm22 as fallback for old unknown runtime version', () {
+      final yaml = _generator(
+        cfg: _baseConfig(command: 'myapp', runtimeVersion: '22.08'),
+        hasFlutter: true,
+      ).generate();
+
+      expect(yaml, contains('org.freedesktop.Sdk.Extension.llvm22'));
+    });
+
     test('does not auto-inject llvm when llvm already in sdk-extensions', () {
       final yaml = _generator(
         cfg: _baseConfig(

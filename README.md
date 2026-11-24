@@ -130,7 +130,7 @@ features added in v0.6.0:
   so they resolve correctly regardless of `subdir:`.
 - **LLVM SDK extension auto-injection** — `runtime-version: '25.08'` is all
   that is needed; `flutpak` injects `org.freedesktop.Sdk.Extension.llvm20`
-  automatically.
+  automatically (`llvm22` for `'26.08'`).
 - **`--config` with a subdirectory path** — the workflow passes
   `--config examples/demo_app/flutpak.yaml`; all paths are resolved relative
   to the config file's directory.

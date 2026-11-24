@@ -113,7 +113,8 @@ class ManifestGenerator {
   }
 
   /// Maps a Freedesktop SDK [runtimeVersion] to its bundled LLVM extension.
-  /// Falls back to llvm22 (latest known) for unrecognised versions.
+  /// Falls back to llvm22 (latest known) for unrecognised versions, older
+  /// ones included; those need the extension set in `sdk-extensions`.
   static String _inferLlvmExtension(String runtimeVersion) {
     const map = {
       '23.08': 'org.freedesktop.Sdk.Extension.llvm17',
