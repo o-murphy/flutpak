@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **LLVM fallback is now llvm22** — runtime versions missing from the mapping get
   `org.freedesktop.Sdk.Extension.llvm22` instead of llvm20. This includes runtimes older than
   23.08, for which neither extension exists on Flathub; set `sdk-extensions` manually there.
+  `generate` logs a warning whenever it falls back.
 
 ## [0.9.0] — 2026-11-13
 
