@@ -142,13 +142,23 @@ void main() {
       expect(yaml, contains('/usr/lib/sdk/llvm19/bin'));
     });
 
-    test('auto-injects llvm20 as fallback for unknown runtime version', () {
+    test('auto-injects llvm22 for Flutter project with runtime 26.08', () {
+      final yaml = _generator(
+        cfg: _baseConfig(command: 'myapp', runtimeVersion: '26.08'),
+        hasFlutter: true,
+      ).generate();
+
+      expect(yaml, contains('org.freedesktop.Sdk.Extension.llvm22'));
+      expect(yaml, contains('/usr/lib/sdk/llvm22/bin'));
+    });
+
+    test('auto-injects llvm22 as fallback for unknown runtime version', () {
       final yaml = _generator(
         cfg: _baseConfig(command: 'myapp', runtimeVersion: '99.08'),
         hasFlutter: true,
       ).generate();
 
-      expect(yaml, contains('org.freedesktop.Sdk.Extension.llvm20'));
+      expect(yaml, contains('org.freedesktop.Sdk.Extension.llvm22'));
     });
 
     test('does not auto-inject llvm when llvm already in sdk-extensions', () {
