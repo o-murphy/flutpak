@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Foreign deps registry: `powersync` 2.6.0 (prebuilt `libpowersync_core` x64/arm64 from
+  `powersync-sqlite-core` v0.5.4).
 - **Flutter SDK module for 3.50.1** — pre-built `flutter-sdk-3.50.1.json` added to
   `modules/flutter-sdk/`.
 
