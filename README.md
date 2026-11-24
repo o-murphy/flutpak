@@ -573,7 +573,7 @@ foreign-deps:
 | `objectbox_flutter_libs`      | 5.3.1, 5.3.2                                          |          |
 | `objectbox_sync_flutter_libs` | 5.3.1, 5.3.2                                          |          |
 | `pdfium_dart`                 | 0.1.2, 0.2.0, 0.2.1, 0.2.2, 0.2.3, 0.4.1             |          |
-| `powersync`                   | 2.1.0, 2.5.0                                         |          |
+| `powersync`                   | 2.1.0, 2.5.0, 2.6.0                                  |          |
 | `printing`                    | 5.14.2, 5.15.1                                        |          |
 | `rhttp`                       | 0.12.0, 0.18.0                                        | cargokit |
 | `simple_secure_storage_linux` | 0.2.5                                                 |          |
