@@ -130,7 +130,7 @@ features added in v0.6.0:
   so they resolve correctly regardless of `subdir:`.
 - **LLVM SDK extension auto-injection** — `runtime-version: '25.08'` is all
   that is needed; `flutpak` injects `org.freedesktop.Sdk.Extension.llvm20`
-  automatically.
+  automatically (`llvm22` for `'26.08'`).
 - **`--config` with a subdirectory path** — the workflow passes
   `--config examples/demo_app/flutpak.yaml`; all paths are resolved relative
   to the config file's directory.
@@ -674,7 +674,7 @@ app-id: io.github.YourOrg.YourApp    # required
 runtime-version: '25.08'             # default: '25.08'
 
 # For Flutter projects, org.freedesktop.Sdk.Extension.llvmXX is auto-injected
-# based on runtime-version (25.08→llvm20, 24.08→llvm19, 23.08→llvm17).
+# based on runtime-version (26.08→llvm22, 25.08→llvm20, 24.08→llvm19, 23.08→llvm17).
 # Add extra extensions manually if needed:
 sdk-extensions:
   - org.freedesktop.Sdk.Extension.rust-stable
@@ -724,7 +724,7 @@ build-options:
 | `runtime-version`                       | string | `25.08`                                      | Freedesktop runtime version                                                                                                                                                                                                                                                                                          |
 | `command`                               | string | last segment of `app-id`                     | Executable name inside `/app/bin/`                                                                                                                                                                                                                                                                                   |
 | `subdir`                                | string | —                                            | Subdirectory within the source tree where the build runs. Emitted as `subdir:` on the app module. Useful when the Flutter project lives in a subdirectory of the git repo. The generated stamp `cp` commands use `$FLATPAK_BUILDER_BUILDDIR` and are unaffected by `subdir:`.                                        |
-| `sdk-extensions`                        | list   | `[]`                                         | For Flutter projects, `llvmXX` is **auto-injected** based on `runtime-version` (25.08 → llvm20, 24.08 → llvm19, 23.08 → llvm17). Add here only extensions beyond llvm (e.g. `rust-stable`).                                                                                                                          |
+| `sdk-extensions`                        | list   | `[]`                                         | For Flutter projects, `llvmXX` is **auto-injected** based on `runtime-version` (26.08 → llvm22, 25.08 → llvm20, 24.08 → llvm19, 23.08 → llvm17). Add here only extensions beyond llvm (e.g. `rust-stable`).                                                                                                                          |
 | `finish-args`                           | list   | `[]`                                         | Extra sandbox permission flags appended after the mandatory Flutter defaults (`--share=ipc`, `--socket=fallback-x11`, `--socket=wayland`, `--device=dri`). Duplicates are silently removed.                                                                                                                          |
 | `sources`                               | list   | `[]`                                         | Verbatim flatpak source entries appended to the app module                                                                                                                                                                                                                                                           |
 | `env`                                   | map    | `{}`                                         | Build-time env vars (shorthand)                                                                                                                                                                                                                                                                                      |

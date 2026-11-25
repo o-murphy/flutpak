@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutpak/flutpak.dart';
 import 'package:test/test.dart';
 import 'package:yaml/yaml.dart';
@@ -142,13 +144,61 @@ void main() {
       expect(yaml, contains('/usr/lib/sdk/llvm19/bin'));
     });
 
-    test('auto-injects llvm20 as fallback for unknown runtime version', () {
+    test('auto-injects llvm22 for Flutter project with runtime 26.08', () {
+      final yaml = _generator(
+        cfg: _baseConfig(command: 'myapp', runtimeVersion: '26.08'),
+        hasFlutter: true,
+      ).generate();
+
+      expect(yaml, contains('org.freedesktop.Sdk.Extension.llvm22'));
+      expect(yaml, contains('/usr/lib/sdk/llvm22/bin'));
+    });
+
+    test('auto-injects llvm22 as fallback for unknown runtime version', () {
       final yaml = _generator(
         cfg: _baseConfig(command: 'myapp', runtimeVersion: '99.08'),
         hasFlutter: true,
       ).generate();
 
-      expect(yaml, contains('org.freedesktop.Sdk.Extension.llvm20'));
+      expect(yaml, contains('org.freedesktop.Sdk.Extension.llvm22'));
+    });
+
+    test('auto-injects llvm22 as fallback for old unknown runtime version', () {
+      final yaml = _generator(
+        cfg: _baseConfig(command: 'myapp', runtimeVersion: '22.08'),
+        hasFlutter: true,
+      ).generate();
+
+      expect(yaml, contains('org.freedesktop.Sdk.Extension.llvm22'));
+    });
+
+    test('warns when falling back for an unknown runtime version', () {
+      final err = _CapturingStdout();
+      IOOverrides.runZoned(
+        () => _generator(
+          cfg: _baseConfig(command: 'myapp', runtimeVersion: '99.08'),
+          hasFlutter: true,
+        ).generate(),
+        stderr: () => err,
+      );
+
+      expect(err.lines, hasLength(1));
+      expect(err.lines.single, contains('WARN'));
+      expect(err.lines.single, contains('99.08'));
+      expect(err.lines.single, contains('llvm22'));
+    });
+
+    test('does not warn for a known runtime version', () {
+      final err = _CapturingStdout();
+      IOOverrides.runZoned(
+        () => _generator(
+          cfg: _baseConfig(command: 'myapp', runtimeVersion: '26.08'),
+          hasFlutter: true,
+        ).generate(),
+        stderr: () => err,
+      );
+
+      expect(err.lines, isEmpty);
     });
 
     test('does not auto-inject llvm when llvm already in sdk-extensions', () {
@@ -514,4 +564,18 @@ void _crlfHelpersTests() {
       expect(patchHasLfLineEndings(''), isFalse);
     });
   });
+}
+
+/// Collects what is written to stderr through [IOOverrides].
+class _CapturingStdout implements Stdout {
+  final lines = <String>[];
+
+  @override
+  bool get supportsAnsiEscapes => false;
+
+  @override
+  void writeln([Object? object = '']) => lines.add('$object');
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }

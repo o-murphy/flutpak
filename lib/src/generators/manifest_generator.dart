@@ -1,4 +1,5 @@
 import '../config.dart';
+import '../utils/log.dart';
 
 /// Generates a Flatpak application manifest YAML from [ManifestConfig].
 ///
@@ -113,14 +114,23 @@ class ManifestGenerator {
   }
 
   /// Maps a Freedesktop SDK [runtimeVersion] to its bundled LLVM extension.
-  /// Falls back to llvm20 (latest known) for unrecognised versions.
+  /// Falls back to llvm22 (latest known) for unrecognised versions, older
+  /// ones included; those need the extension set in `sdk-extensions`. The
+  /// fallback is logged as a warning so it shows up in CI logs.
   static String _inferLlvmExtension(String runtimeVersion) {
     const map = {
       '23.08': 'org.freedesktop.Sdk.Extension.llvm17',
       '24.08': 'org.freedesktop.Sdk.Extension.llvm19',
       '25.08': 'org.freedesktop.Sdk.Extension.llvm20',
+      '26.08': 'org.freedesktop.Sdk.Extension.llvm22',
     };
-    return map[runtimeVersion] ?? 'org.freedesktop.Sdk.Extension.llvm20';
+    const fallback = 'org.freedesktop.Sdk.Extension.llvm22';
+    final ext = map[runtimeVersion];
+    if (ext == null) {
+      logWarn('runtime-version $runtimeVersion is not in the LLVM map, '
+          'falling back to $fallback; set sdk-extensions if this is wrong');
+    }
+    return ext ?? fallback;
   }
 
   void _buildOptions(

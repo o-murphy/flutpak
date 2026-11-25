@@ -8,10 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **LLVM SDK extension for runtime 26.08** — Flutter projects on `runtime-version: '26.08'`
+  now get `org.freedesktop.Sdk.Extension.llvm22` auto-injected (the 26.08 SDK ships LLVM 22).
 - Foreign deps registry: `powersync` 2.6.0 (prebuilt `libpowersync_core` x64/arm64 from
   `powersync-sqlite-core` v0.5.4).
 - **Flutter SDK module for 3.50.1** — pre-built `flutter-sdk-3.50.1.json` added to
   `modules/flutter-sdk/`.
+
+### Changed
+- **LLVM fallback is now llvm22** — runtime versions missing from the mapping get
+  `org.freedesktop.Sdk.Extension.llvm22` instead of llvm20. This includes runtimes older than
+  23.08, for which neither extension exists on Flathub; set `sdk-extensions` manually there.
+  `generate` logs a warning whenever it falls back.
 
 ## [0.9.0] — 2026-11-13
 
