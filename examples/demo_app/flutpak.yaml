@@ -11,7 +11,7 @@ foreign-deps-ref: f95beb503124c18907791a791e9662d1826c3b64
 repo-url: https://github.com/o-murphy/flutpak.git
 
 app-id: io.github.o_murphy.flutpak.demo
-runtime-version: '25.08'
+runtime-version: '26.08'
 command: demo_app
 subdir: examples/demo_app
 
