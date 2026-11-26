@@ -142,16 +142,14 @@ class GenerateCommand extends Command<void> {
 
     // Path dependencies must not be silently dropped. In-repo path packages
     // come with the git checkout; out-of-repo or absolute paths fail clearly.
-    final appDir = (manifestCfg.subdir == null || manifestCfg.subdir!.isEmpty)
-        ? baseDir
-        : p.normalize(p.isAbsolute(manifestCfg.subdir!)
-            ? manifestCfg.subdir!
-            : p.join(baseDir, manifestCfg.subdir!));
+    // Lock `path:` entries are relative to the lock file's directory (the
+    // Flutter app / config directory). Do not join manifest.subdir onto
+    // baseDir — subdir is relative to the repository root and is only a
+    // Flatpak build working-directory hint.
     try {
-      validatePathDependencies(
-        lockFilePaths: effectiveLocks,
-        appDir: appDir,
-        repoRoot: resolveRepoRoot(baseDir),
+      validateGeneratePathDependencies(
+        pubLocks: cfg.pubLocks,
+        baseDir: baseDir,
       );
     } on PathDependencyException catch (e) {
       logError(e.message);
@@ -516,6 +514,29 @@ String injectGeneratedContent({
   }
 
   return editor.toString();
+}
+
+/// Validates `source: path` lock entries the same way [GenerateCommand] does.
+///
+/// [baseDir] is the directory of `flutpak.yaml` and is already the Flutter
+/// app directory. Relative [pubLocks] are resolved against it. Each `path:`
+/// entry is then resolved from the directory that contains its lock file.
+///
+/// `manifest.subdir` is intentionally not taken as an argument: it is
+/// relative to the repository root and must not be joined onto [baseDir].
+List<PathDepClassification> validateGeneratePathDependencies({
+  required List<String> pubLocks,
+  required String baseDir,
+  String? repoRoot,
+}) {
+  final effectiveLocks = pubLocks.map((l) {
+    if (p.isAbsolute(l)) return l;
+    return p.absolute(p.join(baseDir, l));
+  }).toList();
+  return validatePathDependencies(
+    lockFilePaths: effectiveLocks,
+    repoRoot: repoRoot ?? resolveRepoRoot(baseDir),
+  );
 }
 
 /// Merges effective pub locks with extra pubspec paths from the registry and

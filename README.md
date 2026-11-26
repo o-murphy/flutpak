@@ -478,9 +478,12 @@ dependencies:
 
 The app module's git source still checks out the repository root. `subdir:`
 only changes the build working directory, so `../packages/shared` keeps
-resolving in the build tree. Hosted dependencies of those path packages are
-taken from the same `pubspec.lock` as other hosted packages. A warning is
-printed for every path dependency that was found and included this way.
+resolving in the build tree. Lock `path:` entries are resolved from the
+directory that contains the `pubspec.lock` (the Flutter app /
+`flutpak.yaml` directory), not by joining `subdir:` onto that directory.
+Hosted dependencies of those path packages are taken from the same
+`pubspec.lock` as other hosted packages. A warning is printed for every
+path dependency that was found and included this way.
 
 **Rejected** — a path that resolves outside the repository, or an absolute
 `path: /home/me/pkg`. These fail `generate` with an explicit error instead of

@@ -87,8 +87,13 @@ List<PathLockPackage> parsePathPackagesFromLock(String lockFilePath) {
   return out;
 }
 
-/// Classifies a lock path entry against [appDir] (the Flutter project, where
-/// the lock file lives) and [repoRoot] (the git checkout / Flatpak source root).
+/// Classifies a lock path entry against [appDir] and [repoRoot].
+///
+/// [appDir] must be the directory containing the lock file that declared the
+/// path (lock `path:` entries are relative to that file). Do not join
+/// `manifest.subdir` onto the config directory — `subdir` is relative to
+/// the repository root and is only a Flatpak build working-directory hint.
+/// [repoRoot] is the git checkout / Flatpak source root.
 PathDepClassification classifyPathDependency({
   required PathLockPackage package,
   required String appDir,
@@ -133,25 +138,28 @@ String resolveRepoRoot(String startDir) {
 /// Detects path dependencies in [lockFilePaths], warns for each one, and
 /// throws [PathDependencyException] for absolute or out-of-repo paths.
 ///
-/// In-repo path packages are expected to already be present in the git
-/// checkout. The app module's `subdir:` keeps relative `../` layouts working
-/// when the checkout root is the repository root. Hosted dependencies of
-/// those path packages are collected from the same lock file as usual.
+/// Each lock entry is resolved from the directory that contains that lock
+/// file, not from `manifest.subdir`. In-repo path packages are expected to
+/// already be present in the git checkout. The app module's `subdir:` only
+/// changes the Flatpak build working directory, so relative `../` layouts
+/// keep working when the checkout root is the repository root. Hosted
+/// dependencies of those path packages are collected from the same lock
+/// file as usual.
 List<PathDepClassification> validatePathDependencies({
   required List<String> lockFilePaths,
-  required String appDir,
   required String repoRoot,
 }) {
   final seen = <String>{};
   final results = <PathDepClassification>[];
 
   for (final lockPath in lockFilePaths) {
+    final lockAppDir = p.dirname(p.normalize(p.absolute(lockPath)));
     for (final package in parsePathPackagesFromLock(lockPath)) {
       final key = '${package.name}\u0000${package.path}';
       if (!seen.add(key)) continue;
       final classified = classifyPathDependency(
         package: package,
-        appDir: appDir,
+        appDir: lockAppDir,
         repoRoot: repoRoot,
       );
       results.add(classified);
