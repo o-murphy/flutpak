@@ -10,6 +10,7 @@ import '../foreign_deps_registry.dart';
 import '../generators/cargo_sources.dart';
 import '../generators/flutter_sdk.dart';
 import '../generators/manifest_generator.dart';
+import '../generators/path_dependencies.dart';
 import '../generators/pub_sources.dart';
 import '../generators/rustup_generator.dart';
 import '../utils/log.dart';
@@ -136,6 +137,22 @@ class GenerateCommand extends Command<void> {
     if (!PubSourcesGenerator.anyLockExists(effectiveLocks)) {
       logError('pubspec.lock not found: ${effectiveLocks.join(', ')}');
       logError('  Run `flutter pub get` first to resolve dependencies.');
+      exit(1);
+    }
+
+    // Path dependencies must not be silently dropped. In-repo path packages
+    // come with the git checkout; out-of-repo or absolute paths fail clearly.
+    // Lock `path:` entries are relative to the lock file's directory (the
+    // Flutter app / config directory). Do not join manifest.subdir onto
+    // baseDir — subdir is relative to the repository root and is only a
+    // Flatpak build working-directory hint.
+    try {
+      validateGeneratePathDependencies(
+        pubLocks: cfg.pubLocks,
+        baseDir: baseDir,
+      );
+    } on PathDependencyException catch (e) {
+      logError(e.message);
       exit(1);
     }
 
@@ -497,6 +514,29 @@ String injectGeneratedContent({
   }
 
   return editor.toString();
+}
+
+/// Validates `source: path` lock entries the same way [GenerateCommand] does.
+///
+/// [baseDir] is the directory of `flutpak.yaml` and is already the Flutter
+/// app directory. Relative [pubLocks] are resolved against it. Each `path:`
+/// entry is then resolved from the directory that contains its lock file.
+///
+/// `manifest.subdir` is intentionally not taken as an argument: it is
+/// relative to the repository root and must not be joined onto [baseDir].
+List<PathDepClassification> validateGeneratePathDependencies({
+  required List<String> pubLocks,
+  required String baseDir,
+  String? repoRoot,
+}) {
+  final effectiveLocks = pubLocks.map((l) {
+    if (p.isAbsolute(l)) return l;
+    return p.absolute(p.join(baseDir, l));
+  }).toList();
+  return validatePathDependencies(
+    lockFilePaths: effectiveLocks,
+    repoRoot: repoRoot ?? resolveRepoRoot(baseDir),
+  );
 }
 
 /// Merges effective pub locks with extra pubspec paths from the registry and

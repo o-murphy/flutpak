@@ -1,0 +1,10 @@
+packages:
+  elsewhere:
+    dependency: "direct main"
+    description:
+      path: "../../totally_outside"
+      relative: true
+    source: path
+    version: "0.0.0"
+sdks:
+  dart: ">=3.3.0 <4.0.0"
